@@ -12,6 +12,7 @@ ENV https_proxy="http://proxy.ameritas.com:8080"
 ENV NO_PROXY="localhost,127.0.0.1,registry-1.docker.io"
 #ENV SSL_CERT_FILE="/etc/ssl/cert.pem"
 #ENV REQUESTS_CA_BUNDLE="/etc/ssl/cert.pem"
+ENV UI_LOGO_PATH="/app/litellm/proxy/logo.jpg"
 
 
 
@@ -53,6 +54,8 @@ ENV https_proxy="http://proxy.ameritas.com:8080"
 ENV NO_PROXY="localhost,127.0.0.1,registry-1.docker.io"
 #ENV SSL_CERT_FILE="/etc/ssl/cert.pem"
 #ENV REQUESTS_CA_BUNDLE="/etc/ssl/cert.pem"
+ENV UI_LOGO_PATH="/app/litellm/proxy/logo.jpg"
+
 
 
 # Install runtime packages only
