@@ -235,6 +235,8 @@ Example setting a local image (on your container)
 ```shell
 UI_LOGO_PATH="ui_images/logo.jpg"
 ```
+
+To bundle a default logo directly with the UI build, set `NEXT_PUBLIC_LOGO_PATH` to the path of an image placed under `ui/litellm-dashboard/public/` before building the dashboard.
 #### Set Custom Color Theme
 - Navigate to [/enterprise/enterprise_ui](https://github.com/BerriAI/litellm/blob/main/enterprise/enterprise_ui/_enterprise_colors.json)
 - Inside the `enterprise_ui` directory, rename `_enterprise_colors.json` to `enterprise_colors.json`

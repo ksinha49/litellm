@@ -159,9 +159,9 @@ const UIThemeSettings: React.FC<UIThemeSettingsProps> = ({
               Current Logo
             </Text>
             <div className="bg-gray-50 rounded-lg p-6 flex items-center justify-center min-h-[120px]">
-              {logoUrlInput ? (
-                <img 
-                  src={logoUrlInput} 
+              {(logoUrlInput || logoUrl) ? (
+                <img
+                  src={logoUrlInput || logoUrl!}
                   alt="Custom logo"
                   className="max-w-full max-h-24 object-contain"
                   onError={(e) => {
