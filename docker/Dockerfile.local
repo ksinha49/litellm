@@ -1,0 +1,78 @@
+# syntax=docker/dockerfile:1
+
+# ---- Builder stage ----
+FROM registry.access.redhat.com/ubi9/python-311 AS builder
+USER root
+WORKDIR /app
+
+ENV HTTP_PROXY="http://proxy.ameritas.com:8080"
+ENV http_proxy="http://proxy.ameritas.com:8080"
+ENV HTTPS_PROXY="http://proxy.ameritas.com:8080"
+ENV https_proxy="http://proxy.ameritas.com:8080"
+ENV NO_PROXY="localhost,127.0.0.1,registry-1.docker.io"
+#ENV SSL_CERT_FILE="/etc/ssl/cert.pem"
+#ENV REQUESTS_CA_BUNDLE="/etc/ssl/cert.pem"
+
+
+
+# Install build tools
+RUN dnf -y update && \
+    dnf -y install gcc python3-devel openssl-devel && \
+    dnf clean all
+
+# Upgrade pip and install build module
+RUN pip install --no-cache-dir --upgrade pip build
+
+# Copy source code
+COPY . .
+
+# Build the admin UI
+RUN chmod +x docker/build_admin_ui.sh && ./docker/build_admin_ui.sh
+
+# Build wheel for the project
+RUN rm -rf dist/* && python -m build
+
+# Collect all wheels for offline install
+RUN pip wheel --no-cache-dir --wheel-dir=/wheels -r requirements.txt
+
+# Ensure PyJWT version consistency
+RUN pip uninstall -y jwt PyJWT && \
+    pip install --no-cache-dir PyJWT==2.9.0
+
+# ---- Runtime stage ----
+FROM registry.access.redhat.com/ubi9/python-311
+
+USER root
+WORKDIR /app
+
+
+ENV HTTP_PROXY="http://proxy.ameritas.com:8080"
+ENV http_proxy="http://proxy.ameritas.com:8080"
+ENV HTTPS_PROXY="http://proxy.ameritas.com:8080"
+ENV https_proxy="http://proxy.ameritas.com:8080"
+ENV NO_PROXY="localhost,127.0.0.1,registry-1.docker.io"
+#ENV SSL_CERT_FILE="/etc/ssl/cert.pem"
+#ENV REQUESTS_CA_BUNDLE="/etc/ssl/cert.pem"
+
+
+# Install runtime packages only
+RUN dnf -y update && \
+    dnf -y install tzdata openssl && \
+    dnf clean all
+
+# Copy source and prebuilt wheels
+COPY . .
+COPY --from=builder /app/dist/*.whl .
+COPY --from=builder /wheels /wheels
+
+# Install from wheels without contacting PyPI
+RUN pip install --no-cache-dir *.whl /wheels/* --no-index --find-links=/wheels && \
+    rm -f *.whl && rm -rf /wheels
+
+# Generate prisma client and make entrypoints executable
+RUN prisma generate && \
+    chmod +x docker/entrypoint.sh docker/prod_entrypoint.sh
+
+EXPOSE 4000
+ENTRYPOINT ["docker/prod_entrypoint.sh"]
+CMD ["--port", "4000"]
