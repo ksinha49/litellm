@@ -1130,7 +1130,7 @@ Model Info:
         email_logo_url: Optional[str] = None,
         email_support_contact: Optional[str] = None,
     ):
-        from litellm.proxy.proxy_server import CommonProxyErrors, premium_user
+        from litellm.proxy.proxy_server import CommonProxyErrors
 
         if premium_user is not True:
             if email_logo_url is not None or email_support_contact is not None:
