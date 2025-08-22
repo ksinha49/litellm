@@ -8,6 +8,7 @@ from fastapi import HTTPException, Request, status
 from litellm import Router, provider_list
 from litellm._logging import verbose_proxy_logger
 from litellm.proxy._types import *
+from litellm.proxy.utils import _premium_user_check
 from litellm.types.router import CONFIGURABLE_CLIENTSIDE_AUTH_PARAMS
 
 
@@ -195,7 +196,7 @@ async def pre_db_read_auth_checks(
     Raises:
     - HTTPException if request fails initial auth checks
     """
-    from litellm.proxy.proxy_server import general_settings, llm_router, premium_user
+    from litellm.proxy.proxy_server import general_settings, llm_router
 
     # Check 1. request size
     await check_if_request_size_is_safe(request=request)
@@ -225,11 +226,8 @@ async def pre_db_read_auth_checks(
 
     # Check 4. Check if request route is an allowed route on the proxy
     if "allowed_routes" in general_settings:
+        _premium_user_check()
         _allowed_routes = general_settings["allowed_routes"]
-        if premium_user is not True:
-            verbose_proxy_logger.error(
-                f"Trying to set allowed_routes. This is an Enterprise feature. {CommonProxyErrors.not_premium_user.value}"
-            )
         if route not in _allowed_routes:
             verbose_proxy_logger.error(
                 f"Route {route} not in allowed_routes={_allowed_routes}"
@@ -261,13 +259,10 @@ def route_in_additonal_public_routes(current_route: str):
     ```
     """
 
-    # check if user is premium_user - if not do nothing
-    from litellm.proxy.proxy_server import general_settings, premium_user
+    from litellm.proxy.proxy_server import general_settings
 
     try:
-        if premium_user is not True:
-            return False
-        # check if this is defined on the config
+        _premium_user_check()
         if general_settings is None:
             return False
 
@@ -317,18 +312,12 @@ async def check_if_request_size_is_safe(request: Request) -> bool:
         ProxyException: If the request size is too large
 
     """
-    from litellm.proxy.proxy_server import general_settings, premium_user
+    from litellm.proxy.proxy_server import general_settings
 
     max_request_size_mb = general_settings.get("max_request_size_mb", None)
 
     if max_request_size_mb is not None:
-        # Check if premium user
-        if premium_user is not True:
-            verbose_proxy_logger.warning(
-                f"using max_request_size_mb - not checking -  this is an enterprise only feature. {CommonProxyErrors.not_premium_user.value}"
-            )
-            return True
-
+        _premium_user_check()
         # Get the request body
         content_length = request.headers.get("content-length")
 
@@ -382,17 +371,11 @@ async def check_response_size_is_safe(response: Any) -> bool:
 
     """
 
-    from litellm.proxy.proxy_server import general_settings, premium_user
+    from litellm.proxy.proxy_server import general_settings
 
     max_response_size_mb = general_settings.get("max_response_size_mb", None)
     if max_response_size_mb is not None:
-        # Check if premium user
-        if premium_user is not True:
-            verbose_proxy_logger.warning(
-                f"using max_response_size_mb - not checking -  this is an enterprise only feature. {CommonProxyErrors.not_premium_user.value}"
-            )
-            return True
-
+        _premium_user_check()
         response_size_mb = bytes_to_mb(bytes_value=sys.getsizeof(response))
         verbose_proxy_logger.debug(f"response size in MB={response_size_mb}")
         if response_size_mb > max_response_size_mb:

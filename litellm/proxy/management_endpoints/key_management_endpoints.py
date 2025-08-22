@@ -60,6 +60,7 @@ from litellm.proxy.utils import (
     handle_exception_on_proxy,
     is_valid_api_key,
     jsonify_object,
+    _premium_user_check,
 )
 from litellm.router import Router
 from litellm.secret_managers.main import get_secret
@@ -299,7 +300,6 @@ def common_key_access_checks(
     user_api_key_dict: UserAPIKeyAuth,
     data: Union[GenerateKeyRequest, UpdateKeyRequest],
     llm_router: Optional[Router],
-    premium_user: bool,
 ) -> Literal[True]:
     """
     Check if user is allowed to make a key request, for this key
@@ -324,7 +324,6 @@ def common_key_access_checks(
     _check_model_access_group(
         models=data.models,
         llm_router=llm_router,
-        premium_user=premium_user,
     )
     return True
 
@@ -356,7 +355,6 @@ async def _common_key_generation_helper(  # noqa: PLR0915
     from litellm.proxy.proxy_server import (
         litellm_proxy_admin_name,
         llm_router,
-        premium_user,
         prisma_client,
     )
 
@@ -364,7 +362,6 @@ async def _common_key_generation_helper(  # noqa: PLR0915
         user_api_key_dict=user_api_key_dict,
         data=data,
         llm_router=llm_router,
-        premium_user=premium_user,
     )
 
     if (
@@ -497,12 +494,7 @@ async def _common_key_generation_helper(  # noqa: PLR0915
 
     # Set tags on the new key
     if "tags" in data_json:
-        from litellm.proxy.proxy_server import premium_user
-
-        if premium_user is not True and data_json["tags"] is not None:
-            raise ValueError(
-                f"Only premium users can add tags to keys. {CommonProxyErrors.not_premium_user.value}"
-            )
+        _premium_user_check()
 
         _metadata = data_json.get("metadata")
         if not _metadata:
@@ -821,8 +813,6 @@ def prepare_metadata_fields(
                 else:
                     casted_metadata[k] = v
             if k in LiteLLM_ManagementEndpoint_MetadataFields_Premium:
-                from litellm.proxy.utils import _premium_user_check
-
                 _premium_user_check()
                 casted_metadata[k] = v
 
@@ -1031,7 +1021,6 @@ async def update_key_fn(
     """
     from litellm.proxy.proxy_server import (
         llm_router,
-        premium_user,
         prisma_client,
         proxy_logging_obj,
         user_api_key_cache,
@@ -1049,7 +1038,6 @@ async def update_key_fn(
             user_api_key_dict=user_api_key_dict,
             data=data,
             llm_router=llm_router,
-            premium_user=premium_user,
         )
 
         existing_key_row = await prisma_client.get_data(
@@ -1469,7 +1457,7 @@ async def info_key_fn(
 
 
 def _check_model_access_group(
-    models: Optional[List[str]], llm_router: Optional[Router], premium_user: bool
+    models: Optional[List[str]], llm_router: Optional[Router]
 ) -> Literal[True]:
     """
     if is_model_access_group is True + is_wildcard_route is True, check if user is a premium user
@@ -1483,15 +1471,7 @@ def _check_model_access_group(
         if llm_router._is_model_access_group_for_wildcard_route(
             model_access_group=model
         ):
-            if not premium_user:
-                raise HTTPException(
-                    status_code=status.HTTP_403_FORBIDDEN,
-                    detail={
-                        "error": "Setting a model access group on a wildcard model is only available for LiteLLM Enterprise users.{}".format(
-                            CommonProxyErrors.not_premium_user.value
-                        )
-                    },
-                )
+            _premium_user_check()
 
     return True
 
@@ -1550,7 +1530,7 @@ async def generate_key_helper_fn(  # noqa: PLR0915
     ] = None,  # object_permission_id <-> LiteLLM_ObjectPermissionTable
     object_permission: Optional[LiteLLM_ObjectPermissionBase] = None,
 ):
-    from litellm.proxy.proxy_server import premium_user, prisma_client
+    from litellm.proxy.proxy_server import prisma_client
 
     if prisma_client is None:
         raise Exception(
@@ -1673,13 +1653,8 @@ async def generate_key_helper_fn(  # noqa: PLR0915
         if isinstance(saved_token["metadata"], str):
             saved_token["metadata"] = json.loads(saved_token["metadata"])
         if isinstance(saved_token["permissions"], str):
-            if (
-                "get_spend_routes" in saved_token["permissions"]
-                and premium_user is not True
-            ):
-                raise ValueError(
-                    "get_spend_routes permission is only available for LiteLLM Enterprise users"
-                )
+            if "get_spend_routes" in saved_token["permissions"]:
+                _premium_user_check()
 
             saved_token["permissions"] = json.loads(saved_token["permissions"])
         if isinstance(saved_token["model_max_budget"], str):
@@ -2109,20 +2084,14 @@ async def regenerate_key_fn(
         from litellm.proxy.proxy_server import (
             hash_token,
             master_key,
-            premium_user,
             prisma_client,
             proxy_logging_obj,
             user_api_key_cache,
         )
-
         is_master_key_regeneration = data and data.new_master_key is not None
 
-        if (
-            premium_user is not True and not is_master_key_regeneration
-        ):  # allow master key regeneration for non-premium users
-            raise ValueError(
-                f"Regenerating Virtual Keys is an Enterprise feature, {CommonProxyErrors.not_premium_user.value}"
-            )
+        if not is_master_key_regeneration:
+            _premium_user_check()
 
         # Check if key exists, raise exception if key is not in the DB
         key = data.key if data and data.key else key
@@ -3149,12 +3118,7 @@ def validate_model_max_budget(model_max_budget: Optional[Dict]) -> None:
         if len(model_max_budget) == 0:
             return
         if model_max_budget is not None:
-            from litellm.proxy.proxy_server import CommonProxyErrors, premium_user
-
-            if premium_user is not True:
-                raise ValueError(
-                    f"You must have an enterprise license to set model_max_budget. {CommonProxyErrors.not_premium_user.value}"
-                )
+            _premium_user_check()
             for _model, _budget_info in model_max_budget.items():
                 assert isinstance(_model, str)
 
