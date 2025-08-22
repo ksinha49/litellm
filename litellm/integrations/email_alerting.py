@@ -66,11 +66,28 @@ async def get_all_team_member_emails(team_id: Optional[str] = None) -> list:
     return emails
 
 
+async def _check_if_using_premium_email_feature(
+    premium_user: bool,
+    email_logo_url: Optional[str] = None,
+    email_support_contact: Optional[str] = None,
+) -> None:
+    """Ensure email customization is limited to premium users."""
+    from litellm.proxy.proxy_server import CommonProxyErrors
+
+    if premium_user is not True:
+        if email_logo_url is not None or email_support_contact is not None:
+            raise ValueError(
+                f"Trying to Customize Email Alerting\n {CommonProxyErrors.not_premium_user.value}"
+            )
+    return
+
+
 async def send_team_budget_alert(webhook_event: WebhookEvent) -> bool:
     """
     Send an Email Alert to All Team Members when the Team Budget is crossed
     Returns -> True if sent, False if not.
     """
+    from litellm.proxy.proxy_server import premium_user
     from litellm.proxy.utils import send_email
 
     _team_id = webhook_event.team_id
@@ -82,9 +99,9 @@ async def send_team_budget_alert(webhook_event: WebhookEvent) -> bool:
     email_logo_url = os.getenv("SMTP_SENDER_LOGO", os.getenv("EMAIL_LOGO_URL", None))
     email_support_contact = os.getenv("EMAIL_SUPPORT_CONTACT", None)
 
-    # await self._check_if_using_premium_email_feature(
-    #     premium_user, email_logo_url, email_support_contact
-    # )
+    await _check_if_using_premium_email_feature(
+        premium_user, email_logo_url, email_support_contact
+    )
 
     if email_logo_url is None:
         email_logo_url = LITELLM_LOGO_URL
