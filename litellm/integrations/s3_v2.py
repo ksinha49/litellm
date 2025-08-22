@@ -381,14 +381,9 @@ class S3Logger(CustomBatchLogger, BaseAWSLLM):
         )
 
         s3_object_download_filename = (
-            "time-"
-            + start_time.strftime("%Y-%m-%dT%H-%M-%S-%f")
-            + "_"
-            + standard_logging_payload["id"]
-            + ".json"
+            f"time-{start_time.strftime('%Y-%m-%dT%H-%M-%S-%f')}"
+            f"_{standard_logging_payload['id']}.json"
         )
-
-        s3_object_download_filename = f"time-{start_time.strftime('%Y-%m-%dT%H-%M-%S-%f')}_{standard_logging_payload['id']}.json"
 
         return s3BatchLoggingElement(
             payload=dict(standard_logging_payload),
@@ -564,5 +559,7 @@ class S3Logger(CustomBatchLogger, BaseAWSLLM):
             downloaded_object = await self._download_object_from_s3(object_key)
             return downloaded_object
         except Exception as e:
-            verbose_logger.exception(f"Error retrieving object {object_key} from cold storage: {str(e)}")
+            verbose_logger.exception(
+                f"Error retrieving object {object_key} from cold storage: {str(e)}"
+            )
             return None

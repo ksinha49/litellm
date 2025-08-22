@@ -47,6 +47,7 @@ from litellm.types.utils import (
     StandardPassThroughResponseObject,
     TextCompletionResponse,
 )
+from litellm import _custom_logger_compatible_callbacks_literal
 
 from .types_utils.utils import get_instance_fn, validate_custom_validate_return_type
 
@@ -1531,6 +1532,33 @@ class DynamoDBArgs(LiteLLMPydanticObjectBase):
     assume_role_aws_session_name: Optional[str] = None
 
 
+class S3CallbackParams(LiteLLMPydanticObjectBase):
+    """Configuration for S3 logging callbacks."""
+
+    s3_bucket_name: str = Field(description="AWS S3 bucket name for storing logs")
+    s3_region_name: str = Field(description="AWS region where the bucket is located")
+    s3_aws_access_key_id: Optional[str] = Field(
+        default=None, description="AWS access key id used for S3"
+    )
+    s3_aws_secret_access_key: Optional[str] = Field(
+        default=None, description="AWS secret access key used for S3"
+    )
+    s3_path: Optional[str] = Field(
+        default=None, description="Optional path prefix within the bucket"
+    )
+
+
+class ConfigLiteLLMSettings(LiteLLMPydanticObjectBase):
+    """liteLLM module level settings."""
+
+    s3_callback_params: Optional[S3CallbackParams] = Field(
+        default=None,
+        description="Parameters for configuring the S3 logging callback",
+    )
+
+    model_config = ConfigDict(extra="allow")
+
+
 class PassThroughGenericEndpoint(LiteLLMPydanticObjectBase):
     id: Optional[str] = Field(
         default=None,
@@ -1698,6 +1726,10 @@ class ConfigGeneralSettings(LiteLLMPydanticObjectBase):
         default=None,
         description="Set-up pass-through endpoints for provider-specific endpoints. Docs - https://docs.litellm.ai/docs/proxy/pass_through",
     )
+    cold_storage_custom_logger: Optional[_custom_logger_compatible_callbacks_literal] = Field(
+        default=None,
+        description="Custom logger to use for cold storage retrieval e.g. 's3_v2'",
+    )
 
 
 class ConfigYAML(LiteLLMPydanticObjectBase):
@@ -1713,7 +1745,7 @@ class ConfigYAML(LiteLLMPydanticObjectBase):
         None,
         description="List of supported models on the server, with model-specific configs",
     )
-    litellm_settings: Optional[dict] = Field(
+    litellm_settings: Optional[ConfigLiteLLMSettings] = Field(
         None,
         description="litellm Module settings. See __init__.py for all, example litellm.drop_params=True, litellm.set_verbose=True, litellm.api_base, litellm.cache",
     )
@@ -2239,6 +2271,18 @@ class AllCallbacks(LiteLLMPydanticObjectBase):
             "AWS_ACCESS_KEY_ID",
             "AWS_SECRET_ACCESS_KEY",
             "AWS_REGION_NAME",
+        ],
+    )
+
+    s3_v2: CallbackOnUI = CallbackOnUI(
+        litellm_callback_name="s3_v2",
+        ui_callback_name="s3 Bucket (AWS) V2",
+        litellm_callback_params=[
+            "S3_BUCKET_NAME",
+            "S3_REGION_NAME",
+            "AWS_ACCESS_KEY_ID",
+            "AWS_SECRET_ACCESS_KEY",
+            "S3_PATH",
         ],
     )
 
