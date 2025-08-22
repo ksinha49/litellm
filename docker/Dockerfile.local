@@ -65,12 +65,17 @@ RUN dnf -y update && \
 
 # Copy source and prebuilt wheels
 COPY . .
+COPY docker/fetch_litellm_settings.sh docker/
 COPY --from=builder /app/dist/*.whl .
 COPY --from=builder /wheels /wheels
 
 # Install from wheels without contacting PyPI
 RUN pip install --no-cache-dir *.whl /wheels/* --no-index --find-links=/wheels && \
     rm -f *.whl && rm -rf /wheels
+
+# Fetch runtime settings from AWS SSM
+RUN yum install -y awscli && \
+    docker/fetch_litellm_settings.sh
 
 # Generate prisma client and make entrypoints executable
 RUN prisma generate && \

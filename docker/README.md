@@ -63,3 +63,27 @@ docker-compose down
 
 -   **`build_admin_ui.sh: not found`**: This error can occur if the Docker build context is not set correctly. Ensure that you are running the `docker-compose` command from the root of the project.
 -   **`Master key is not initialized`**: This error means the `MASTER_key` environment variable is not set. Make sure you have created a `.env` file in the project root with the `MASTER_KEY` defined.
+
+## Fetching LiteLLM settings from AWS SSM
+
+`docker/Dockerfile.local` runs `docker/fetch_litellm_settings.sh` during the image build. The script reads configuration values from AWS Systems Manager Parameter Store and writes them to `/app/litellm_settings.yaml` so the proxy starts with S3 logging enabled.
+
+### Required IAM permissions
+
+The instance or build role must have permission to read the parameters:
+
+```
+ssm:GetParameter
+```
+
+### Parameter naming convention
+
+Parameters are expected at the following paths (replace `<env>` with your environment name):
+
+```
+/parameters/litellm/<env>/S3_BUCKET_NAME
+/parameters/litellm/<env>/S3_REGION_NAME
+/parameters/litellm/<env>/LOG_LEVEL
+```
+
+The script automatically detects the AWS region using the instance metadata service if `S3_REGION_NAME` is not defined.
