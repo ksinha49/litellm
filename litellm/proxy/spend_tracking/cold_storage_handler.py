@@ -92,3 +92,4 @@ class ColdStorageHandler:
         return cast(
             _custom_logger_compatible_callbacks_literal, cold_storage_custom_logger
         )
+

@@ -1326,6 +1326,8 @@ model_list:
  - model_name: gpt-3.5-turbo
     litellm_params:
       model: gpt-3.5-turbo
+general_settings:
+  cold_storage_custom_logger: s3_v2
 litellm_settings:
   success_callback: ["s3_v2"]
   s3_callback_params:
