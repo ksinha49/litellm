@@ -7940,6 +7940,9 @@ def get_app_name():
 def get_logo_url():
     """Get the current logo URL from environment"""
     logo_path = os.getenv("UI_LOGO_PATH", "")
+    if logo_path and not logo_path.startswith(("http://", "https://")):
+        # If the path is local, serve it through /get_image
+        return {"logo_url": "/get_image"}
     return {"logo_url": logo_path}
 
 
@@ -7951,7 +7954,19 @@ def get_image():
     current_dir = os.path.dirname(os.path.abspath(__file__))
     default_logo = os.path.join(current_dir, "logo.jpg")
 
-    logo_path = os.getenv("UI_LOGO_PATH", default_logo)
+    logo_path_setting = os.getenv("UI_LOGO_PATH", "")
+    if not logo_path_setting:
+        logo_path = default_logo
+    elif logo_path_setting.startswith(("http://", "https://")):
+        logo_path = logo_path_setting
+    else:
+        # Treat as path relative to current_dir if not absolute
+        logo_path = (
+            logo_path_setting
+            if os.path.isabs(logo_path_setting)
+            else os.path.join(current_dir, logo_path_setting)
+        )
+
     verbose_proxy_logger.debug("Reading logo from path: %s", logo_path)
 
     # Check if the logo path is an HTTP/HTTPS URL

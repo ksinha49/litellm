@@ -2,7 +2,7 @@ import Link from "next/link"
 import React, { useState, useEffect } from "react"
 import type { MenuProps } from "antd"
 import { Dropdown, Tooltip } from "antd"
-import { getProxyBaseUrl, Organization } from "@/components/networking"
+import { Organization } from "@/components/networking"
 import { defaultOrg } from "@/components/common_components/default_org"
 import { 
   UserOutlined,
@@ -39,12 +39,8 @@ const Navbar: React.FC<NavbarProps> = ({
   accessToken,
   isPublicPage = false,
 }) => {
-  const baseUrl = getProxyBaseUrl();
   const [logoutUrl, setLogoutUrl] = useState("");
   const { logoUrl } = useTheme();
-  
-  // Simple logo URL: use custom logo if available, otherwise default
-  const imageUrl = logoUrl || `${baseUrl}/get_image`;
 
   useEffect(() => {
     const initializeProxySettings = async () => {
@@ -132,11 +128,13 @@ const Navbar: React.FC<NavbarProps> = ({
           {/* Left side with correct logo positioning */}
           <div className="flex items-center flex-shrink-0">
             <Link href="/" className="flex items-center">
-              <img
-                src={imageUrl}
-                alt="LiteLLM Brand"
-                className="h-8 w-auto"
-              />
+              {logoUrl && (
+                <img
+                  src={logoUrl}
+                  alt="LiteLLM Brand"
+                  className="h-8 w-auto"
+                />
+              )}
             </Link>
           </div>
 
