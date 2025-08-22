@@ -41,7 +41,7 @@ If `db.useStackgresOperator` is used (not yet implemented):
 
 ### Environment Variables
 
-- `LITELLM_PREMIUM_USER`: Override premium license detection. Set to `"True"` to enable enterprise features or `"False"` to disable them. When unset, the proxy will perform its standard license check.
+- `LITELLM_PREMIUM_USER`: Override premium license detection. Set to `"True"` to enable enterprise features or `"False"` to disable them. Defaults to `true` when unset.
 
 #### Example `environmentSecrets` Secret
 
