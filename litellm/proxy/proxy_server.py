@@ -452,7 +452,12 @@ except ImportError:
 
 server_root_path = os.getenv("SERVER_ROOT_PATH", "")
 _license_check = LicenseCheck()
-premium_user: bool = _license_check.is_premium()
+_premium_user_env = os.getenv("LITELLM_PREMIUM_USER")
+premium_user: bool = (
+    _premium_user_env.lower() in ["true", "1", "yes"]
+    if _premium_user_env is not None
+    else _license_check.is_premium()
+)
 premium_user_data: Optional["EnterpriseLicenseData"] = (
     _license_check.airgapped_license_data
 )
@@ -554,13 +559,16 @@ async def proxy_startup_event(app: FastAPI):
 
     init_verbose_loggers()
     ## CHECK PREMIUM USER
+    _premium_user_env = os.getenv("LITELLM_PREMIUM_USER")
+    if _premium_user_env is not None:
+        premium_user = _premium_user_env.lower() in ["true", "1", "yes"]
+    else:
+        premium_user = _license_check.is_premium()
     verbose_proxy_logger.debug(
         "litellm.proxy.proxy_server.py::startup() - CHECKING PREMIUM USER - {}".format(
             premium_user
         )
     )
-    if premium_user is False:
-        premium_user = _license_check.is_premium()
 
     ## CHECK MASTER KEY IN ENVIRONMENT ##
     master_key = get_secret_str("LITELLM_MASTER_KEY")

@@ -39,7 +39,11 @@ If `db.useStackgresOperator` is used (not yet implemented):
 | `proxy_config.*`                                           | See [values.yaml](./values.yaml) for default settings.  See [example_config_yaml](../../../litellm/proxy/example_config_yaml/) for configuration examples.                            | N/A  |
 | `extraContainers[]`                                        | An array of additional containers to be deployed as sidecars alongside the LiteLLM Proxy.                                                                                             | `[]`  |
 
-#### Example `environmentSecrets` Secret 
+### Environment Variables
+
+- `LITELLM_PREMIUM_USER`: Override premium license detection. Set to `"True"` to enable enterprise features or `"False"` to disable them. When unset, the proxy will perform its standard license check.
+
+#### Example `environmentSecrets` Secret
 
 ```
 apiVersion: v1
