@@ -57,6 +57,7 @@ ENV NO_PROXY="localhost,127.0.0.1,registry-1.docker.io"
 ENV UI_LOGO_PATH="/app/litellm/proxy/logo.jpg"
 
 
+
 # Install runtime packages only
 RUN dnf -y update && \
     dnf -y install tzdata openssl && \
