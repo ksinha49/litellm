@@ -40,6 +40,8 @@ import UIThemeSettings from "@/components/ui_theme_settings"
 import { UiLoadingSpinner } from "@/components/ui/ui-loading-spinner"
 import { cx } from "@/lib/cva.config"
 
+const envAppName = process.env.NEXT_PUBLIC_APP_NAME
+
 function getCookie(name: string) {
   const cookieValue = document.cookie.split("; ").find((row) => row.startsWith(name + "="))
   return cookieValue ? cookieValue.split("=")[1] : null
@@ -81,10 +83,10 @@ interface ProxySettings {
 
 const queryClient = new QueryClient()
 
-function LoadingScreen() {
+function LoadingScreen({ appName }: { appName: string }) {
   return (
     <div className={cx("h-screen", "flex items-center justify-center gap-4")}>
-      <div className="text-lg font-medium py-2 pr-4 border-r border-r-gray-200">🚅 LiteLLM</div>
+      <div className="text-lg font-medium py-2 pr-4 border-r border-r-gray-200">🚅 {appName}</div>
 
       <div className="flex items-center justify-center gap-2">
         <UiLoadingSpinner className="size-4" />
@@ -115,6 +117,7 @@ export default function CreateKeyPage() {
   const [createClicked, setCreateClicked] = useState<boolean>(false)
   const [authLoading, setAuthLoading] = useState(true)
   const [userID, setUserID] = useState<string | null>(null)
+  const [appName, setAppName] = useState<string>(envAppName || "LiteLLM")
 
   const invitation_id = searchParams.get("invitation_id")
 
@@ -149,6 +152,17 @@ export default function CreateKeyPage() {
       // get the information for constructing the proxy base url, and then set the token and auth loading
       setToken(token)
       setAuthLoading(false)
+      if (!envAppName) {
+        const url = proxyBaseUrl ? `${proxyBaseUrl}/get_app_name` : `/get_app_name`
+        fetch(url)
+          .then((res) => res.json())
+          .then((data) => {
+            if (data.app_name) {
+              setAppName(data.app_name)
+            }
+          })
+          .catch((error) => console.warn("Failed to load app name:", error))
+      }
     })
   }, [])
 
@@ -214,11 +228,11 @@ export default function CreateKeyPage() {
   }, [accessToken, userID, userRole])
 
   if (authLoading || redirectToLogin) {
-    return <LoadingScreen />
+    return <LoadingScreen appName={appName} />
   }
 
   return (
-    <Suspense fallback={<LoadingScreen />}>
+    <Suspense fallback={<LoadingScreen appName={appName} />}>
       <QueryClientProvider client={queryClient}>
         <ThemeProvider accessToken={accessToken}>
           {invitation_id ? (
