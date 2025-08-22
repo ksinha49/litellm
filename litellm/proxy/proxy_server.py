@@ -7929,6 +7929,13 @@ async def claim_onboarding_link(data: InvitationClaim):
     return user_obj
 
 
+@app.get("/get_app_name", include_in_schema=False)
+def get_app_name():
+    """Get the current UI app name from environment"""
+    app_name = os.getenv("UI_APP_NAME", "")
+    return {"app_name": app_name}
+
+
 @app.get("/get_logo_url", include_in_schema=False)
 def get_logo_url():
     """Get the current logo URL from environment"""

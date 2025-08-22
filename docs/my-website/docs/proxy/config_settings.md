@@ -598,6 +598,7 @@ router_settings:
 | MICROSOFT_CLIENT_SECRET | Client secret for Microsoft services
 | MICROSOFT_TENANT | Tenant ID for Microsoft Azure
 | MICROSOFT_SERVICE_PRINCIPAL_ID | Service Principal ID for Microsoft Enterprise Application. (This is an advanced feature if you want litellm to auto-assign members to Litellm Teams based on their Microsoft Entra ID Groups)
+| NEXT_PUBLIC_APP_NAME | Name displayed in Admin UI; build-time override for app branding
 | NO_DOCS | Flag to disable Swagger UI documentation
 | NO_REDOC | Flag to disable Redoc documentation
 | NO_PROXY | List of addresses to bypass proxy
@@ -701,6 +702,7 @@ router_settings:
 | TOGETHER_AI_EMBEDDING_150_M | Size parameter for Together AI 150M embedding model. Default is 150
 | TOGETHER_AI_EMBEDDING_350_M | Size parameter for Together AI 350M embedding model. Default is 350
 | TOOL_CHOICE_OBJECT_TOKEN_COUNT | Token count for tool choice objects. Default is 4
+| UI_APP_NAME | Server-provided application name for the UI; used if NEXT_PUBLIC_APP_NAME is not set
 | UI_LOGO_PATH | Path to the logo image used in the UI
 | UI_PASSWORD | Password for accessing the UI
 | UI_USERNAME | Username for accessing the UI
