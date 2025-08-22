@@ -248,7 +248,9 @@ from litellm.proxy.management_endpoints.customer_endpoints import (
 from litellm.proxy.management_endpoints.internal_user_endpoints import (
     router as internal_user_router,
 )
-from litellm.proxy.management_endpoints.internal_user_endpoints import user_update
+from litellm.proxy.management_endpoints.internal_user_endpoints import (
+    user_update,
+)
 from litellm.proxy.management_endpoints.key_management_endpoints import (
     delete_verification_tokens,
     duration_in_seconds,
@@ -295,7 +297,9 @@ from litellm.proxy.middleware.prometheus_auth_middleware import PrometheusAuthMi
 from litellm.proxy.openai_files_endpoints.files_endpoints import (
     router as openai_files_router,
 )
-from litellm.proxy.openai_files_endpoints.files_endpoints import set_files_config
+from litellm.proxy.openai_files_endpoints.files_endpoints import (
+    set_files_config,
+)
 from litellm.proxy.pass_through_endpoints.llm_passthrough_endpoints import (
     passthrough_endpoint_router,
 )
@@ -452,12 +456,8 @@ except ImportError:
 
 server_root_path = os.getenv("SERVER_ROOT_PATH", "")
 _license_check = LicenseCheck()
-_premium_user_env = os.getenv("LITELLM_PREMIUM_USER")
-premium_user: bool = (
-    _premium_user_env.lower() in ["true", "1", "yes"]
-    if _premium_user_env is not None
-    else _license_check.is_premium()
-)
+_premium_user_env = os.getenv("LITELLM_PREMIUM_USER", "true")
+premium_user: bool = _premium_user_env.lower() in ["true", "1", "yes"]
 premium_user_data: Optional["EnterpriseLicenseData"] = (
     _license_check.airgapped_license_data
 )
@@ -554,16 +554,13 @@ async def proxy_shutdown_event():
 
 @asynccontextmanager
 async def proxy_startup_event(app: FastAPI):
-    global prisma_client, master_key, use_background_health_checks, llm_router, llm_model_list, general_settings, proxy_budget_rescheduler_min_time, proxy_budget_rescheduler_max_time, litellm_proxy_admin_name, db_writer_client, store_model_in_db, premium_user, _license_check, proxy_batch_polling_interval
+    global prisma_client, master_key, use_background_health_checks, llm_router, llm_model_list, general_settings, proxy_budget_rescheduler_min_time, proxy_budget_rescheduler_max_time, litellm_proxy_admin_name, db_writer_client, store_model_in_db, premium_user, proxy_batch_polling_interval
     import json
 
     init_verbose_loggers()
     ## CHECK PREMIUM USER
-    _premium_user_env = os.getenv("LITELLM_PREMIUM_USER")
-    if _premium_user_env is not None:
-        premium_user = _premium_user_env.lower() in ["true", "1", "yes"]
-    else:
-        premium_user = _license_check.is_premium()
+    _premium_user_env = os.getenv("LITELLM_PREMIUM_USER", "true")
+    premium_user = _premium_user_env.lower() in ["true", "1", "yes"]
     verbose_proxy_logger.debug(
         "litellm.proxy.proxy_server.py::startup() - CHECKING PREMIUM USER - {}".format(
             premium_user
