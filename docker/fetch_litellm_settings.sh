@@ -13,9 +13,9 @@ AWS_REGION="${AWS_REGION:-}"
 if [ -z "$AWS_REGION" ]; then
   TOKEN=$(curl -s -m 5 -X PUT "http://169.254.169.254/latest/api/token" -H "X-aws-ec2-metadata-token-ttl-seconds: 60" || true)
   if [ -n "$TOKEN" ]; then
-    AWS_REGION=$(curl -s -m 5 -H "X-aws-ec2-metadata-token: $TOKEN" "http://169.254.169.254/latest/dynamic/instance-identity/document" | grep -oP '(?<=\"region\"\s*:\s*\")([^\"]+)')
+    AWS_REGION=$(curl -s -m 5 -H "X-aws-ec2-metadata-token: $TOKEN" "http://169.254.169.254/latest/dynamic/instance-identity/document" | grep -oP '"region"\s*:\s*"\K[^\"]+')
   else
-    AWS_REGION=$(curl -s -m 5 "http://169.254.169.254/latest/dynamic/instance-identity/document" | grep -oP '(?<=\"region\"\s*:\s*\")([^\"]+)')
+    AWS_REGION=$(curl -s -m 5 "http://169.254.169.254/latest/dynamic/instance-identity/document" | grep -oP '"region"\s*:\s*"\K[^\"]+')
   fi
 fi
 if [ -z "$AWS_REGION" ]; then
