@@ -1008,7 +1008,7 @@ def _add_guardrails_from_key_or_team_metadata(
         metadata_variable_name: The name of the metadata field in data
 
     """
-    from litellm.proxy.utils import _premium_user_check
+    from litellm.proxy.auth.premium import _premium_user_check
 
     for _management_object_metadata in [key_metadata, team_metadata]:
         if _management_object_metadata and "guardrails" in _management_object_metadata:

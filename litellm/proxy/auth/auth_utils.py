@@ -8,7 +8,7 @@ from fastapi import HTTPException, Request, status
 from litellm import Router, provider_list
 from litellm._logging import verbose_proxy_logger
 from litellm.proxy._types import *
-from litellm.proxy.utils import _premium_user_check
+from litellm.proxy.auth.premium import _premium_user_check
 from litellm.types.router import CONFIGURABLE_CLIENTSIDE_AUTH_PARAMS
 
 

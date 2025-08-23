@@ -60,8 +60,8 @@ from litellm.proxy.utils import (
     handle_exception_on_proxy,
     is_valid_api_key,
     jsonify_object,
-    _premium_user_check,
 )
+from litellm.proxy.auth.premium import _premium_user_check
 from litellm.router import Router
 from litellm.secret_managers.main import get_secret
 from litellm.types.router import Deployment

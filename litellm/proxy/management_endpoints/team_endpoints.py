@@ -84,9 +84,9 @@ from litellm.proxy.management_helpers.utils import (
 )
 from litellm.proxy.utils import (
     PrismaClient,
-    _premium_user_check,
     handle_exception_on_proxy,
 )
+from litellm.proxy.auth.premium import _premium_user_check
 from litellm.router import Router
 from litellm.types.proxy.management_endpoints.common_daily_activity import (
     SpendAnalyticsPaginatedResponse,
