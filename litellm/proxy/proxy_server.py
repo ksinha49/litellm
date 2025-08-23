@@ -209,6 +209,14 @@ from litellm.proxy.common_utils.load_config_utils import (
 from litellm.proxy.common_utils.openai_endpoint_utils import (
     remove_sensitive_info_from_deployment,
 )
+from litellm.proxy.chat_completion_helpers import (
+    ChatCompletionDependencies,
+    format_chat_completion_response,
+    handle_rejected_request,
+    log_chat_completion_error,
+    route_chat_request,
+    validate_chat_request,
+)
 from litellm.proxy.common_utils.proxy_state import ProxyState
 from litellm.proxy.common_utils.reset_budget_job import ResetBudgetJob
 from litellm.proxy.common_utils.swagger_utils import ERROR_RESPONSES
@@ -3474,6 +3482,24 @@ def select_data_generator(
     )
 
 
+def get_chat_completion_dependencies() -> ChatCompletionDependencies:
+    """Provide dependencies for the chat completion endpoint."""
+
+    return ChatCompletionDependencies(
+        proxy_logging_obj=proxy_logging_obj,
+        llm_router=llm_router,
+        general_settings=general_settings,
+        proxy_config=proxy_config,
+        select_data_generator=select_data_generator,
+        user_model=user_model,
+        user_temperature=user_temperature,
+        user_request_timeout=user_request_timeout,
+        user_max_tokens=user_max_tokens,
+        user_api_base=user_api_base,
+        version=version,
+    )
+
+
 def get_litellm_model_info(model: dict = {}):
     model_info = model.get("model_info", {})
     model_to_lookup = model.get("litellm_params", {}).get("model", None)
@@ -4028,6 +4054,7 @@ async def chat_completion(  # noqa: PLR0915
     fastapi_response: Response,
     model: Optional[str] = None,
     user_api_key_dict: UserAPIKeyAuth = Depends(user_api_key_auth),
+    deps: ChatCompletionDependencies = Depends(get_chat_completion_dependencies),
 ):
     """
 
@@ -4052,76 +4079,37 @@ async def chat_completion(  # noqa: PLR0915
     ```
 
     """
-    global general_settings, user_debug, proxy_logging_obj, llm_model_list
-    global user_temperature, user_request_timeout, user_max_tokens, user_api_base
     data = await _read_request_body(request=request)
+    data = validate_chat_request(data)
     base_llm_response_processor = ProxyBaseLLMRequestProcessing(data=data)
     try:
-        result = await base_llm_response_processor.base_process_llm_request(
+        result = await route_chat_request(
+            processor=base_llm_response_processor,
             request=request,
             fastapi_response=fastapi_response,
             user_api_key_dict=user_api_key_dict,
-            route_type="acompletion",
-            proxy_logging_obj=proxy_logging_obj,
-            llm_router=llm_router,
-            general_settings=general_settings,
-            proxy_config=proxy_config,
-            select_data_generator=select_data_generator,
             model=model,
-            user_model=user_model,
-            user_temperature=user_temperature,
-            user_request_timeout=user_request_timeout,
-            user_max_tokens=user_max_tokens,
-            user_api_base=user_api_base,
-            version=version,
+            deps=deps,
         )
-        if isinstance(result, BaseModel):
-            return result.model_dump(exclude_none=True, exclude_unset=True)
-        else:
-            return result
+        return format_chat_completion_response(result)
     except RejectedRequestError as e:
-        _data = e.request_data
-        await proxy_logging_obj.post_call_failure_hook(
+        await log_chat_completion_error(
+            proxy_logging_obj=deps.proxy_logging_obj,
             user_api_key_dict=user_api_key_dict,
-            original_exception=e,
-            request_data=_data,
+            error=e,
+            data=e.request_data,
         )
-        _chat_response = litellm.ModelResponse()
-        _chat_response.choices[0].message.content = e.message  # type: ignore
-
-        if data.get("stream", None) is not None and data["stream"] is True:
-            _iterator = litellm.utils.ModelResponseIterator(
-                model_response=_chat_response, convert_to_delta=True
-            )
-            _streaming_response = litellm.CustomStreamWrapper(
-                completion_stream=_iterator,
-                model=data.get("model", ""),
-                custom_llm_provider="cached_response",
-                logging_obj=data.get("litellm_logging_obj", None),
-            )
-            selected_data_generator = select_data_generator(
-                response=_streaming_response,
-                user_api_key_dict=user_api_key_dict,
-                request_data=_data,
-            )
-
-            return StreamingResponse(
-                selected_data_generator,
-                media_type="text/event-stream",
-                status_code=(
-                    e.status_code
-                    if hasattr(e, "status_code")
-                    else status.HTTP_400_BAD_REQUEST
-                ),
-            )
-        _usage = litellm.Usage(prompt_tokens=0, completion_tokens=0, total_tokens=0)
-        _chat_response.usage = _usage  # type: ignore
-        return _chat_response
+        return await handle_rejected_request(
+            error=e,
+            data=e.request_data,
+            user_api_key_dict=user_api_key_dict,
+            select_data_generator=deps.select_data_generator,
+        )
     except Exception as e:
         raise await base_llm_response_processor._handle_llm_api_exception(
             e=e,
             user_api_key_dict=user_api_key_dict,
-            proxy_logging_obj=proxy_logging_obj,
+            proxy_logging_obj=deps.proxy_logging_obj,
         )
 
 
