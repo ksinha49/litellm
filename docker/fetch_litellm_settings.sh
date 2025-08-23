@@ -1,6 +1,11 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+if ! command -v aws >/dev/null 2>&1; then
+    echo "AWS CLI not installed; skipping settings fetch" >&2
+    exit 0
+fi
+
 # Fetch LiteLLM runtime settings from AWS SSM and write to /app/litellm_settings.yaml
 # Usage: LITELLM_ENV=<env> docker/fetch_litellm_settings.sh
 
