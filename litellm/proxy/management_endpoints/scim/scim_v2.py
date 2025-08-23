@@ -41,7 +41,8 @@ from litellm.proxy.management_endpoints.team_endpoints import (
     team_member_add,
     team_member_delete,
 )
-from litellm.proxy.utils import _premium_user_check, handle_exception_on_proxy
+from litellm.proxy.auth.premium import _premium_user_check
+from litellm.proxy.utils import handle_exception_on_proxy
 from litellm.types.proxy.management_endpoints.scim_v2 import *
 
 

@@ -44,7 +44,7 @@ class GcsPubSubLogger(CustomBatchLogger):
             topic_id (str): Pub/Sub topic ID
             credentials_path (str, optional): Path to Google Cloud credentials JSON file
         """
-        from litellm.proxy.utils import _premium_user_check
+        from litellm.proxy.auth.premium import _premium_user_check
 
         _premium_user_check()
 
@@ -111,7 +111,7 @@ class GcsPubSubLogger(CustomBatchLogger):
         from litellm.proxy.spend_tracking.spend_tracking_utils import (
             get_logging_payload,
         )
-        from litellm.proxy.utils import _premium_user_check
+        from litellm.proxy.auth.premium import _premium_user_check
 
         _premium_user_check()
 

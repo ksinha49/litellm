@@ -7,7 +7,7 @@ from litellm.proxy._types import (
     LitellmUserRoles,
     UserAPIKeyAuth,
 )
-from litellm.proxy.utils import _premium_user_check
+from litellm.proxy.auth.premium import _premium_user_check
 
 
 def _user_has_admin_view(user_api_key_dict: UserAPIKeyAuth) -> bool:
