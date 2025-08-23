@@ -9,13 +9,26 @@ fi
 # Fetch LiteLLM runtime settings from AWS SSM and write to /app/litellm_settings.yaml
 # Usage: LITELLM_ENV=<env> docker/fetch_litellm_settings.sh
 
+AWS_REGION="${AWS_REGION:-}"
+if [ -z "$AWS_REGION" ]; then
+  TOKEN=$(curl -s -m 5 -X PUT "http://169.254.169.254/latest/api/token" -H "X-aws-ec2-metadata-token-ttl-seconds: 60" || true)
+  if [ -n "$TOKEN" ]; then
+    AWS_REGION=$(curl -s -m 5 -H "X-aws-ec2-metadata-token: $TOKEN" "http://169.254.169.254/latest/dynamic/instance-identity/document" | grep -oP '(?<=\"region\"\s*:\s*\")([^\"]+)')
+  else
+    AWS_REGION=$(curl -s -m 5 "http://169.254.169.254/latest/dynamic/instance-identity/document" | grep -oP '(?<=\"region\"\s*:\s*\")([^\"]+)')
+  fi
+fi
+if [ -z "$AWS_REGION" ]; then
+  AWS_REGION=$(aws configure get region 2>/dev/null || true)
+fi
+
 get_parameter_with_retries() {
   local name="$1"
   local attempt=1
   local max_attempts=5
   local value
   while [ "$attempt" -le "$max_attempts" ]; do
-    if value=$(aws ssm get-parameter --with-decryption --name "$name" --query 'Parameter.Value' --output text 2>/dev/null); then
+    if value=$(aws ssm get-parameter --region "$AWS_REGION" --with-decryption --name "$name" --query 'Parameter.Value' --output text 2>/dev/null); then
       echo "$value"
       return 0
     fi
@@ -44,16 +57,6 @@ export DATABASE_URL="postgresql://${POSTGRESQL_USERID}:${POSTGRESQL_PASSCODE}@${
 if [ -n "$S3_BUCKET_NAME" ]; then
   if S3_REGION_NAME=$(get_parameter_with_retries "$PREFIX/S3_REGION_NAME" 2>/dev/null); then
     AWS_REGION="$S3_REGION_NAME"
-  else
-    AWS_REGION="${AWS_REGION:-}"
-    if [ -z "$AWS_REGION" ]; then
-      TOKEN=$(curl -s -m 5 -X PUT "http://169.254.169.254/latest/api/token" -H "X-aws-ec2-metadata-token-ttl-seconds: 60" || true)
-      if [ -n "$TOKEN" ]; then
-        AWS_REGION=$(curl -s -m 5 -H "X-aws-ec2-metadata-token: $TOKEN" "http://169.254.169.254/latest/dynamic/instance-identity/document" | grep -oP '(?<=\"region\"\s*:\s*\")([^\"]+)')
-      else
-        AWS_REGION=$(curl -s -m 5 "http://169.254.169.254/latest/dynamic/instance-identity/document" | grep -oP '(?<=\"region\"\s*:\s*\")([^\"]+)')
-      fi
-    fi
   fi
 fi
 
