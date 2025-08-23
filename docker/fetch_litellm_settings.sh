@@ -21,6 +21,9 @@ fi
 if [ -z "$AWS_REGION" ]; then
   AWS_REGION=$(aws configure get region 2>/dev/null || true)
 fi
+if [ -z "$AWS_REGION" ]; then
+  AWS_REGION="us-east-2"
+fi
 
 get_parameter_with_retries() {
   local name="$1"
