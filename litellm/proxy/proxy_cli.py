@@ -6,6 +6,7 @@ import random
 import subprocess
 import sys
 import urllib.parse as urlparse
+from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Optional, Union
 
 import click
@@ -30,6 +31,25 @@ telemetry = None
 class LiteLLMDatabaseConnectionPool(Enum):
     database_connection_pool_limit = 10
     database_connection_pool_timeout = 60
+
+
+@dataclass
+class ProxyConfigOptions:
+    """Grouped configuration for starting the proxy server."""
+
+    host: str
+    port: int
+    config: Optional[str]
+    num_workers: Optional[int]
+    run_gunicorn: bool
+    run_hypercorn: bool
+    ssl_keyfile_path: Optional[str]
+    ssl_certfile_path: Optional[str]
+    ciphers: Optional[str]
+    log_config: Optional[str]
+    skip_server_startup: bool
+    keepalive_timeout: Optional[int]
+    detailed_debug: bool = False
 
 
 def append_query_params(url, params) -> str:
@@ -299,6 +319,218 @@ class ProxyInitializationHelpers:
         return "uvloop"
 
 
+def load_proxy_config(
+    options: ProxyConfigOptions,
+    iam_token_db_auth: bool,
+    use_prisma_db_push: bool,
+):
+    """Load proxy configuration from environment or file."""
+    from litellm.proxy.proxy_server import KeyManagementSettings, ProxyConfig
+
+    db_connection_pool_limit = 100
+    db_connection_timeout = 60
+    general_settings = {}
+
+    if iam_token_db_auth:
+        from litellm.proxy.auth.rds_iam_token import generate_iam_auth_token
+
+        db_host = os.getenv("DATABASE_HOST")
+        db_port = os.getenv("DATABASE_PORT")
+        db_user = os.getenv("DATABASE_USER")
+        db_name = os.getenv("DATABASE_NAME")
+        db_schema = os.getenv("DATABASE_SCHEMA")
+
+        token = generate_iam_auth_token(db_host=db_host, db_port=db_port, db_user=db_user)
+        _db_url = f"postgresql://{db_user}:{token}@{db_host}:{db_port}/{db_name}"
+        if db_schema:
+            _db_url += f"?schema={db_schema}"
+
+        os.environ["DATABASE_URL"] = _db_url
+        os.environ["IAM_TOKEN_DB_AUTH"] = "True"
+
+    from litellm.secret_managers.aws_secret_manager import decrypt_env_var
+
+    if os.getenv("USE_AWS_KMS", None) is not None and os.getenv("USE_AWS_KMS") == "True":
+        new_env_var = decrypt_env_var()
+        for k, v in new_env_var.items():
+            os.environ[k] = v
+
+    if options.config is not None:
+        try:
+            import asyncio
+        except Exception:  # pragma: no cover - handled in tests
+            raise ImportError("yaml needs to be imported. Run - `pip install 'litellm[proxy]'`")
+
+        proxy_config = ProxyConfig()
+        _config = asyncio.run(proxy_config.get_config(config_file_path=options.config))
+
+        litellm_settings = _config.get("litellm_settings", None)
+        if (
+            litellm_settings is not None
+            and "json_logs" in litellm_settings
+            and litellm_settings["json_logs"] is True
+        ):
+            import litellm
+
+            litellm.json_logs = True
+            litellm._turn_on_json()
+
+        general_settings = _config.get("general_settings", {}) or {}
+        if general_settings:
+            key_management_system = general_settings.get("key_management_system", None)
+            proxy_config.initialize_secret_manager(key_management_system)
+        key_management_settings = general_settings.get("key_management_settings", None)
+        if key_management_settings is not None:
+            import litellm
+
+            litellm._key_management_settings = KeyManagementSettings(**key_management_settings)
+        database_url = general_settings.get("database_url", None)
+        if database_url is None and os.getenv("DATABASE_URL") is None:
+            from litellm.proxy.utils import construct_database_url_from_env_vars
+
+            database_url = construct_database_url_from_env_vars()
+            if database_url:
+                os.environ["DATABASE_URL"] = database_url
+        db_connection_pool_limit = general_settings.get(
+            "database_connection_pool_limit",
+            LiteLLMDatabaseConnectionPool.database_connection_pool_limit.value,
+        )
+        db_connection_timeout = general_settings.get(
+            "database_connection_pool_timeout",
+            LiteLLMDatabaseConnectionPool.database_connection_pool_timeout.value,
+        )
+        if database_url and database_url.startswith("os.environ/"):
+            original_dir = os.getcwd()
+            sys.path.insert(0, os.path.abspath("../.."))
+            import litellm
+            from litellm import get_secret_str
+
+            database_url = get_secret_str(database_url, default_value=None)
+            os.chdir(original_dir)
+        if database_url is not None and isinstance(database_url, str):
+            os.environ["DATABASE_URL"] = database_url
+
+    if options.config is None and os.getenv("DATABASE_URL") is None:
+        from litellm.proxy.utils import construct_database_url_from_env_vars
+
+        database_url = construct_database_url_from_env_vars()
+        if database_url:
+            os.environ["DATABASE_URL"] = database_url
+
+    if options.config is None:
+        db_connection_pool_limit = (
+            LiteLLMDatabaseConnectionPool.database_connection_pool_limit.value
+        )
+        db_connection_timeout = (
+            LiteLLMDatabaseConnectionPool.database_connection_pool_timeout.value
+        )
+
+    if os.getenv("DATABASE_URL", None) is not None or os.getenv("DIRECT_URL", None) is not None:
+        try:
+            from litellm.secret_managers.main import get_secret
+
+            if os.getenv("DATABASE_URL", None) is not None:
+                params = {
+                    "connection_limit": db_connection_pool_limit,
+                    "pool_timeout": db_connection_timeout,
+                }
+                database_url = get_secret("DATABASE_URL", default_value=None)
+                modified_url = append_query_params(database_url, params)
+                os.environ["DATABASE_URL"] = modified_url
+            if os.getenv("DIRECT_URL", None) is not None:
+                params = {
+                    "connection_limit": db_connection_pool_limit,
+                    "pool_timeout": db_connection_timeout,
+                }
+                database_url = os.getenv("DIRECT_URL")
+                modified_url = append_query_params(database_url, params)
+                os.environ["DIRECT_URL"] = modified_url
+            subprocess.run(["prisma"], capture_output=True)
+            is_prisma_runnable = True
+        except FileNotFoundError:
+            is_prisma_runnable = False
+
+        if is_prisma_runnable:
+            from litellm.proxy.db.check_migration import check_prisma_schema_diff
+            from litellm.proxy.db.prisma_client import (
+                PrismaManager,
+                should_update_prisma_schema,
+            )
+
+            if should_update_prisma_schema(
+                general_settings.get("disable_prisma_schema_update")
+            ) is False:
+                check_prisma_schema_diff(db_url=None)
+            else:
+                PrismaManager.setup_database(use_migrate=not use_prisma_db_push)
+        else:
+            print(  # noqa: T201
+                "Unable to connect to DB. DATABASE_URL found in environment, but prisma package not found."
+            )
+
+    return general_settings
+
+
+def initialize_proxy_server(options: ProxyConfigOptions):
+    """Prepare uvicorn arguments and enable debugging if requested."""
+
+    import litellm
+
+    if options.detailed_debug is True:
+        litellm._turn_on_debug()
+
+    if options.port == 4000 and ProxyInitializationHelpers._is_port_in_use(options.port):
+        options.port = random.randint(1024, 49152)
+
+    uvicorn_args = ProxyInitializationHelpers._get_default_unvicorn_init_args(
+        host=options.host,
+        port=options.port,
+        log_config=options.log_config,
+        keepalive_timeout=options.keepalive_timeout,
+    )
+    return uvicorn_args
+
+
+def start_proxy_server(app, options: ProxyConfigOptions, uvicorn_args):
+    """Start the proxy server using uvicorn, gunicorn, or hypercorn."""
+
+    if options.run_gunicorn and options.run_hypercorn:
+        raise ValueError("Cannot enable both gunicorn and hypercorn")
+
+    if options.run_gunicorn is False and options.run_hypercorn is False:
+        if options.ssl_certfile_path is not None and options.ssl_keyfile_path is not None:
+            print(  # noqa: T201
+                f"\033[1;32mLiteLLM Proxy: Using SSL with certfile: {options.ssl_certfile_path} and keyfile: {options.ssl_keyfile_path}\033[0m\n"
+            )
+            uvicorn_args["ssl_keyfile"] = options.ssl_keyfile_path
+            uvicorn_args["ssl_certfile"] = options.ssl_certfile_path
+
+        loop_type = ProxyInitializationHelpers._get_loop_type()
+        if loop_type:
+            uvicorn_args["loop"] = loop_type
+
+        import uvicorn
+
+        uvicorn.run(**uvicorn_args, workers=options.num_workers)
+    elif options.run_gunicorn is True:
+        ProxyInitializationHelpers._run_gunicorn_server(
+            host=options.host,
+            port=options.port,
+            app=app,
+            num_workers=options.num_workers or 1,
+            ssl_certfile_path=options.ssl_certfile_path or "",
+            ssl_keyfile_path=options.ssl_keyfile_path or "",
+        )
+    elif options.run_hypercorn is True:
+        ProxyInitializationHelpers._init_hypercorn_server(
+            app=app,
+            host=options.host,
+            port=options.port,
+            ssl_certfile_path=options.ssl_certfile_path or "",
+            ssl_keyfile_path=options.ssl_keyfile_path or "",
+            ciphers=options.ciphers,
+        )
+
 @click.command()
 @click.option(
     "--host", default="0.0.0.0", help="Host for the server to listen on.", envvar="HOST"
@@ -522,12 +754,7 @@ def run_server(  # noqa: PLR0915
     keepalive_timeout,
 ):
     try:
-        from litellm.proxy.proxy_server import (
-            KeyManagementSettings,
-            ProxyConfig,
-            app,
-            save_worker_config,
-        )
+        from litellm.proxy.proxy_server import app, save_worker_config
     except ImportError as e:
         raise ModuleNotFoundError(
             "Failed to import proxy server. Please install proxy dependencies with "
@@ -570,207 +797,30 @@ def run_server(  # noqa: PLR0915
             config=config,
             use_queue=use_queue,
         )
-        try:
-            import uvicorn
-        except Exception:
-            raise ImportError(
-                "uvicorn, gunicorn needs to be imported. Run - `pip install 'litellm[proxy]'`"
-            )
 
-        db_connection_pool_limit = 100
-        db_connection_timeout = 60
-        general_settings = {}
-        ### GET DB TOKEN FOR IAM AUTH ###
+        options = ProxyConfigOptions(
+            host=host,
+            port=port,
+            config=config,
+            num_workers=num_workers,
+            run_gunicorn=run_gunicorn,
+            run_hypercorn=run_hypercorn,
+            ssl_keyfile_path=ssl_keyfile_path,
+            ssl_certfile_path=ssl_certfile_path,
+            ciphers=ciphers,
+            log_config=log_config,
+            skip_server_startup=skip_server_startup,
+            keepalive_timeout=keepalive_timeout,
+            detailed_debug=detailed_debug,
+        )
 
-        if iam_token_db_auth:
-            from litellm.proxy.auth.rds_iam_token import generate_iam_auth_token
+        load_proxy_config(
+            options,
+            iam_token_db_auth=iam_token_db_auth,
+            use_prisma_db_push=use_prisma_db_push,
+        )
 
-            db_host = os.getenv("DATABASE_HOST")
-            db_port = os.getenv("DATABASE_PORT")
-            db_user = os.getenv("DATABASE_USER")
-            db_name = os.getenv("DATABASE_NAME")
-            db_schema = os.getenv("DATABASE_SCHEMA")
-
-            token = generate_iam_auth_token(
-                db_host=db_host, db_port=db_port, db_user=db_user
-            )
-
-            # print(f"token: {token}")
-            _db_url = f"postgresql://{db_user}:{token}@{db_host}:{db_port}/{db_name}"
-            if db_schema:
-                _db_url += f"?schema={db_schema}"
-
-            os.environ["DATABASE_URL"] = _db_url
-            os.environ["IAM_TOKEN_DB_AUTH"] = "True"
-
-        ### DECRYPT ENV VAR ###
-
-        from litellm.secret_managers.aws_secret_manager import decrypt_env_var
-
-        if (
-            os.getenv("USE_AWS_KMS", None) is not None
-            and os.getenv("USE_AWS_KMS") == "True"
-        ):
-            ## V2 IMPLEMENTATION OF AWS KMS - USER WANTS TO DECRYPT MULTIPLE KEYS IN THEIR ENV
-            new_env_var = decrypt_env_var()
-
-            for k, v in new_env_var.items():
-                os.environ[k] = v
-
-        if config is not None:
-            """
-            Allow user to pass in db url via config
-
-            read from there and save it to os.env['DATABASE_URL']
-            """
-            try:
-                import asyncio
-
-            except Exception:
-                raise ImportError(
-                    "yaml needs to be imported. Run - `pip install 'litellm[proxy]'`"
-                )
-
-            proxy_config = ProxyConfig()
-            _config = asyncio.run(proxy_config.get_config(config_file_path=config))
-
-            ### LITELLM SETTINGS ###
-            litellm_settings = _config.get("litellm_settings", None)
-            if (
-                litellm_settings is not None
-                and "json_logs" in litellm_settings
-                and litellm_settings["json_logs"] is True
-            ):
-                import litellm
-
-                litellm.json_logs = True
-
-                litellm._turn_on_json()
-            ### GENERAL SETTINGS ###
-            general_settings = _config.get("general_settings", {})
-            if general_settings is None:
-                general_settings = {}
-            if general_settings:
-                ### LOAD SECRET MANAGER ###
-                key_management_system = general_settings.get(
-                    "key_management_system", None
-                )
-                proxy_config.initialize_secret_manager(key_management_system)
-            key_management_settings = general_settings.get(
-                "key_management_settings", None
-            )
-            if key_management_settings is not None:
-                import litellm
-
-                litellm._key_management_settings = KeyManagementSettings(
-                    **key_management_settings
-                )
-            database_url = general_settings.get("database_url", None)
-            if database_url is None and os.getenv("DATABASE_URL") is None:
-                # Use helper function to construct DATABASE_URL from individual variables
-                from litellm.proxy.utils import construct_database_url_from_env_vars
-
-                database_url = construct_database_url_from_env_vars()
-                if database_url:
-                    os.environ["DATABASE_URL"] = database_url
-            db_connection_pool_limit = general_settings.get(
-                "database_connection_pool_limit",
-                LiteLLMDatabaseConnectionPool.database_connection_pool_limit.value,
-            )
-            db_connection_timeout = general_settings.get(
-                "database_connection_pool_timeout",
-                LiteLLMDatabaseConnectionPool.database_connection_pool_timeout.value,
-            )
-            if database_url and database_url.startswith("os.environ/"):
-                original_dir = os.getcwd()
-                # set the working directory to where this script is
-                sys.path.insert(
-                    0, os.path.abspath("../..")
-                )  # Adds the parent directory to the system path - for litellm local dev
-                import litellm
-                from litellm import get_secret_str
-
-                database_url = get_secret_str(database_url, default_value=None)
-                os.chdir(original_dir)
-            if database_url is not None and isinstance(database_url, str):
-                os.environ["DATABASE_URL"] = database_url
-
-        # Handle database URL construction when no config file is used
-        if config is None and os.getenv("DATABASE_URL") is None:
-            # Use helper function to construct DATABASE_URL from individual variables
-            from litellm.proxy.utils import construct_database_url_from_env_vars
-
-            database_url = construct_database_url_from_env_vars()
-            if database_url:
-                os.environ["DATABASE_URL"] = database_url
-
-        # Set default values for connection pool settings when no config is used
-        if config is None:
-            db_connection_pool_limit = (
-                LiteLLMDatabaseConnectionPool.database_connection_pool_limit.value
-            )
-            db_connection_timeout = (
-                LiteLLMDatabaseConnectionPool.database_connection_pool_timeout.value
-            )
-
-        if (
-            os.getenv("DATABASE_URL", None) is not None
-            or os.getenv("DIRECT_URL", None) is not None
-        ):
-            try:
-                from litellm.secret_managers.main import get_secret
-
-                if os.getenv("DATABASE_URL", None) is not None:
-                    ### add connection pool + pool timeout args
-                    params = {
-                        "connection_limit": db_connection_pool_limit,
-                        "pool_timeout": db_connection_timeout,
-                    }
-                    database_url = get_secret("DATABASE_URL", default_value=None)
-                    modified_url = append_query_params(database_url, params)
-                    os.environ["DATABASE_URL"] = modified_url
-                if os.getenv("DIRECT_URL", None) is not None:
-                    ### add connection pool + pool timeout args
-                    params = {
-                        "connection_limit": db_connection_pool_limit,
-                        "pool_timeout": db_connection_timeout,
-                    }
-                    database_url = os.getenv("DIRECT_URL")
-                    modified_url = append_query_params(database_url, params)
-                    os.environ["DIRECT_URL"] = modified_url
-                    ###
-                subprocess.run(["prisma"], capture_output=True)
-                is_prisma_runnable = True
-            except FileNotFoundError:
-                is_prisma_runnable = False
-
-            if is_prisma_runnable:
-                from litellm.proxy.db.check_migration import check_prisma_schema_diff
-                from litellm.proxy.db.prisma_client import (
-                    PrismaManager,
-                    should_update_prisma_schema,
-                )
-
-                if (
-                    should_update_prisma_schema(
-                        general_settings.get("disable_prisma_schema_update")
-                    )
-                    is False
-                ):
-                    check_prisma_schema_diff(db_url=None)
-                else:
-                    PrismaManager.setup_database(use_migrate=not use_prisma_db_push)
-            else:
-                print(  # noqa
-                    f"Unable to connect to DB. DATABASE_URL found in environment, but prisma package not found."  # noqa
-                )
-        if port == 4000 and ProxyInitializationHelpers._is_port_in_use(port):
-            port = random.randint(1024, 49152)
-
-        import litellm
-
-        if detailed_debug is True:
-            litellm._turn_on_debug()
+        uvicorn_args = initialize_proxy_server(options)
 
         # DO NOT DELETE - enables global variables to work across files
         from litellm.proxy.proxy_server import app  # noqa
@@ -780,53 +830,12 @@ def run_server(  # noqa: PLR0915
         #   uvicorn litellm.proxy.health_app_factory:build_health_app --factory --host 0.0.0.0 --port=4001
         # This is compatible with the SEPARATE_HEALTH_APP Docker/supervisord pattern.
         # --- END SEPARATE HEALTH APP LOGIC ---
-        # Skip server startup if requested (after all setup is done)
-        if skip_server_startup:
-            print(  # noqa
-                "LiteLLM: Setup complete. Skipping server startup as requested."
-            )
+
+        if options.skip_server_startup:
+            print("LiteLLM: Setup complete. Skipping server startup as requested.")  # noqa: T201
             return
 
-        uvicorn_args = ProxyInitializationHelpers._get_default_unvicorn_init_args(
-            host=host,
-            port=port,
-            log_config=log_config,
-            keepalive_timeout=keepalive_timeout,
-        )
-        if run_gunicorn is False and run_hypercorn is False:
-            if ssl_certfile_path is not None and ssl_keyfile_path is not None:
-                print(  # noqa
-                    f"\033[1;32mLiteLLM Proxy: Using SSL with certfile: {ssl_certfile_path} and keyfile: {ssl_keyfile_path}\033[0m\n"  # noqa
-                )
-                uvicorn_args["ssl_keyfile"] = ssl_keyfile_path
-                uvicorn_args["ssl_certfile"] = ssl_certfile_path
-
-            loop_type = ProxyInitializationHelpers._get_loop_type()
-            if loop_type:
-                uvicorn_args["loop"] = loop_type
-
-            uvicorn.run(
-                **uvicorn_args,
-                workers=num_workers,
-            )
-        elif run_gunicorn is True:
-            ProxyInitializationHelpers._run_gunicorn_server(
-                host=host,
-                port=port,
-                app=app,
-                num_workers=num_workers,
-                ssl_certfile_path=ssl_certfile_path,
-                ssl_keyfile_path=ssl_keyfile_path,
-            )
-        elif run_hypercorn is True:
-            ProxyInitializationHelpers._init_hypercorn_server(
-                app=app,
-                host=host,
-                port=port,
-                ssl_certfile_path=ssl_certfile_path,
-                ssl_keyfile_path=ssl_keyfile_path,
-                ciphers=ciphers,
-            )
+        start_proxy_server(app, options, uvicorn_args)
 
 
 if __name__ == "__main__":
