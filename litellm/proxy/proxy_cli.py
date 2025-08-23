@@ -17,8 +17,6 @@ if TYPE_CHECKING:
 else:
     FastAPI = Any
 
-sys.path.append(os.getcwd())
-
 config_filename = "litellm.secrets"
 
 litellm_mode = os.getenv("LITELLM_MODE", "DEV")  # "PRODUCTION", "DEV"
@@ -523,38 +521,22 @@ def run_server(  # noqa: PLR0915
     skip_server_startup,
     keepalive_timeout,
 ):
-    args = locals()
-    if local:
-        from proxy_server import (
+    try:
+        from litellm.proxy.proxy_server import (
             KeyManagementSettings,
             ProxyConfig,
             app,
             save_worker_config,
         )
-    else:
-        try:
-            from .proxy_server import (
-                KeyManagementSettings,
-                ProxyConfig,
-                app,
-                save_worker_config,
-            )
-        except ModuleNotFoundError as e:
-            raise ModuleNotFoundError(
-                f"Missing dependency {e}. Run `pip install 'litellm[proxy]'`"
-            )
-        except ImportError as e:
-            if "litellm[proxy]" in str(e):
-                # user is missing a proxy dependency, ask them to pip install litellm[proxy]
-                raise e
-            else:
-                # this is just a local/relative import error, user git cloned litellm
-                from proxy_server import (
-                    KeyManagementSettings,
-                    ProxyConfig,
-                    app,
-                    save_worker_config,
-                )
+    except ImportError as e:
+        raise ModuleNotFoundError(
+            "Failed to import proxy server. Please install proxy dependencies with "
+            "`pip install 'litellm[proxy]'`."
+            f" Original error: {e}"
+        ) from e
+
+    if local:
+        pass  # backwards compatibility
     if version is True:
         ProxyInitializationHelpers._echo_litellm_version()
         return

@@ -232,7 +232,7 @@ class TestProxyInitializationHelpers:
         with patch.dict(
             "sys.modules",
             {
-                "proxy_server": MagicMock(
+                "litellm.proxy.proxy_server": MagicMock(
                     app=mock_app,
                     ProxyConfig=mock_proxy_config,
                     KeyManagementSettings=mock_key_mgmt,
@@ -282,7 +282,7 @@ class TestProxyInitializationHelpers:
         with patch.dict(
             "sys.modules",
             {
-                "proxy_server": MagicMock(
+                "litellm.proxy.proxy_server": MagicMock(
                     app=mock_app,
                     ProxyConfig=mock_proxy_config,
                     KeyManagementSettings=mock_key_mgmt,
@@ -313,6 +313,29 @@ class TestProxyInitializationHelpers:
             # Check that the uvicorn.run was called with the timeout_keep_alive parameter
             call_args = mock_uvicorn_run.call_args
             assert call_args[1]["timeout_keep_alive"] == 30
+
+    def test_missing_proxy_dependencies_surfaces_error(self):
+        """Ensure missing proxy dependencies raise helpful error"""
+        from click.testing import CliRunner
+
+        from litellm.proxy.proxy_cli import run_server
+
+        runner = CliRunner()
+
+        real_import = builtins.__import__
+
+        def fake_import(name, *args, **kwargs):
+            if name == "litellm.proxy.proxy_server":
+                raise ModuleNotFoundError("fastapi")
+            return real_import(name, *args, **kwargs)
+
+        with patch("builtins.__import__", side_effect=fake_import):
+            result = runner.invoke(run_server, ["--skip_server_startup"])
+
+        assert result.exit_code != 0
+        assert isinstance(result.exception, ModuleNotFoundError)
+        assert "fastapi" in str(result.exception)
+        assert "pip install 'litellm[proxy]'" in str(result.exception)
 
     @patch.dict(os.environ, {}, clear=True)
     def test_construct_database_url_from_env_vars(self):
@@ -403,7 +426,7 @@ class TestProxyInitializationHelpers:
             with patch.dict(
                 "sys.modules",
                 {
-                    "proxy_server": MagicMock(
+                    "litellm.proxy.proxy_server": MagicMock(
                         app=mock_app,
                         ProxyConfig=mock_proxy_config,
                         KeyManagementSettings=mock_key_mgmt,
@@ -531,7 +554,7 @@ class TestHealthAppFactory:
         with patch.dict(
             "sys.modules",
             {
-                "proxy_server": MagicMock(
+                "litellm.proxy.proxy_server": MagicMock(
                     app=mock_app,
                     ProxyConfig=mock_proxy_config,
                     KeyManagementSettings=mock_key_mgmt,
