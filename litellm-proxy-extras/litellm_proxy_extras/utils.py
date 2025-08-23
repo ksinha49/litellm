@@ -309,6 +309,18 @@ class ProxyExtrasDBManager:
                             )
                             logger.info("✅ All migrations resolved.")
                             return True
+                        elif 'relation "_prisma_migrations" already exists' in e.stderr:
+                            logger.info(
+                                "Detected existing _prisma_migrations table, creating baseline and resolving all migrations"
+                            )
+                            ProxyExtrasDBManager._create_baseline_migration(
+                                schema_path
+                            )
+                            ProxyExtrasDBManager._resolve_all_migrations(
+                                migrations_dir, schema_path
+                            )
+                            logger.info("✅ All migrations resolved.")
+                            return True
                         elif (
                             "P3018" in e.stderr
                         ):  # PostgreSQL error code for duplicate column

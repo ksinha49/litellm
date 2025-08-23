@@ -33,7 +33,9 @@ docker-compose up
 ```
 
 
-### Docker Run 
+**Note:** LiteLLM now automatically baselines the database if a `_prisma_migrations` table already exists, reducing manual cleanup when redeploying.
+
+### Docker Run
 
 #### Step 1. CREATE config.yaml 
 
