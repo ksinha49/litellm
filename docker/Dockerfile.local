@@ -3,6 +3,7 @@
 ARG POSTGRESQL_ENDPT=""
 ARG POSTGRESQL_PASSCODE=""
 ARG POSTGRESQL_PORT=""
+ARG NEXT_PUBLIC_LOGO_PATH="/favicon.png"
 
 # ---- Builder stage ----
 FROM registry.access.redhat.com/ubi9/python-311 AS builder
@@ -12,9 +13,11 @@ WORKDIR /app
 ARG POSTGRESQL_ENDPT
 ARG POSTGRESQL_PASSCODE
 ARG POSTGRESQL_PORT
+ARG NEXT_PUBLIC_LOGO_PATH
 ENV POSTGRESQL_ENDPT=${POSTGRESQL_ENDPT}
 ENV POSTGRESQL_PASSCODE=${POSTGRESQL_PASSCODE}
 ENV POSTGRESQL_PORT=${POSTGRESQL_PORT}
+ENV NEXT_PUBLIC_LOGO_PATH=${NEXT_PUBLIC_LOGO_PATH}
 
 ENV HTTP_PROXY="http://proxy.ameritas.com:8080"
 ENV http_proxy="http://proxy.ameritas.com:8080"
@@ -23,7 +26,7 @@ ENV https_proxy="http://proxy.ameritas.com:8080"
 ENV NO_PROXY="localhost,127.0.0.1,registry-1.docker.io"
 #ENV SSL_CERT_FILE="/etc/ssl/cert.pem"
 #ENV REQUESTS_CA_BUNDLE="/etc/ssl/cert.pem"
-ENV UI_LOGO_PATH="/app/litellm/proxy/logo.jpg"
+ENV UI_LOGO_PATH="/app/ui/litellm-dashboard/public/favicon.png"
 
 
 
@@ -60,9 +63,11 @@ WORKDIR /app
 ARG POSTGRESQL_ENDPT
 ARG POSTGRESQL_PASSCODE
 ARG POSTGRESQL_PORT
+ARG NEXT_PUBLIC_LOGO_PATH
 ENV POSTGRESQL_ENDPT=${POSTGRESQL_ENDPT}
 ENV POSTGRESQL_PASSCODE=${POSTGRESQL_PASSCODE}
 ENV POSTGRESQL_PORT=${POSTGRESQL_PORT}
+ENV NEXT_PUBLIC_LOGO_PATH=${NEXT_PUBLIC_LOGO_PATH}
 
 
 ENV HTTP_PROXY="http://proxy.ameritas.com:8080"
@@ -72,7 +77,7 @@ ENV https_proxy="http://proxy.ameritas.com:8080"
 ENV NO_PROXY="localhost,127.0.0.1,registry-1.docker.io"
 #ENV SSL_CERT_FILE="/etc/ssl/cert.pem"
 #ENV REQUESTS_CA_BUNDLE="/etc/ssl/cert.pem"
-ENV UI_LOGO_PATH="/app/litellm/proxy/logo.jpg"
+ENV UI_LOGO_PATH="/app/ui/litellm-dashboard/public/favicon.png"
 
 
 
