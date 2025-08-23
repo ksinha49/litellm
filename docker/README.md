@@ -95,3 +95,31 @@ Optional parameters to enable S3 logging:
 ```
 
 The script automatically detects the AWS region using the instance metadata service if `S3_REGION_NAME` is not defined. If `S3_BUCKET_NAME` is absent, S3 logging is disabled.
+
+### Skipping the SSM fetch
+
+For local builds or environments without AWS credentials, you can skip the SSM lookup by setting `SKIP_SSM_FETCH=1`:
+
+```bash
+SKIP_SSM_FETCH=1 docker/fetch_litellm_settings.sh
+```
+
+When building the Docker image you may pass it as a build argument:
+
+```bash
+docker build --build-arg SKIP_SSM_FETCH=1 -f docker/Dockerfile.local .
+```
+
+### Overriding settings
+
+`fetch_litellm_settings.sh` falls back to sensible defaults (`LOG_LEVEL=INFO`, PostgreSQL parameters pointing at `localhost`), but you can override any value through environment variables or build arguments. Example:
+
+```bash
+docker build \
+  --build-arg LOG_LEVEL=DEBUG \
+  --build-arg POSTGRESQL_ENDPT=host.docker.internal \
+  --build-arg POSTGRESQL_PASSCODE=mysecret \
+  -f docker/Dockerfile.local .
+```
+
+These arguments are used if the corresponding SSM parameters are missing or if `SKIP_SSM_FETCH` is set.
