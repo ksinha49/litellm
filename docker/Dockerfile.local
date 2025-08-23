@@ -91,9 +91,11 @@ COPY --from=builder /wheels /wheels
 RUN pip install --no-cache-dir *.whl /wheels/* --no-index --find-links=/wheels && \
     rm -f *.whl && rm -rf /wheels
 
-# Fetch runtime settings from AWS SSM
-RUN yum install -y awscli && \
-    docker/fetch_litellm_settings.sh
+# Install AWS CLI v2 and fetch runtime settings from AWS SSM
+RUN dnf -y install unzip && \
+    curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+RUN unzip awscliv2.zip && ./aws/install && rm -rf awscliv2.zip aws/
+RUN docker/fetch_litellm_settings.sh
 
 # Generate prisma client and make entrypoints executable
 RUN prisma generate && \
