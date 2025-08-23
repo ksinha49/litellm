@@ -28,6 +28,12 @@ PREFIX="/parameters/litellm/${LITELLM_ENV}"
 
 S3_BUCKET_NAME=$(get_parameter_with_retries "$PREFIX/S3_BUCKET_NAME")
 LOG_LEVEL=$(get_parameter_with_retries "$PREFIX/LOG_LEVEL")
+POSTGRESQL_ENDPT=$(get_parameter_with_retries "$PREFIX/POSTGRESQL_ENDPT")
+POSTGRESQL_PASSCODE=$(get_parameter_with_retries "$PREFIX/POSTGRESQL_PASSCODE")
+POSTGRESQL_PORT=$(get_parameter_with_retries "$PREFIX/POSTGRESQL_PORT")
+
+export POSTGRESQL_ENDPT POSTGRESQL_PASSCODE POSTGRESQL_PORT
+export DATABASE_URL="postgresql://postgres:${POSTGRESQL_PASSCODE}@${POSTGRESQL_ENDPT}:${POSTGRESQL_PORT}/postgres"
 if S3_REGION_NAME=$(get_parameter_with_retries "$PREFIX/S3_REGION_NAME" 2>/dev/null); then
   AWS_REGION="$S3_REGION_NAME"
 else
