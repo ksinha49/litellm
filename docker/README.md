@@ -81,9 +81,17 @@ ssm:GetParameter
 Parameters are expected at the following paths (replace `<env>` with your environment name):
 
 ```
-/parameters/litellm/<env>/S3_BUCKET_NAME
-/parameters/litellm/<env>/S3_REGION_NAME
 /parameters/litellm/<env>/LOG_LEVEL
+/parameters/litellm/<env>/POSTGRESQL_ENDPT
+/parameters/litellm/<env>/POSTGRESQL_PASSCODE
+/parameters/litellm/<env>/POSTGRESQL_PORT
 ```
 
-The script automatically detects the AWS region using the instance metadata service if `S3_REGION_NAME` is not defined.
+Optional parameters to enable S3 logging:
+
+```
+/parameters/litellm/<env>/S3_BUCKET_NAME
+/parameters/litellm/<env>/S3_REGION_NAME
+```
+
+The script automatically detects the AWS region using the instance metadata service if `S3_REGION_NAME` is not defined. If `S3_BUCKET_NAME` is absent, S3 logging is disabled.
