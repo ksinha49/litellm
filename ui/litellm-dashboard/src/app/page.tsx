@@ -117,7 +117,7 @@ export default function CreateKeyPage() {
   const [createClicked, setCreateClicked] = useState<boolean>(false)
   const [authLoading, setAuthLoading] = useState(true)
   const [userID, setUserID] = useState<string | null>(null)
-  const [appName, setAppName] = useState<string>(envAppName || "LiteLLM")
+  const [appName, setAppName] = useState<string>(envAppName || "Ameritas LiteLLM")
 
   const invitation_id = searchParams.get("invitation_id")
 

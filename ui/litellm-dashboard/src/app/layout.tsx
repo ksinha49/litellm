@@ -3,7 +3,7 @@ import { Inter } from "next/font/google";
 import "./globals.css";
 
 const inter = Inter({ subsets: ["latin"] });
-const appName = process.env.NEXT_PUBLIC_APP_NAME || "LiteLLM";
+const appName = process.env.NEXT_PUBLIC_APP_NAME || "Ameritas LiteLLM";
 
 export const metadata: Metadata = {
   title: `${appName} Dashboard`,
