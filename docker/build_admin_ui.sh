@@ -22,8 +22,17 @@ if [[ "$(uname)" == "Darwin" ]]; then
     brew update
     brew install curl
 else
-    # Assume Linux, try using apt-get
-    if command -v apt-get &> /dev/null; then
+    # Assume Linux, try using available package manager
+    if command -v dnf &> /dev/null; then
+        # Use dnf or yum if available
+        if ! command -v curl &> /dev/null; then
+            dnf -y install curl
+        fi
+    elif command -v yum &> /dev/null; then
+        if ! command -v curl &> /dev/null; then
+            yum -y install curl
+        fi
+    elif command -v apt-get &> /dev/null; then
         apt-get update
         apt-get install -y curl
     elif command -v apk &> /dev/null; then
