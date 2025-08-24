@@ -89,7 +89,7 @@ RUN dnf -y update && \
 # Copy source and prebuilt wheels
 COPY . .
 # Default config lives under /app/config/config.yaml
-RUN mkdir -p config && cp proxy_server_config.yaml config/config.yaml
+RUN mkdir -p config && cp litellm_settings.yaml config/config.yaml
 COPY docker/fetch_litellm_settings.sh docker/
 COPY --from=builder /app/dist/*.whl .
 COPY --from=builder /wheels /wheels
