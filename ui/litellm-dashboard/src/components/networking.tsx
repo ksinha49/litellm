@@ -4721,12 +4721,13 @@ export const getPassThroughEndpointsCall = async (accessToken: String) => {
 
 export const getConfigFieldSetting = async (
   accessToken: String,
-  fieldName: string
+  fieldName: string,
+  configType: string = "general_settings"
 ) => {
   try {
     let url = proxyBaseUrl
-      ? `${proxyBaseUrl}/config/field/info?field_name=${fieldName}`
-      : `/config/field/info?field_name=${fieldName}`;
+      ? `${proxyBaseUrl}/config/field/info?field_name=${fieldName}&config_type=${configType}`
+      : `/config/field/info?field_name=${fieldName}&config_type=${configType}`;
 
     //NotificationsManager.info("Requesting model data");
     const response = await fetch(url, {
@@ -4842,7 +4843,8 @@ export const createPassThroughEndpoint = async (
 export const updateConfigFieldSetting = async (
   accessToken: String,
   fieldName: string,
-  fieldValue: any
+  fieldValue: any,
+  configType: string = "general_settings"
 ) => {
   try {
     let url = proxyBaseUrl
@@ -4852,7 +4854,7 @@ export const updateConfigFieldSetting = async (
     let formData = {
       field_name: fieldName,
       field_value: fieldValue,
-      config_type: "general_settings",
+      config_type: configType,
     };
     //NotificationsManager.info("Requesting model data");
     const response = await fetch(url, {
