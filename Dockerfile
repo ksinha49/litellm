@@ -92,7 +92,7 @@ RUN chmod +x docker/prod_entrypoint.sh
 
 EXPOSE 4000/tcp
 
-RUN dnf install -y supervisor && dnf clean all
+RUN pip install supervisor --no-cache-dir
 COPY docker/supervisord.conf /etc/supervisord.conf
 
 ENTRYPOINT ["docker/prod_entrypoint.sh"]
