@@ -1,3 +1,9 @@
+ENV HTTP_PROXY="http://proxy.ameritas.com:8080"
+ENV http_proxy="http://proxy.ameritas.com:8080"
+ENV HTTPS_PROXY="http://proxy.ameritas.com:8080"
+ENV https_proxy="http://proxy.ameritas.com:8080"
+ENV NO_PROXY="localhost,127.0.0.1,registry-1.docker.io"
+
 # Base image for building
 ARG LITELLM_BUILD_IMAGE=registry.access.redhat.com/ubi9/python-311
 
@@ -45,6 +51,12 @@ RUN pip install PyJWT==2.9.0 --no-cache-dir
 
 # Build Admin UI
 RUN chmod +x docker/build_admin_ui.sh && ./docker/build_admin_ui.sh
+
+ENV HTTP_PROXY="http://proxy.ameritas.com:8080"
+ENV http_proxy="http://proxy.ameritas.com:8080"
+ENV HTTPS_PROXY="http://proxy.ameritas.com:8080"
+ENV https_proxy="http://proxy.ameritas.com:8080"
+ENV NO_PROXY="localhost,127.0.0.1,registry-1.docker.io"
 
 # Runtime stage
 FROM $LITELLM_RUNTIME_IMAGE AS runtime
