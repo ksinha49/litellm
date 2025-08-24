@@ -43,7 +43,14 @@ if [ $? -eq 0 ]; then
   # Copy the contents of the output directory to the specified destination
   cp -r ./out/* "$destination_dir"
 
+  echo "Contents of out/:"
+  ls -al out/
+  echo "Contents of $destination_dir:"
+  ls -al "$destination_dir"
+
   echo "Deployment completed."
 else
   echo "Build failed. Deployment aborted."
 fi
+set +x
+echo "build_ui.sh finished"

@@ -3,9 +3,8 @@
 # # try except this script
 # set -e
 
-# print current dir 
-echo
-pwd
+set -x
+echo "Current working directory: $(pwd)"
 
 
 # Build Admin UI
@@ -58,6 +57,10 @@ else
     rm -f ui/litellm-dashboard/ui_colors.json
 fi
 
+ls -al ui/litellm-dashboard
+echo "Latest commit:"
+git log -1 --oneline
+
 # cd in to /ui/litellm-dashboard
 cd ui/litellm-dashboard
 
@@ -69,3 +72,4 @@ chmod +x ./build_ui.sh
 
 # return to root directory
 cd ../..
+set +x
