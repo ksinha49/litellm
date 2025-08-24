@@ -88,6 +88,8 @@ RUN dnf -y update && \
 
 # Copy source and prebuilt wheels
 COPY . .
+# Default config lives under /app/config/config.yaml
+RUN mkdir -p config && cp proxy_server_config.yaml config/config.yaml
 COPY docker/fetch_litellm_settings.sh docker/
 COPY --from=builder /app/dist/*.whl .
 COPY --from=builder /wheels /wheels
@@ -108,4 +110,4 @@ RUN prisma generate && \
 
 EXPOSE 4000
 ENTRYPOINT ["docker/prod_entrypoint.sh"]
-CMD ["--port", "4000"]
+CMD ["--config", "/app/config/config.yaml", "--port", "4000"]
