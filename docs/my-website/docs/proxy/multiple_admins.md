@@ -33,6 +33,8 @@ litellm_settings:
   store_audit_logs: false
 ```
 
+You can also toggle this setting from the LiteLLM dashboard under **Logs → Audit Logs** using the **Store Audit Logs** switch.
+
 ### 2. Make a change to an entity
 
 In this example, we will delete a key.

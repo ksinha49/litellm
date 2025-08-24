@@ -8388,44 +8388,61 @@ async def update_config_general_settings(
             detail={"error": CommonProxyErrors.not_allowed_access.value},
         )
 
-    if data.field_name not in ConfigGeneralSettings.model_fields:
-        raise HTTPException(
-            status_code=400,
-            detail={"error": "Invalid field={} passed in.".format(data.field_name)},
+    if data.config_type == "general_settings":
+        if data.field_name not in ConfigGeneralSettings.model_fields:
+            raise HTTPException(
+                status_code=400,
+                detail={"error": "Invalid field={} passed in.".format(data.field_name)},
+            )
+
+        try:
+            ConfigGeneralSettings(**{data.field_name: data.field_value})
+        except Exception:
+            raise HTTPException(
+                status_code=400,
+                detail={
+                    "error": "Invalid type of field value={} passed in.".format(
+                        type(data.field_value),
+                    )
+                },
+            )
+
+        db_param_name = "general_settings"
+        existing = await prisma_client.db.litellm_config.find_first(
+            where={"param_name": db_param_name}
         )
-
-    try:
-        ConfigGeneralSettings(**{data.field_name: data.field_value})
-    except Exception:
-        raise HTTPException(
-            status_code=400,
-            detail={
-                "error": "Invalid type of field value={} passed in.".format(
-                    type(data.field_value),
-                )
-            },
+        if existing is None or existing.param_value is None:
+            settings = {}
+        else:
+            settings = dict(existing.param_value)
+    elif data.config_type == "litellm_settings":
+        if data.field_name not in LITELLM_SETTINGS_SAFE_DB_OVERRIDES:
+            raise HTTPException(
+                status_code=400,
+                detail={"error": "Invalid field={} passed in.".format(data.field_name)},
+            )
+        setattr(litellm, data.field_name, data.field_value)
+        db_param_name = "litellm_settings"
+        existing = await prisma_client.db.litellm_config.find_first(
+            where={"param_name": db_param_name}
         )
-
-    ## get general settings from db
-    db_general_settings = await prisma_client.db.litellm_config.find_first(
-        where={"param_name": "general_settings"}
-    )
-    ### update value
-
-    if db_general_settings is None or db_general_settings.param_value is None:
-        general_settings = {}
+        if existing is None or existing.param_value is None:
+            settings = {}
+        else:
+            settings = dict(existing.param_value)
     else:
-        general_settings = dict(db_general_settings.param_value)
+        raise HTTPException(
+            status_code=400,
+            detail={"error": "Invalid config_type passed in."},
+        )
 
-    ## update db
-
-    general_settings[data.field_name] = data.field_value
+    settings[data.field_name] = data.field_value
 
     response = await prisma_client.db.litellm_config.upsert(
-        where={"param_name": "general_settings"},
+        where={"param_name": db_param_name},
         data={
-            "create": {"param_name": "general_settings", "param_value": json.dumps(general_settings)},  # type: ignore
-            "update": {"param_value": json.dumps(general_settings)},  # type: ignore
+            "create": {"param_name": db_param_name, "param_value": json.dumps(settings)},  # type: ignore
+            "update": {"param_value": json.dumps(settings)},  # type: ignore
         },
     )
 
@@ -8441,6 +8458,7 @@ async def update_config_general_settings(
 )
 async def get_config_general_settings(
     field_name: str,
+    config_type: Literal["general_settings", "litellm_settings"] = "general_settings",
     user_api_key_dict: UserAPIKeyAuth = Depends(user_api_key_auth),
 ):
     global prisma_client
@@ -8463,35 +8481,42 @@ async def get_config_general_settings(
             detail={"error": CommonProxyErrors.not_allowed_access.value},
         )
 
-    if field_name not in ConfigGeneralSettings.model_fields:
+    if config_type == "general_settings":
+        if field_name not in ConfigGeneralSettings.model_fields:
+            raise HTTPException(
+                status_code=400,
+                detail={"error": "Invalid field={} passed in.".format(field_name)},
+            )
+        db_param_name = "general_settings"
+    elif config_type == "litellm_settings":
+        if field_name not in LITELLM_SETTINGS_SAFE_DB_OVERRIDES:
+            raise HTTPException(
+                status_code=400,
+                detail={"error": "Invalid field={} passed in.".format(field_name)},
+            )
+        db_param_name = "litellm_settings"
+    else:
         raise HTTPException(
             status_code=400,
-            detail={"error": "Invalid field={} passed in.".format(field_name)},
+            detail={"error": "Invalid config_type passed in."},
         )
 
-    ## get general settings from db
     db_general_settings = await prisma_client.db.litellm_config.find_first(
-        where={"param_name": "general_settings"}
+        where={"param_name": db_param_name}
     )
-    ### pop the value
-
     if db_general_settings is None or db_general_settings.param_value is None:
         raise HTTPException(
             status_code=400,
             detail={"error": "Field name={} not in DB".format(field_name)},
         )
+    settings = dict(db_general_settings.param_value)
+    if field_name in settings:
+        return ConfigFieldInfo(field_name=field_name, field_value=settings[field_name])
     else:
-        general_settings = dict(db_general_settings.param_value)
-
-        if field_name in general_settings:
-            return ConfigFieldInfo(
-                field_name=field_name, field_value=general_settings[field_name]
-            )
-        else:
-            raise HTTPException(
-                status_code=400,
-                detail={"error": "Field name={} not in DB".format(field_name)},
-            )
+        raise HTTPException(
+            status_code=400,
+            detail={"error": "Field name={} not in DB".format(field_name)},
+        )
 
 
 @router.get(

@@ -2,7 +2,8 @@ import { DataTable } from "./table";
 import moment from "moment";
 import { useRef, useState, useEffect, useCallback, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { uiAuditLogsCall, keyListCall } from "../networking";
+import { uiAuditLogsCall, keyListCall, getConfigFieldSetting, updateConfigFieldSetting } from "../networking";
+import { Switch } from "antd";
 import { AuditLogEntry, auditLogColumns } from "./columns";
 import { Text } from "@tremor/react";
 import { Team } from "../key_team_helpers/key_list";
@@ -263,38 +264,32 @@ export default function AuditLogs({
     const end = start + pageSize;
     return completeFilteredLogs.slice(start, end);
   }, [completeFilteredLogs, clientCurrentPage, pageSize]);
+  const [storeAuditLogs, setStoreAuditLogs] = useState<boolean>(false);
 
-  // Check if audit logs are empty (not loading and no data)
-  const showAuditLogsInfo = (!allLogsQuery.data || allLogsQuery.data.length === 0);
+  useEffect(() => {
+    if (!accessToken) return;
+    getConfigFieldSetting(accessToken, "store_audit_logs", "litellm_settings")
+      .then((data) => {
+        if (data && typeof data.field_value === "boolean") {
+          setStoreAuditLogs(data.field_value);
+        }
+      })
+      .catch(() => {});
+  }, [accessToken]);
 
-  // Custom AuditLogsInfoMessage component
-  const AuditLogsInfoMessage = ({ show }: { show: boolean }) => {
-    if (!show) return null;
-    
-    return (
-      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 flex items-start mb-6">
-        <div className="text-blue-500 mr-3 flex-shrink-0 mt-0.5">
-          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <circle cx="12" cy="12" r="10"></circle>
-            <line x1="12" y1="16" x2="12" y2="12"></line>
-            <line x1="12" y1="8" x2="12.01" y2="8"></line>
-          </svg>
-        </div>
-        <div>
-          <h4 className="text-sm font-medium text-blue-800">Audit Logs Not Available</h4>
-          <p className="text-sm text-blue-700 mt-1">
-            To enable audit logging, add the following configuration to your Ameritas LiteLLM proxy configuration file:
-          </p>
-          <pre className="mt-2 bg-white p-3 rounded border border-blue-200 text-xs font-mono overflow-auto">
-{`litellm_settings:
-  store_audit_logs: true`}
-          </pre>
-          <p className="text-xs text-blue-700 mt-2">
-            Note: This will only affect new requests after the configuration change and proxy restart.
-          </p>
-        </div>
-      </div>
-    );
+  const handleAuditLogToggle = async (checked: boolean) => {
+    if (!accessToken) return;
+    setStoreAuditLogs(checked);
+    try {
+      await updateConfigFieldSetting(
+        accessToken,
+        "store_audit_logs",
+        checked,
+        "litellm_settings"
+      );
+    } catch (e) {
+      setStoreAuditLogs(!checked);
+    }
   };
 
   const renderSubComponent = useCallback(({ row }: { row: any }) => {
@@ -436,13 +431,14 @@ export default function AuditLogs({
       {/* <FilterComponent options={auditLogFilterOptions} onApplyFilters={handleFilterChange} onResetFilters={handleFilterReset} /> */}
       <div className="bg-white rounded-lg shadow">
         <div className="border-b px-6 py-4">
-        <h1 className="text-xl font-semibold py-4">
-              Audit Logs
-            </h1>
-          
-          {/* Show Audit Logs Info Message when no data */}
-          <AuditLogsInfoMessage show={showAuditLogsInfo} />
-          
+          <div className="flex items-center justify-between">
+            <h1 className="text-xl font-semibold py-4">Audit Logs</h1>
+            <div className="flex items-center gap-2">
+              <span className="text-sm">Store Audit Logs</span>
+              <Switch checked={storeAuditLogs} onChange={handleAuditLogToggle} />
+            </div>
+          </div>
+
           <div className="flex flex-col md:flex-row items-start md:items-center justify-between space-y-4 md:space-y-0">
             
             <div className="flex flex-wrap items-center gap-3">

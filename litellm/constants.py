@@ -859,6 +859,7 @@ LITELLM_SETTINGS_SAFE_DB_OVERRIDES = [
     "default_internal_user_params",
     "public_model_groups",
     "public_model_groups_links",
+    "store_audit_logs",
 ]
 SPECIAL_LITELLM_AUTH_TOKEN = ["ui-token"]
 DEFAULT_MANAGEMENT_OBJECT_IN_MEMORY_CACHE_TTL = int(

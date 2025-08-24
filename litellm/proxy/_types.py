@@ -1589,11 +1589,11 @@ class PassThroughEndpointResponse(LiteLLMPydanticObjectBase):
 class ConfigFieldUpdate(LiteLLMPydanticObjectBase):
     field_name: str
     field_value: Any
-    config_type: Literal["general_settings"]
+    config_type: str
 
 
 class ConfigFieldDelete(LiteLLMPydanticObjectBase):
-    config_type: Literal["general_settings"]
+    config_type: str
     field_name: str
 
 
