@@ -94,23 +94,23 @@ const ConditionalPublicModelName: React.FC = () => {
   const publicNameTooltipContent = (
     <>
       <div className="mb-2 font-normal">
-        The name you specify in your API calls to LiteLLM Proxy
+        The name you specify in your API calls to Ameritas LiteLLM Proxy
       </div>
         <div className="mb-2 font-normal">
           <strong>Example:</strong> If you name your public model <code className="bg-gray-700 px-1 py-0.5 rounded text-xs">example-name</code> 
            , and choose <code className="bg-gray-700 px-1 py-0.5 rounded text-xs">openai/qwen-plus-latest</code> as the LiteLLM model 
       </div>
       <div className="mb-2 font-normal">
-        <strong>Usage:</strong> You make an API call to the LiteLLM proxy with <code className="bg-gray-700 px-1 py-0.5 rounded text-xs">model = &quot;example-name&quot;</code>
+        <strong>Usage:</strong> You make an API call to the Ameritas LiteLLM proxy with <code className="bg-gray-700 px-1 py-0.5 rounded text-xs">model = &quot;example-name&quot;</code>
       </div>
       <div className="font-normal">
-        <strong>Result:</strong> LiteLLM sends <code className="bg-gray-700 px-1 py-0.5 rounded text-xs">qwen-plus-latest</code> to the provider
+        <strong>Result:</strong> Ameritas LiteLLM sends <code className="bg-gray-700 px-1 py-0.5 rounded text-xs">qwen-plus-latest</code> to the provider
       </div>
     </>
   );
 
   const liteLLMModelTooltipContent = (
-    <div>The model name LiteLLM will send to the LLM API</div>
+    <div>The model name Ameritas LiteLLM will send to the LLM API</div>
   );
 
   const columns = [
@@ -142,7 +142,7 @@ const ConditionalPublicModelName: React.FC = () => {
     {
       title: (
         <span className="flex items-center">
-          LiteLLM Model Name
+          Ameritas LiteLLM Model Name
           <Tooltip 
             content={liteLLMModelTooltipContent}
             width="360px"
@@ -159,7 +159,7 @@ const ConditionalPublicModelName: React.FC = () => {
       <Form.Item
         label="Model Mappings"
         name="model_mappings"
-        tooltip="Map public model names to LiteLLM model names for load balancing"
+        tooltip="Map public model names to Ameritas LiteLLM model names for load balancing"
         labelCol={{ span: 10 }}
         wrapperCol={{ span: 16 }}
         labelAlign="left"

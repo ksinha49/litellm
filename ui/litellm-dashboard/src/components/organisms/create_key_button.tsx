@@ -1143,7 +1143,7 @@ const CreateKey: React.FC<CreateKeyProps> = ({
               <p>
                 Please save this secret key somewhere safe and accessible. For
                 security reasons, <b>you will not be able to view it again</b>{" "}
-                through your LiteLLM account. If you lose this secret key, you
+                through your Ameritas LiteLLM account. If you lose this secret key, you
                 will need to generate a new one.
               </p>
             </Col>

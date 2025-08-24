@@ -150,7 +150,7 @@ const VectorStoreForm: React.FC<VectorStoreFormProps> = ({
             message="PG Vector Setup Required"
             description={
               <div>
-                <p>LiteLLM provides a server to connect to PG Vector. To use this provider:</p>
+                <p>Ameritas LiteLLM provides a server to connect to PG Vector. To use this provider:</p>
                 <ol style={{ marginLeft: '16px', marginTop: '8px' }}>
                   <li>Deploy the litellm-pgvector server from: <a href="https://github.com/BerriAI/litellm-pgvector" target="_blank" rel="noopener noreferrer">https://github.com/BerriAI/litellm-pgvector</a></li>
                   <li>Configure your PostgreSQL database with pgvector extension</li>
