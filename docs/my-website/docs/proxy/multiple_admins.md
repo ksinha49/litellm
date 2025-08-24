@@ -26,11 +26,11 @@ Requires Enterprise License, Get in touch with us [here](https://calendly.com/d/
 
 ## Usage
 
-### 1. Switch on audit Logs 
-Add `store_audit_logs` to your litellm config.yaml and then start the proxy
+### 1. Audit log configuration
+Audit logs are enabled by default. To disable them, set `store_audit_logs: false` in your litellm config and then start the proxy
 ```shell
 litellm_settings:
-  store_audit_logs: true
+  store_audit_logs: false
 ```
 
 ### 2. Make a change to an entity
