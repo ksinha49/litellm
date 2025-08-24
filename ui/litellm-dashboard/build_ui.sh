@@ -37,8 +37,9 @@ if [ $? -eq 0 ]; then
   # Specify the destination directory
   destination_dir="../../litellm/proxy/_experimental/out"
 
-  # Remove existing files in the destination directory
-  rm -rf "$destination_dir"/*
+  # Remove existing files in the destination directory to avoid stale files
+  rm -rf "$destination_dir"
+  mkdir -p "$destination_dir"
 
   # Copy the contents of the output directory to the specified destination
   cp -r ./out/* "$destination_dir"
@@ -51,6 +52,7 @@ if [ $? -eq 0 ]; then
   echo "Deployment completed."
 else
   echo "Build failed. Deployment aborted."
+  exit 1
 fi
 set +x
 echo "build_ui.sh finished"
