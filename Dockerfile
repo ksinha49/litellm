@@ -60,6 +60,7 @@ RUN ls -la /app
 
 # Copy the built wheel from the builder stage to the runtime stage; assumes only one wheel file is present
 COPY --from=builder /app/dist/*.whl .
+COPY --from=builder /app/litellm/proxy/_experimental/out /app/litellm/proxy/_experimental/out
 COPY --from=builder /wheels/ /wheels/
 
 # Install the built wheel using pip; again using a wildcard if it's the only file
