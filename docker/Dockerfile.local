@@ -92,6 +92,7 @@ COPY . .
 RUN mkdir -p config && cp litellm_config.yaml config/config.yaml
 COPY docker/fetch_litellm_settings.sh docker/
 COPY --from=builder /app/dist/*.whl .
+COPY --from=builder /app/litellm/proxy/_experimental/out /app/litellm/proxy/_experimental/out
 COPY --from=builder /wheels /wheels
 
 # Install from wheels without contacting PyPI
