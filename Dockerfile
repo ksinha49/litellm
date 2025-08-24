@@ -1,8 +1,8 @@
 # Base image for building
-ARG LITELLM_BUILD_IMAGE=cgr.dev/chainguard/python:latest-dev
+ARG LITELLM_BUILD_IMAGE=registry.access.redhat.com/ubi9/python-311
 
 # Runtime image
-ARG LITELLM_RUNTIME_IMAGE=cgr.dev/chainguard/python:latest-dev
+ARG LITELLM_RUNTIME_IMAGE=registry.access.redhat.com/ubi9/python-311
 # Builder stage
 FROM $LITELLM_BUILD_IMAGE AS builder
 
@@ -12,7 +12,9 @@ WORKDIR /app
 USER root
 
 # Install build dependencies
-RUN apk add --no-cache gcc python3-dev openssl openssl-dev
+RUN dnf -y update && \
+    dnf install -y gcc python3-devel openssl openssl-devel && \
+    dnf clean all
 
 
 RUN pip install --upgrade pip && \
@@ -51,7 +53,9 @@ FROM $LITELLM_RUNTIME_IMAGE AS runtime
 USER root
 
 # Install runtime dependencies
-RUN apk add --no-cache openssl tzdata
+RUN dnf -y update && \
+    dnf install -y openssl tzdata && \
+    dnf clean all
 
 WORKDIR /app
 # Copy the current directory contents into the container at /app
@@ -76,7 +80,7 @@ RUN chmod +x docker/prod_entrypoint.sh
 
 EXPOSE 4000/tcp
 
-RUN apk add --no-cache supervisor
+RUN dnf install -y supervisor && dnf clean all
 COPY docker/supervisord.conf /etc/supervisord.conf
 
 ENTRYPOINT ["docker/prod_entrypoint.sh"]
