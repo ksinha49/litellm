@@ -45,7 +45,7 @@ interface PublicModelHubProps {
 
 const PublicModelHub: React.FC<PublicModelHubProps> = ({ accessToken }) => {
   const [modelHubData, setModelHubData] = useState<ModelGroupInfo[] | null>(null);
-  const [pageTitle, setPageTitle] = useState<string>("LiteLLM Gateway");
+  const [pageTitle, setPageTitle] = useState<string>("Ameritas LiteLLM Gateway");
   const [customDocsDescription, setCustomDocsDescription] = useState<string | null>(null);
   const [litellmVersion, setLitellmVersion] = useState<string>("");
   const [usefulLinks, setUsefulLinks] = useState<Record<string, string>>({});
@@ -500,7 +500,7 @@ const PublicModelHub: React.FC<PublicModelHubProps> = ({ accessToken }) => {
             <div className="flex items-center space-x-3 text-sm text-gray-600">
               <span className="flex items-center">
                 <span className="w-4 h-4 mr-2">🔧</span>
-                Built with litellm: v{litellmVersion}
+                Built with Ameritas LiteLLM: v{litellmVersion}
               </span>
             </div>
           </Card>
