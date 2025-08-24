@@ -1,7 +1,7 @@
 #!/bin/bash
 
-# # try except this script
-# set -e
+# try except this script
+set -e
 
 set -x
 echo "Current working directory: $(pwd)"
@@ -61,6 +61,9 @@ ls -al ui/litellm-dashboard
 echo "Latest commit:"
 git log -1 --oneline
 
+# Clean existing Admin UI build output to avoid stale files
+rm -rf litellm/proxy/_experimental/out
+
 # cd in to /ui/litellm-dashboard
 cd ui/litellm-dashboard
 
@@ -68,7 +71,7 @@ cd ui/litellm-dashboard
 chmod +x ./build_ui.sh
 
 # run ./build_ui.sh
-./build_ui.sh
+./build_ui.sh || exit 1
 
 # return to root directory
 cd ../..
