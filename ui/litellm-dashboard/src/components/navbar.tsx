@@ -131,7 +131,7 @@ const Navbar: React.FC<NavbarProps> = ({
               {logoUrl && (
                 <img
                   src={logoUrl}
-                  alt="LiteLLM Brand"
+                  alt="Ameritas LiteLLM Brand"
                   className="h-8 w-auto"
                 />
               )}
