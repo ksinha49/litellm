@@ -29,6 +29,9 @@ if [ $? -ne 0 ]; then
     exit 1
 fi
 
+# Install dependencies
+npm ci
+
 # Run npm build with the environment variable
 UI_BASE_PATH=$UI_BASE_PATH npm run build
 
