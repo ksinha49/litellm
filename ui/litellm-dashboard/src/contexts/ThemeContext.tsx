@@ -22,7 +22,9 @@ interface ThemeProviderProps {
 }
 
 export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children, accessToken }) => {
-  const [logoUrl, setLogoUrl] = useState<string | null>(process.env.NEXT_PUBLIC_LOGO_PATH || '/favicon.png');
+  const rootPath = process.env.NEXT_PUBLIC_SERVER_ROOT_PATH || '';
+  const defaultLogoUrl = `${rootPath}/ui/favicon.png`;
+  const [logoUrl, setLogoUrl] = useState<string | null>(process.env.NEXT_PUBLIC_LOGO_PATH || defaultLogoUrl);
 
   // Load logo URL from backend on mount
   useEffect(() => {
@@ -47,13 +49,13 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children, accessTo
           }
         } catch (error) {
           console.warn('Failed to load logo settings from backend:', error);
-          setLogoUrl('/favicon.png');
+          setLogoUrl(defaultLogoUrl);
         }
       }
     };
 
     loadLogoSettings();
-  }, [accessToken]);
+  }, [accessToken, defaultLogoUrl]);
 
   return (
     <ThemeContext.Provider value={{ logoUrl, setLogoUrl }}>

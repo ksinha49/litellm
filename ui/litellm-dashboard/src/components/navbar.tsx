@@ -42,6 +42,8 @@ const Navbar: React.FC<NavbarProps> = ({
 }) => {
   const [logoutUrl, setLogoutUrl] = useState("");
   const { logoUrl } = useTheme();
+  const rootPath = process.env.NEXT_PUBLIC_SERVER_ROOT_PATH || '';
+  const defaultLogoUrl = `${rootPath}/ui/favicon.png`;
 
   useEffect(() => {
     const initializeProxySettings = async () => {
@@ -130,7 +132,7 @@ const Navbar: React.FC<NavbarProps> = ({
           <div className="flex items-center flex-shrink-0">
             <Link href="/" className="flex items-center">
               <Image
-                src={logoUrl || "/favicon.png"}
+                src={logoUrl || defaultLogoUrl}
                 alt="Ameritas LiteLLM Brand"
                 className="h-8 w-8 object-contain"
                 width={32}
