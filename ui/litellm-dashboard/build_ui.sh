@@ -24,6 +24,9 @@ fi
 echo "Contents of ui_colors.json:"
 cat ui_colors.json
 
+# Increase Node.js heap limit to prevent build worker OOM kills
+export NODE_OPTIONS=--max-old-space-size=4096
+
 # Run npm build
 npm run build
 
