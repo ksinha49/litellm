@@ -145,8 +145,8 @@ const Navbar: React.FC<NavbarProps> = ({
                 height={32}
               />
               <span className="ml-2 flex flex-col leading-tight">
-                <span className="text-xs text-gray-900">{topLabel}</span>
-                <span className="text-sm font-bold text-gray-900">{bottomLabel}</span>
+                <span className="text-base font-medium text-gray-900">{topLabel}</span>
+                <span className="text-lg font-bold text-gray-900">{bottomLabel}</span>
               </span>
             </Link>
           </div>
