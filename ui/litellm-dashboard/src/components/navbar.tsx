@@ -71,6 +71,10 @@ const Navbar: React.FC<NavbarProps> = ({
     window.location.href = logoutUrl;
   };
 
+  const labelParts = appName.split(" ");
+  const topLabel = labelParts[0] || "";
+  const bottomLabel = labelParts.slice(1).join(" ") || labelParts[0] || "";
+
   const userItems: MenuProps["items"] = [
     {
       key: "user-info",
@@ -140,7 +144,10 @@ const Navbar: React.FC<NavbarProps> = ({
                 width={32}
                 height={32}
               />
-              <span className="ml-2 text-lg font-medium text-gray-900">{appName}</span>
+              <span className="ml-2 flex flex-col leading-tight">
+                <span className="text-xs text-gray-900">{topLabel}</span>
+                <span className="text-sm font-bold text-gray-900">{bottomLabel}</span>
+              </span>
             </Link>
           </div>
 
