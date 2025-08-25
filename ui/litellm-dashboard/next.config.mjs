@@ -6,6 +6,9 @@ const nextConfig = {
     env: {
         // Default logo bundled with the UI; can be overridden at build time
         NEXT_PUBLIC_LOGO_PATH: '/favicon.png',
+    },
+    images: {
+        unoptimized: true,
     }
 };
 
