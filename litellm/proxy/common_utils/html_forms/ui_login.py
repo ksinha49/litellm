@@ -10,7 +10,7 @@ html_form = f"""
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>LiteLLM Login</title>
+      <title>Ameritas LiteLLM Login</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <style>
         body {{
@@ -38,8 +38,13 @@ html_form = f"""
             text-align: center;
             margin-bottom: 30px;
         }}
-        
-        .logo {{
+
+        .logo-image {{
+            height: 40px;
+            margin-bottom: 10px;
+        }}
+
+        .logo-text {{
             font-size: 24px;
             font-weight: 600;
             color: #1e293b;
@@ -58,34 +63,6 @@ html_form = f"""
             margin: 0 0 20px;
             font-size: 16px;
             text-align: center;
-        }}
-
-        .info-box {{
-            background-color: #f1f5f9;
-            border-radius: 6px;
-            padding: 20px;
-            margin-bottom: 30px;
-            border-left: 4px solid #2563eb;
-        }}
-        
-        .info-header {{
-            display: flex;
-            align-items: center;
-            margin-bottom: 12px;
-            color: #1e40af;
-            font-weight: 600;
-            font-size: 16px;
-        }}
-        
-        .info-header svg {{
-            margin-right: 8px;
-        }}
-        
-        .info-box p {{
-            color: #475569;
-            margin: 8px 0;
-            line-height: 1.5;
-            font-size: 14px;
         }}
 
         label {{
@@ -190,27 +167,14 @@ html_form = f"""
 <body>
     <form action="{url_to_redirect_to}" method="post">
         <div class="logo-container">
-            <div class="logo">
-                🚅 LiteLLM
-            </div>
+            <img src="/ui/litellm-dashboard/public/favicon.png" alt="Ameritas LiteLLM logo" class="logo-image">
+            <div class="logo-text">Ameritas LiteLLM</div>
         </div>
         <h2>Login</h2>
-        <p class="subtitle">Access your LiteLLM Admin UI.</p>
-        <div class="info-box">
-            <div class="info-header">
-                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <circle cx="12" cy="12" r="10"></circle>
-                    <line x1="12" y1="16" x2="12" y2="12"></line>
-                    <line x1="12" y1="8" x2="12.01" y2="8"></line>
-                </svg>
-                Default Credentials
-            </div>
-            <p>By default, Username is <code>admin</code> and Password is your set LiteLLM Proxy <code>MASTER_KEY</code>.</p>
-            <p>Need to set UI credentials or SSO? <a href="https://docs.litellm.ai/docs/proxy/ui" target="_blank">Check the documentation</a>.</p>
-        </div>
+        <p class="subtitle">Access Ameritas Admin UI</p>
         <label for="username">Username<span class="required">*</span></label>
         <input type="text" id="username" name="username" required placeholder="Enter your username" autocomplete="username">
-        
+
         <label for="password">Password<span class="required">*</span></label>
         <input type="password" id="password" name="password" required placeholder="Enter your password" autocomplete="current-password">
         <div class="toggle-password">
