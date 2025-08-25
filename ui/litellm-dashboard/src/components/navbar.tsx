@@ -1,5 +1,4 @@
 import Link from "next/link"
-import Image from "next/image"
 import React, { useState, useEffect } from "react"
 import type { MenuProps } from "antd"
 import { Dropdown, Tooltip } from "antd"
@@ -137,7 +136,7 @@ const Navbar: React.FC<NavbarProps> = ({
           {/* Left side with correct logo positioning */}
           <div className="flex items-center flex-shrink-0">
             <Link href="/" className="flex items-center">
-              <Image
+              <img
                 src={logoUrl || defaultLogoUrl}
                 alt="Ameritas LiteLLM Brand"
                 className="h-8 w-8 object-contain"
