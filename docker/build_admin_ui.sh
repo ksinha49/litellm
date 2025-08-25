@@ -47,7 +47,8 @@ curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.38.0/install.sh | bash
 source ~/.nvm/nvm.sh
 nvm install v20
 nvm use v20
-npm install -g npm
+# Use npm bundled with Node 20 without upgrading
+# npm install -g npm
 
 # copy enterprise colors if available; otherwise, use default LiteLLM UI
 if [ -f "enterprise/enterprise_ui/enterprise_colors.json" ]; then
