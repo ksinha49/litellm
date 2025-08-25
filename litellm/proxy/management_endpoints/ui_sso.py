@@ -826,7 +826,7 @@ class SSOAuthenticationHandler:
             RedirectResponse: The redirect response from the SSO provider
         """
         # Google SSO Auth
-        if google_client_id is not None:
+        if google_client_id:
             from fastapi_sso.sso.google import GoogleSSO
 
             google_client_secret = os.getenv("GOOGLE_CLIENT_SECRET", None)
@@ -848,7 +848,7 @@ class SSOAuthenticationHandler:
             with google_sso:
                 return await google_sso.get_login_redirect(state=state)
         # Microsoft SSO Auth
-        elif microsoft_client_id is not None:
+        elif microsoft_client_id:
             from fastapi_sso.sso.microsoft import MicrosoftSSO
 
             microsoft_client_secret = os.getenv("MICROSOFT_CLIENT_SECRET", None)
@@ -869,7 +869,7 @@ class SSOAuthenticationHandler:
             )
             with microsoft_sso:
                 return await microsoft_sso.get_login_redirect(state=state)
-        elif generic_client_id is not None:
+        elif generic_client_id:
             from fastapi_sso.sso.base import DiscoveryDocument
             from fastapi_sso.sso.generic import create_provider
 
@@ -954,11 +954,7 @@ class SSOAuthenticationHandler:
         microsoft_client_id: Optional[str] = None,
         generic_client_id: Optional[str] = None,
     ) -> bool:
-        if (
-            google_client_id is not None
-            or microsoft_client_id is not None
-            or generic_client_id is not None
-        ):
+        if google_client_id or microsoft_client_id or generic_client_id:
             return True
         return False
 
