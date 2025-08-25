@@ -92,7 +92,27 @@ const TagInfoView: React.FC<TagInfoViewProps> = ({ tagId, onClose, accessToken, 
       {isEditing ? (
         <Card>
           <Form form={form} onFinish={handleSave} layout="vertical" initialValues={tagDetails}>
-            <Form.Item label="Tag Name" name="name" rules={[{ required: true, message: "Please input a tag name" }]}>
+            <Form.Item
+              label="Tag Name"
+              name="name"
+              rules={[
+                { required: true, message: "Please input a tag name" },
+                {
+                  validator: (_, value) => {
+                    if (!value) return Promise.resolve();
+                    const reservedNames = ["litellm-internal-health-check"];
+                    const reservedPrefixes = ["User-Agent:"];
+                    if (
+                      reservedNames.includes(value) ||
+                      reservedPrefixes.some((p) => value.startsWith(p))
+                    ) {
+                      return Promise.reject("This tag name is reserved");
+                    }
+                    return Promise.resolve();
+                  },
+                },
+              ]}
+            >
               <Input />
             </Form.Item>
 

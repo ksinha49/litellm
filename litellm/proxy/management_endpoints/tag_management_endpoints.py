@@ -17,7 +17,9 @@ from typing import TYPE_CHECKING, Dict, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException
 
+import litellm
 from litellm._logging import verbose_proxy_logger
+from litellm.constants import LITTELM_INTERNAL_HEALTH_SERVICE_ACCOUNT_NAME
 from litellm.litellm_core_utils.safe_json_dumps import safe_dumps
 from litellm.proxy._types import UserAPIKeyAuth
 from litellm.proxy.auth.user_api_key_auth import user_api_key_auth
@@ -40,6 +42,9 @@ if TYPE_CHECKING:
     from litellm.types.router import Deployment
 
 router = APIRouter()
+
+# Reserved tag prefixes that cannot be used for new tags
+RESERVED_TAG_PREFIXES = ["User-Agent:"]
 
 
 async def _get_model_names(prisma_client, model_ids: list) -> Dict[str, str]:
@@ -172,6 +177,18 @@ async def new_tag(
         raise HTTPException(
             status_code=500, detail=CommonProxyErrors.no_llm_router.value
         )
+    # Reserved tag validation
+    reserved_names = [LITTELM_INTERNAL_HEALTH_SERVICE_ACCOUNT_NAME]
+    reserved_prefixes = RESERVED_TAG_PREFIXES + [
+        f"{header}:" for header in (litellm.extra_spend_tag_headers or [])
+    ]
+    if tag.name in reserved_names or any(
+        tag.name.startswith(prefix) for prefix in reserved_prefixes
+    ):
+        raise HTTPException(
+            status_code=400, detail=f"Tag {tag.name} is reserved and cannot be used"
+        )
+
     try:
         # Get existing tags config
         tags_config = await _get_tags_config(prisma_client)

@@ -22,6 +22,13 @@ Tags returned by the `/tag/list` endpoint are grouped into:
 - **Configured tags** – tags you create in the dashboard to control which models a request may use.
 - **Dynamic tags** – tags detected from request metadata for spend tracking. These show up as read-only in the dashboard and do not restrict models.
 
+### Reserved Tag Names
+
+Some tag names are reserved by LiteLLM and cannot be created. Requests to create tags with these names will be rejected.
+
+- `litellm-internal-health-check`
+- Any tag starting with `User-Agent:` or prefixes generated from request headers (for example values from `extra_spend_tag_headers`)
+
 ## 1. Create a tag
 
 On the LiteLLM UI, navigate to Experimental > Tag Management > Create Tag.
