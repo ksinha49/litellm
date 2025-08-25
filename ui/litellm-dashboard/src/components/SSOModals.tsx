@@ -105,7 +105,7 @@ const SSOModals: React.FC<SSOModalsProps> = ({
   accessToken,
   ssoConfigured = false, // Default to false if not provided
 }) => {
-  const [isClearConfirmModalVisible, setIsClearConfirmModalVisible] = useState(false);
+  const [isResetConfirmModalVisible, setIsResetConfirmModalVisible] = useState(false);
 
   // Load existing SSO settings when modal opens
   useEffect(() => {
@@ -179,7 +179,7 @@ const SSOModals: React.FC<SSOModalsProps> = ({
     }
   };
 
-  // Handle clearing SSO settings
+  // Handle resetting SSO settings
   const handleClearSSO = async () => {
     if (!accessToken) {
       NotificationsManager.fromBackend("No access token available");
@@ -187,8 +187,8 @@ const SSOModals: React.FC<SSOModalsProps> = ({
     }
 
     try {
-      // Clear all SSO settings by sending empty values
-      const clearSettings = {
+      // Reset all SSO settings by sending empty values
+      const resetSettings = {
         google_client_id: '',
         google_client_secret: '',
         microsoft_client_id: '',
@@ -204,21 +204,21 @@ const SSOModals: React.FC<SSOModalsProps> = ({
         sso_provider: '',
       };
 
-      await updateSSOSettings(accessToken, clearSettings);
-      
-      // Clear the form
+      await updateSSOSettings(accessToken, resetSettings);
+
+      // Reset the form
       form.resetFields();
-      
+
       // Close the confirmation modal
-      setIsClearConfirmModalVisible(false);
-      
+      setIsResetConfirmModalVisible(false);
+
       // Close the main SSO modal and trigger refresh
       handleAddSSOOk();
-      
-      NotificationsManager.success("SSO settings cleared successfully");
+
+      NotificationsManager.success("SSO settings reset successfully");
     } catch (error) {
-      console.error("Failed to clear SSO settings:", error);
-      NotificationsManager.fromBackend("Failed to clear SSO settings");
+      console.error("Failed to reset SSO settings:", error);
+      NotificationsManager.fromBackend("Failed to reset SSO settings");
     }
   };
 
@@ -264,7 +264,7 @@ const SSOModals: React.FC<SSOModalsProps> = ({
             <Form.Item
               label="SSO Provider"
               name="sso_provider"
-              rules={[{ required: true, message: "Please select an SSO provider" }]}
+              rules={[{ required: !ssoConfigured, message: "Please select an SSO provider" }]}
             >
               <Select>
                 {Object.entries(ssoProviderLogoMap).map(([value, logo]) => (
@@ -313,11 +313,11 @@ const SSOModals: React.FC<SSOModalsProps> = ({
           </>
           <div style={{ textAlign: "right", marginTop: "10px", display: "flex", justifyContent: "flex-end", alignItems: "center", gap: "8px" }}>
             {ssoConfigured && (
-              <Button2 
-                onClick={() => setIsClearConfirmModalVisible(true)}
-                style={{ 
-                  backgroundColor: '#6366f1', 
-                  borderColor: '#6366f1', 
+              <Button2
+                onClick={() => setIsResetConfirmModalVisible(true)}
+                style={{
+                  backgroundColor: '#6366f1',
+                  borderColor: '#6366f1',
                   color: 'white'
                 }}
                 onMouseEnter={(e) => {
@@ -328,8 +328,9 @@ const SSOModals: React.FC<SSOModalsProps> = ({
                   e.currentTarget.style.backgroundColor = '#6366f1';
                   e.currentTarget.style.borderColor = '#6366f1';
                 }}
+                title="Reset SSO to restore default login"
               >
-                Clear
+                Reset SSO
               </Button2>
             )}
             <Button2 htmlType="submit">Save</Button2>
@@ -337,23 +338,23 @@ const SSOModals: React.FC<SSOModalsProps> = ({
         </Form>
       </Modal>
 
-      {/* Clear Confirmation Modal */}
+      {/* Reset Confirmation Modal */}
       <Modal
-        title="Confirm Clear SSO Settings"
-        visible={isClearConfirmModalVisible}
+        title="Confirm Reset SSO"
+        visible={isResetConfirmModalVisible}
         onOk={handleClearSSO}
-        onCancel={() => setIsClearConfirmModalVisible(false)}
-        okText="Yes, Clear"
+        onCancel={() => setIsResetConfirmModalVisible(false)}
+        okText="Yes, Reset"
         cancelText="Cancel"
-        okButtonProps={{ 
+        okButtonProps={{
           danger: true,
-          style: { 
-            backgroundColor: '#dc2626', 
-            borderColor: '#dc2626' 
+          style: {
+            backgroundColor: '#dc2626',
+            borderColor: '#dc2626'
           }
         }}
       >
-        <p>Are you sure you want to clear all SSO settings? This action cannot be undone.</p>
+        <p>Are you sure you want to reset all SSO settings? This will restore default login for your users.</p>
         <p>Users will no longer be able to login using SSO after this change.</p>
       </Modal>
 
