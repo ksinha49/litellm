@@ -50,7 +50,8 @@ const TagManagement: React.FC<TagProps> = ({
   userID,
   userRole,
 }) => {
-  const [tags, setTags] = useState<Tag[]>([]);
+  const [configuredTags, setConfiguredTags] = useState<Tag[]>([]);
+  const [dynamicTags, setDynamicTags] = useState<Tag[]>([]);
   const [isCreateModalVisible, setIsCreateModalVisible] = useState(false);
   const [selectedTagId, setSelectedTagId] = useState<string | null>(null);
   const [editTag, setEditTag] = useState<boolean>(false);
@@ -65,7 +66,13 @@ const TagManagement: React.FC<TagProps> = ({
     try {
       const response = await tagListCall(accessToken);
       console.log("List tags response:", response);
-      setTags(Object.values(response));
+      setConfiguredTags(Object.values(response.configured_tags));
+      setDynamicTags(
+        Object.values(response.dynamic_tags).map((tag: Tag) => ({
+          ...tag,
+          is_dynamic: true,
+        }))
+      );
     } catch (error) {
       console.error("Error fetching tags:", error);
       NotificationsManager.fromBackend("Error fetching tags: " + error);
@@ -182,7 +189,7 @@ const TagManagement: React.FC<TagProps> = ({
           <Grid numItems={1} className="gap-2 pt-2 pb-2 h-[75vh] w-full mt-2">
             <Col numColSpan={1}>
               <TagTable
-                data={tags}
+                data={configuredTags}
                 onEdit={(tag) => {
                   setSelectedTagId(tag.name);
                   setEditTag(true);
@@ -192,6 +199,23 @@ const TagManagement: React.FC<TagProps> = ({
               />
             </Col>
           </Grid>
+
+          {dynamicTags.length > 0 && (
+            <div className="mt-8">
+              <h2>Dynamic Tags</h2>
+              <Grid numItems={1} className="gap-2 pt-2 pb-2 w-full mt-2">
+                <Col numColSpan={1}>
+                  <TagTable
+                    data={dynamicTags}
+                    onEdit={() => {}}
+                    onDelete={() => {}}
+                    onSelectTag={() => {}}
+                    readOnly
+                  />
+                </Col>
+              </Grid>
+            </div>
+          )}
 
           {/* Create Tag Modal */}
           <Modal

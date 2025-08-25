@@ -15,6 +15,13 @@ router_settings:
   enable_tag_filtering: True # 👈 Key Change
 ```
 
+## Configured vs Dynamic Tags
+
+Tags returned by the `/tag/list` endpoint are grouped into:
+
+- **Configured tags** – tags you create in the dashboard to control which models a request may use.
+- **Dynamic tags** – tags detected from request metadata for spend tracking. These show up as read-only in the dashboard and do not restrict models.
+
 ## 1. Create a tag
 
 On the LiteLLM UI, navigate to Experimental > Tag Management > Create Tag.

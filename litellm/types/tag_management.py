@@ -33,6 +33,11 @@ class TagInfoRequest(BaseModel):
     names: List[str]
 
 
+class TagListResponse(BaseModel):
+    configured_tags: Dict[str, TagConfig]
+    dynamic_tags: Dict[str, TagConfig]
+
+
 class LiteLLM_DailyTagSpendTable(BaseModel):
     id: str
     tag: str

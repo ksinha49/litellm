@@ -97,7 +97,7 @@ const NewUsagePage: React.FC<NewUsagePageProps> = ({ accessToken, userRole, user
     }
     const tags = await tagListCall(accessToken)
     setAllTags(
-      Object.values(tags).map((tag: Tag) => ({
+      Object.values(tags.configured_tags).map((tag: Tag) => ({
         label: tag.name,
         value: tag.name,
       })),
