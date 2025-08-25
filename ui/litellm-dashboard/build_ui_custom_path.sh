@@ -21,11 +21,12 @@ if ! command -v nvm &> /dev/null; then
 fi
 
 # Use nvm to set the required Node.js version
-nvm use v20
+NODE_VERSION="v20"
+nvm use $NODE_VERSION
 
 # Check if nvm use was successful
 if [ $? -ne 0 ]; then
-    echo "Error: Failed to switch to Node.js v20. Deployment aborted."
+    echo "Error: Failed to switch to Node.js $NODE_VERSION. Deployment aborted."
     exit 1
 fi
 
