@@ -28,6 +28,7 @@ interface NavbarProps {
   proxySettings: any;
   accessToken: string | null;
   isPublicPage: boolean;
+  appName?: string;
 }
 
 const Navbar: React.FC<NavbarProps> = ({
@@ -39,6 +40,7 @@ const Navbar: React.FC<NavbarProps> = ({
   setProxySettings,
   accessToken,
   isPublicPage = false,
+  appName = "Ameritas LiteLLM",
 }) => {
   const [logoutUrl, setLogoutUrl] = useState("");
   const { logoUrl } = useTheme();
@@ -68,6 +70,10 @@ const Navbar: React.FC<NavbarProps> = ({
     clearMCPAuthTokens(); // Clear MCP auth tokens on logout
     window.location.href = logoutUrl;
   };
+
+  const labelParts = appName.split(" ");
+  const topLabel = labelParts[0] || "";
+  const bottomLabel = labelParts.slice(1).join(" ") || labelParts[0] || "";
 
   const userItems: MenuProps["items"] = [
     {
@@ -138,7 +144,10 @@ const Navbar: React.FC<NavbarProps> = ({
                 width={32}
                 height={32}
               />
-              <span className="ml-2 text-lg font-semibold">AMERITAS LITELLM</span>
+              <span className="ml-2 flex flex-col leading-tight">
+                <span className="text-base font-medium text-gray-900">{topLabel}</span>
+                <span className="text-lg font-bold text-gray-900">{bottomLabel}</span>
+              </span>
             </Link>
           </div>
 
