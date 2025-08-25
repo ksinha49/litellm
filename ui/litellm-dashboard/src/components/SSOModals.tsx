@@ -3,6 +3,7 @@ import { Modal, Form, Input, Button as Button2, Select, message } from "antd";
 import { Text, TextInput } from "@tremor/react";
 import { getSSOSettings, updateSSOSettings } from "./networking";
 import NotificationsManager from "./molecules/notifications_manager";
+import Image from "next/image";
 
 interface SSOModalsProps {
   isAddSSOModalVisible: boolean;
@@ -269,7 +270,15 @@ const SSOModals: React.FC<SSOModalsProps> = ({
                 {Object.entries(ssoProviderLogoMap).map(([value, logo]) => (
                   <Select.Option key={value} value={value}>
                     <div style={{ display: 'flex', alignItems: 'center', padding: '4px 0' }}>
-                      {logo && <img src={logo} alt={value} style={{ height: 24, width: 24, marginRight: 12, objectFit: 'contain' }} />}
+                      {logo && (
+                        <Image
+                          src={logo}
+                          alt={value}
+                          style={{ height: 24, width: 24, marginRight: 12, objectFit: 'contain' }}
+                          width={24}
+                          height={24}
+                        />
+                      )}
                       <span>{value.charAt(0).toUpperCase() + value.slice(1)} SSO</span>
                     </div>
                   </Select.Option>

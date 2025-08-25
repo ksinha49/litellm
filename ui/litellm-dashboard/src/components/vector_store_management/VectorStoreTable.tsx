@@ -18,6 +18,7 @@ import {
   ChevronDownIcon,
 } from "@heroicons/react/outline";
 import { Tooltip } from "antd";
+import Image from "next/image";
 import {
   ColumnDef,
   flexRender,
@@ -101,7 +102,7 @@ const VectorStoreTable: React.FC<VectorStoreTableProps> = ({
         const { displayName, logo } = getProviderLogoAndName(vectorStore.custom_llm_provider);
         return (
           <div className="flex items-center space-x-2">
-            {logo && <img src={logo} alt={displayName} className="h-4 w-4" />}
+            {logo && <Image src={logo} alt={displayName} className="h-4 w-4" width={16} height={16} />}
             <span className="text-xs">{displayName}</span>
           </div>
         );

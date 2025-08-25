@@ -9,6 +9,7 @@ import {
 } from "@tremor/react";
 import { Modal, Form, Input, message, Spin, Select } from "antd";
 import NotificationsManager from "./molecules/notifications_manager";
+import Image from "next/image";
 
 interface CloudZeroExportModalProps {
   isOpen: boolean;
@@ -204,10 +205,12 @@ const CloudZeroExportModal: React.FC<CloudZeroExportModalProps> = ({
       value: 'cloudzero',
       label: (
         <div className="flex items-center gap-2">
-          <img 
-            src="/cloudzero.png" 
-            alt="CloudZero" 
+          <Image
+            src="/cloudzero.png"
+            alt="CloudZero"
             className="w-5 h-5"
+            width={20}
+            height={20}
             onError={(e) => {
               // Fallback to text if image fails to load
               (e.target as HTMLImageElement).style.display = 'none';

@@ -10,6 +10,7 @@ import { message } from "antd"
 import { useTheme } from "@/contexts/ThemeContext"
 import { getProxyBaseUrl } from "@/components/networking"
 import NotificationsManager from "./molecules/notifications_manager";
+import Image from "next/image";
 
 interface UIThemeSettingsProps {
   userID: string | null;
@@ -160,10 +161,12 @@ const UIThemeSettings: React.FC<UIThemeSettingsProps> = ({
             </Text>
             <div className="bg-gray-50 rounded-lg p-6 flex items-center justify-center min-h-[120px]">
               {(logoUrlInput || logoUrl) ? (
-                <img
+                <Image
                   src={logoUrlInput || logoUrl!}
                   alt="Custom logo"
                   className="max-w-full max-h-24 object-contain"
+                  width={96}
+                  height={96}
                   onError={(e) => {
                     const target = e.target as HTMLImageElement;
                     target.style.display = 'none';

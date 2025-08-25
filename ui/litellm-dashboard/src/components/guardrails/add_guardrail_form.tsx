@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Card, Form, Typography, Select, Input, Switch, Tooltip, Modal, message, Divider, Space, Tag, Image, Steps } from 'antd';
+import { Card, Form, Typography, Select, Input, Switch, Tooltip, Modal, message, Divider, Space, Tag, Steps } from 'antd';
 import { Button, TextInput } from '@tremor/react';
 import type { FormInstance } from 'antd';
 import { GuardrailProviders, guardrail_provider_map, shouldRenderPIIConfigSettings, guardrailLogoMap, populateGuardrailProviders, populateGuardrailProviderMap, getGuardrailProviders } from './guardrail_info_helpers';
@@ -8,6 +8,7 @@ import PiiConfiguration from './pii_configuration';
 import GuardrailProviderFields from './guardrail_provider_fields';
 import GuardrailOptionalParams from './guardrail_optional_params';
 import NotificationsManager from '../molecules/notifications_manager';
+import Image from 'next/image';
 
 const { Title, Text, Link } = Typography;
 const { Option } = Select;
@@ -383,15 +384,17 @@ const AddGuardrailForm: React.FC<AddGuardrailFormProps> = ({
                 label={
                   <div style={{ display: 'flex', alignItems: 'center' }}>
                     {guardrailLogoMap[value] && (
-                      <img 
-                        src={guardrailLogoMap[value]} 
+                      <Image
+                        src={guardrailLogoMap[value]}
                         alt=""
-                        style={{ 
-                          height: '20px', 
-                          width: '20px', 
+                        style={{
+                          height: '20px',
+                          width: '20px',
                           marginRight: '8px',
                           objectFit: 'contain'
                         }}
+                        width={20}
+                        height={20}
                         onError={(e) => {
                           // Hide broken image icon if image fails to load
                           e.currentTarget.style.display = 'none';
@@ -404,15 +407,17 @@ const AddGuardrailForm: React.FC<AddGuardrailFormProps> = ({
               >
                 <div style={{ display: 'flex', alignItems: 'center' }}>
                   {guardrailLogoMap[value] && (
-                    <img 
-                      src={guardrailLogoMap[value]} 
+                    <Image
+                      src={guardrailLogoMap[value]}
                       alt=""
-                      style={{ 
-                        height: '20px', 
-                        width: '20px', 
+                      style={{
+                        height: '20px',
+                        width: '20px',
                         marginRight: '8px',
                         objectFit: 'contain'
                       }}
+                      width={20}
+                      height={20}
                       onError={(e) => {
                         // Hide broken image icon if image fails to load
                         e.currentTarget.style.display = 'none';

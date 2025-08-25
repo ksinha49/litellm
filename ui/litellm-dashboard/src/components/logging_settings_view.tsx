@@ -2,6 +2,7 @@ import React from "react";
 import { Text, Badge } from "@tremor/react";
 import { CogIcon, BanIcon } from "@heroicons/react/outline";
 import { callbackInfo, callback_map, reverse_callback_map } from "./callback_info_helpers";
+import Image from "next/image";
 
 interface LoggingConfig {
   callback_name: string;
@@ -81,10 +82,12 @@ export function LoggingSettingsView({
                 >
                   <div className="flex items-center gap-3">
                     {logoUrl ? (
-                      <img 
-                        src={logoUrl} 
-                        alt={displayName} 
-                        className="w-5 h-5 object-contain" 
+                      <Image
+                        src={logoUrl}
+                        alt={displayName}
+                        className="w-5 h-5 object-contain"
+                        width={20}
+                        height={20}
                       />
                     ) : (
                       <CogIcon className="h-5 w-5 text-gray-400" />
@@ -138,10 +141,12 @@ export function LoggingSettingsView({
                 >
                   <div className="flex items-center gap-3">
                     {logoUrl ? (
-                      <img 
-                        src={logoUrl} 
-                        alt={displayName} 
-                        className="w-5 h-5 object-contain" 
+                      <Image
+                        src={logoUrl}
+                        alt={displayName}
+                        className="w-5 h-5 object-contain"
+                        width={20}
+                        height={20}
                       />
                     ) : (
                       <BanIcon className="h-5 w-5 text-gray-400" />

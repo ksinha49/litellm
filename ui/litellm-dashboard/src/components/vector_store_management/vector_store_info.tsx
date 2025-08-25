@@ -26,6 +26,7 @@ import { VectorStore } from "./types";
 import { Providers, providerLogoMap, provider_map } from "../provider_info_helpers";
 import VectorStoreTester from "./VectorStoreTester";
 import NotificationsManager from "../molecules/notifications_manager";
+import Image from "next/image";
 
 interface VectorStoreInfoViewProps {
   vectorStoreId: string;
@@ -207,10 +208,12 @@ const VectorStoreInfoView: React.FC<VectorStoreInfoViewProps> = ({
                             return (
                               <Select2.Option key={providerEnum} value={provider_map[providerEnum]}>
                                 <div className="flex items-center space-x-2">
-                                  <img
+                                  <Image
                                     src={providerLogoMap[providerDisplayName]}
                                     alt={`${providerEnum} logo`}
                                     className="w-5 h-5"
+                                    width={20}
+                                    height={20}
                                     onError={(e) => {
                                       // Create a div with provider initial as fallback
                                       const target = e.target as HTMLImageElement;
@@ -340,10 +343,12 @@ const VectorStoreInfoView: React.FC<VectorStoreInfoViewProps> = ({
                           return (
                             <>
                               {logo && (
-                                <img 
-                                  src={logo} 
-                                  alt={`${displayName} logo`} 
+                                <Image
+                                  src={logo}
+                                  alt={`${displayName} logo`}
                                   className="w-5 h-5"
+                                  width={20}
+                                  height={20}
                                   onError={(e) => {
                                     const target = e.target as HTMLImageElement;
                                     const parent = target.parentElement;

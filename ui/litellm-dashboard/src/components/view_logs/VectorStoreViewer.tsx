@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { getProviderLogoAndName } from "../provider_info_helpers";
+import Image from "next/image";
 
 interface VectorStoreContent {
   text: string;
@@ -98,10 +99,12 @@ export function VectorStoreViewer({ data }: VectorStoreViewerProps) {
                           return (
                             <>
                               {logo && (
-                                <img 
-                                  src={logo} 
-                                  alt={`${displayName} logo`} 
-                                  className="h-5 w-5 mr-2" 
+                                <Image
+                                  src={logo}
+                                  alt={`${displayName} logo`}
+                                  className="h-5 w-5 mr-2"
+                                  width={20}
+                                  height={20}
                                 />
                               )}
                               {displayName}

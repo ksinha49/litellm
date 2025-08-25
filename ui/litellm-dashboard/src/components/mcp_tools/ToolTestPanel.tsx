@@ -3,6 +3,7 @@ import { Button, Callout, TextInput } from "@tremor/react";
 import { MCPTool, InputSchema } from "./types";
 import { Form, Tooltip, message } from "antd";
 import { InfoCircleOutlined, ClockCircleOutlined } from "@ant-design/icons";
+import Image from "next/image";
 import NotificationsManager from "../molecules/notifications_manager"; 
 
 export function ToolTestPanel({
@@ -164,11 +165,12 @@ export function ToolTestPanel({
       <div className="flex items-center justify-between pb-3 border-b border-gray-200">
         <div className="flex items-center space-x-3">
           {tool.mcp_info.logo_url && (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
+            <Image
               src={tool.mcp_info.logo_url}
               alt={`${tool.mcp_info.server_name} logo`}
               className="w-6 h-6 object-contain"
+              width={24}
+              height={24}
             />
           )}
           <div className="flex-1 min-w-0">
@@ -548,11 +550,12 @@ export function ToolTestPanel({
                                 </div>
                                 <div className="p-3">
                                   <div className="bg-gray-50 rounded p-3 border border-gray-200">
-                                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                                    <img
+                                    <Image
                                       src={content.url}
                                       alt="Tool result"
                                       className="max-w-full h-auto rounded shadow-sm"
+                                      width={400}
+                                      height={400}
                                     />
                                   </div>
                                 </div>

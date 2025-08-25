@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import ReactMarkdown from "react-markdown";
+import Image from "next/image";
 import {
   Card,
   Title,
@@ -1001,11 +1002,13 @@ const ChatUI: React.FC<ChatUIProps> = ({
                          hyphens: 'auto'
                        }}>
                     {message.isImage ? (
-                      <img 
-                        src={typeof message.content === "string" ? message.content : ""} 
-                        alt="Generated image" 
-                        className="max-w-full rounded-md border border-gray-200 shadow-sm" 
-                        style={{ maxHeight: '500px' }} 
+                      <Image
+                        src={typeof message.content === "string" ? message.content : ""}
+                        alt="Generated image"
+                        className="max-w-full rounded-md border border-gray-200 shadow-sm"
+                        style={{ maxHeight: '500px' }}
+                        width={500}
+                        height={500}
                       />
                     ) : (
                       <>
@@ -1092,10 +1095,12 @@ const ChatUI: React.FC<ChatUIProps> = ({
                   </Dragger>
                 ) : (
                   <div className="relative inline-block">
-                    <img 
-                      src={imagePreviewUrl || ''} 
-                      alt="Upload preview" 
+                    <Image
+                      src={imagePreviewUrl || ''}
+                      alt="Upload preview"
                       className="max-w-32 max-h-32 rounded-md border border-gray-200 object-cover"
+                      width={128}
+                      height={128}
                     />
                     <button
                       className="absolute top-1 right-1 bg-white shadow-sm border border-gray-200 rounded px-1 py-1 text-red-500 hover:bg-red-50 text-xs"
@@ -1117,10 +1122,12 @@ const ChatUI: React.FC<ChatUIProps> = ({
                         <FilePdfOutlined style={{ fontSize: '16px', color: 'white' }} />
                       </div>
                     ) : (
-                      <img 
-                        src={responsesImagePreviewUrl || ''} 
-                        alt="Upload preview" 
+                      <Image
+                        src={responsesImagePreviewUrl || ''}
+                        alt="Upload preview"
                         className="w-10 h-10 rounded-md border border-gray-200 object-cover"
+                        width={40}
+                        height={40}
                       />
                     )}
                   </div>
@@ -1151,10 +1158,12 @@ const ChatUI: React.FC<ChatUIProps> = ({
                         <FilePdfOutlined style={{ fontSize: '16px', color: 'white' }} />
                       </div>
                     ) : (
-                      <img 
-                        src={chatImagePreviewUrl || ''} 
-                        alt="Upload preview" 
+                      <Image
+                        src={chatImagePreviewUrl || ''}
+                        alt="Upload preview"
                         className="w-10 h-10 rounded-md border border-gray-200 object-cover"
+                        width={40}
+                        height={40}
                       />
                     )}
                   </div>

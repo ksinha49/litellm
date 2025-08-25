@@ -5,6 +5,7 @@ import { GuardrailProviders, guardrail_provider_map, guardrailLogoMap, getGuardr
 import { getGuardrailUISettings } from '../networking';
 import PiiConfiguration from './pii_configuration';
 import NotificationsManager from '../molecules/notifications_manager';
+import Image from 'next/image';
 
 const { Title, Text } = Typography;
 const { Option } = Select;
@@ -384,15 +385,17 @@ const EditGuardrailForm: React.FC<EditGuardrailFormProps> = ({
               >
                 <div style={{ display: 'flex', alignItems: 'center' }}>
                   {guardrailLogoMap[value] && (
-                    <img 
-                      src={guardrailLogoMap[value]} 
+                    <Image
+                      src={guardrailLogoMap[value]}
                       alt=""
-                      style={{ 
-                        height: '20px', 
-                        width: '20px', 
+                      style={{
+                        height: '20px',
+                        width: '20px',
                         marginRight: '8px',
                         objectFit: 'contain'
                       }}
+                      width={20}
+                      height={20}
                       onError={(e) => {
                         // Hide broken image icon if image fails to load
                         e.currentTarget.style.display = 'none';

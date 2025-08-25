@@ -10,6 +10,7 @@ import StdioConfiguration from "./StdioConfiguration"
 import { isAdminRole } from "@/utils/roles"
 import { validateMCPServerUrl, validateMCPServerName } from "./utils"
 import NotificationsManager from "../molecules/notifications_manager"
+import Image from "next/image"
 
 const asset_logos_folder = "../ui/assets/logos/"
 export const mcpLogoImg = `${asset_logos_folder}mcp_logo.png`
@@ -185,16 +186,13 @@ const CreateMCPServer: React.FC<CreateMCPServerProps> = ({
     <Modal
       title={
         <div className="flex items-center space-x-3 pb-4 border-b border-gray-100">
-          <img
+          <Image
             src={mcpLogoImg}
             alt="MCP Logo"
-            className="w-8 h-8 object-contain"
-            style={{
-              height: "20px",
-              width: "20px",
-              marginRight: "8px",
-              objectFit: "contain",
-            }}
+            className="w-5 h-5 object-contain"
+            style={{ marginRight: "8px", objectFit: "contain" }}
+            width={20}
+            height={20}
           />
           <h2 className="text-xl font-semibold text-gray-900">Add New MCP Server</h2>
         </div>

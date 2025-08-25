@@ -17,6 +17,7 @@ import ProviderSpecificFields from "../add_model/provider_specific_fields";
 import { TextInput } from "@tremor/react";
 import { CredentialItem } from "../networking";
 const { Title, Link } = Typography;
+import Image from "next/image";
 
 interface AddCredentialsModalProps {
   isVisible: boolean;
@@ -119,10 +120,12 @@ const AddCredentialsModal: React.FC<AddCredentialsModalProps> = ({
                 value={providerEnum}
               >
                 <div className="flex items-center space-x-2">
-                  <img
+                  <Image
                     src={providerLogoMap[providerDisplayName]}
                     alt={`${providerEnum} logo`}
                     className="w-5 h-5"
+                    width={20}
+                    height={20}
                     onError={(e) => {
                       const target = e.target as HTMLImageElement;
                       const parent = target.parentElement;

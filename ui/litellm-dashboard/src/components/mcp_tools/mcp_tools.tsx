@@ -18,6 +18,7 @@ import {
 import { Modal, Input, Form, message } from "antd";
 import { Button, Card, Title, Text } from "@tremor/react";
 import { RobotOutlined, ApiOutlined, KeyOutlined, SafetyOutlined, ToolOutlined } from "@ant-design/icons";
+import Image from "next/image";
 
 import { AUTH_TYPE } from "./types";
 import NotificationsManager from "../molecules/notifications_manager"
@@ -314,10 +315,12 @@ const MCPToolsViewer = ({
                       >
                         <div className="flex items-start space-x-2">
                           {tool.mcp_info.logo_url && (
-                            <img
+                            <Image
                               src={tool.mcp_info.logo_url}
                               alt={`${tool.mcp_info.server_name} logo`}
                               className="w-4 h-4 object-contain flex-shrink-0 mt-0.5"
+                              width={16}
+                              height={16}
                             />
                           )}
                           <div className="flex-1 min-w-0">
