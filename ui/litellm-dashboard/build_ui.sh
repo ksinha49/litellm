@@ -38,6 +38,9 @@ if [ $? -eq 0 ]; then
   echo
   pwd
 
+  # Ensure favicon is included in build output
+  cp ./public/favicon.png ./out/favicon.png
+
   # Specify the destination directory
   destination_dir="../../litellm/proxy/_experimental/out"
 

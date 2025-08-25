@@ -5,6 +5,7 @@ server_root_path = os.getenv("SERVER_ROOT_PATH", "")
 if server_root_path != "":
     url_to_redirect_to += server_root_path
 url_to_redirect_to += "/login"
+favicon_path = f"{server_root_path}/ui/favicon.png" if server_root_path else "/ui/favicon.png"
 html_form = f"""
 <!DOCTYPE html>
 <html lang="en">
@@ -167,7 +168,7 @@ html_form = f"""
 <body>
     <form action="{url_to_redirect_to}" method="post">
         <div class="logo-container">
-            <img src="/ui/litellm-dashboard/public/favicon.png" alt="Ameritas LiteLLM logo" class="logo-image">
+            <img src="{favicon_path}" alt="Ameritas LiteLLM logo" class="logo-image">
             <div class="logo-text">Ameritas LiteLLM</div>
         </div>
         <h2>Login</h2>
