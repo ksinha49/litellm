@@ -169,10 +169,10 @@ html_form = f"""
     <form action="{url_to_redirect_to}" method="post">
         <div class="logo-container">
             <img src="{favicon_path}" alt="Ameritas LiteLLM logo" class="logo-image">
-            <div class="logo-text">Ameritas LiteLLM</div>
+            <div class="logo-text">Ameritas-LiteLLM</div>
         </div>
         <h2>Login</h2>
-        <p class="subtitle">Access Ameritas Admin UI</p>
+        <p class="subtitle">Access Ameritas LiteLLM Admin Panel</p>
         <label for="username">Username<span class="required">*</span></label>
         <input type="text" id="username" name="username" required placeholder="Enter your username" autocomplete="username">
 
