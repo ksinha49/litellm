@@ -129,15 +129,14 @@ const Navbar: React.FC<NavbarProps> = ({
           {/* Left side with correct logo positioning */}
           <div className="flex items-center flex-shrink-0">
             <Link href="/" className="flex items-center">
-              {logoUrl && (
-                <Image
-                  src={logoUrl}
-                  alt="Ameritas LiteLLM Brand"
-                  className="h-8 w-auto"
-                  width={32}
-                  height={32}
-                />
-              )}
+              <Image
+                src={logoUrl || "/favicon.png"}
+                alt="Ameritas LiteLLM Brand"
+                className="h-8 w-8 object-contain"
+                width={32}
+                height={32}
+              />
+              <span className="ml-2 text-lg font-semibold">AMERITAS LITELLM</span>
             </Link>
           </div>
 
