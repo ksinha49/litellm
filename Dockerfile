@@ -3,6 +3,11 @@ ARG LITELLM_BUILD_IMAGE=registry.access.redhat.com/ubi9/python-311
 
 # Runtime image
 ARG LITELLM_RUNTIME_IMAGE=registry.access.redhat.com/ubi9/python-311
+
+# Optional proxy configuration
+ARG HTTP_PROXY=""
+ARG HTTPS_PROXY=""
+ARG NO_PROXY="localhost,127.0.0.1"
 # Builder stage
 FROM $LITELLM_BUILD_IMAGE AS builder
 
@@ -11,11 +16,13 @@ WORKDIR /app
 
 USER root
 
-ENV HTTP_PROXY="http://proxy.ameritas.com:8080"
-ENV http_proxy="http://proxy.ameritas.com:8080"
-ENV HTTPS_PROXY="http://proxy.ameritas.com:8080"
-ENV https_proxy="http://proxy.ameritas.com:8080"
-ENV NO_PROXY="localhost,127.0.0.1,registry-1.docker.io"
+# Accept proxy settings at build time
+ARG HTTP_PROXY
+ARG HTTPS_PROXY
+ARG NO_PROXY
+ENV HTTP_PROXY=${HTTP_PROXY} \
+    HTTPS_PROXY=${HTTPS_PROXY} \
+    NO_PROXY=${NO_PROXY}
 
 # Install build dependencies
 RUN dnf -y update && \
@@ -55,11 +62,13 @@ FROM $LITELLM_RUNTIME_IMAGE AS runtime
 # Ensure runtime stage runs as root
 USER root
 
-ENV HTTP_PROXY="http://proxy.ameritas.com:8080"
-ENV http_proxy="http://proxy.ameritas.com:8080"
-ENV HTTPS_PROXY="http://proxy.ameritas.com:8080"
-ENV https_proxy="http://proxy.ameritas.com:8080"
-ENV NO_PROXY="localhost,127.0.0.1,registry-1.docker.io"
+# Accept proxy settings at build time
+ARG HTTP_PROXY
+ARG HTTPS_PROXY
+ARG NO_PROXY
+ENV HTTP_PROXY=${HTTP_PROXY} \
+    HTTPS_PROXY=${HTTPS_PROXY} \
+    NO_PROXY=${NO_PROXY}
 
 # Install runtime dependencies
 RUN dnf -y update && \
