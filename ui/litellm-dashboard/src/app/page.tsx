@@ -262,6 +262,7 @@ export default function CreateKeyPage() {
                 proxySettings={proxySettings}
                 accessToken={accessToken}
                 isPublicPage={false}
+                appName={appName}
               />
               <div className="flex flex-1 overflow-auto">
                 <div className="mt-8">
