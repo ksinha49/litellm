@@ -6,6 +6,18 @@ import Image from '@theme/IdealImage';
 
 You can find the Dockerfile to build litellm proxy [here](https://github.com/BerriAI/litellm/blob/main/Dockerfile)
 
+If your network requires a proxy during the image build, supply the values using build arguments:
+
+```bash
+docker build \
+  --build-arg HTTP_PROXY=http://proxy:8080 \
+  --build-arg HTTPS_PROXY=http://proxy:8080 \
+  --build-arg NO_PROXY=localhost,127.0.0.1 \
+  -t litellm-proxy .
+```
+
+Omit these flags if a proxy is not needed.
+
 ## Quick Start
 
 To start using Litellm, run the following commands in a shell:
