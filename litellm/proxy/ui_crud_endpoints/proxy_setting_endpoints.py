@@ -495,12 +495,22 @@ async def update_sso_settings(sso_config: SSOConfig):
     # Update environment variables in config and in memory
     sso_data = sso_config.model_dump(exclude_none=True)
     for field_name, value in sso_data.items():
+        if value == "":
+            # treat empty strings as None - remove existing entries
+            if field_name == "user_email":
+                config["general_settings"].pop("proxy_admin_email", None)
+            elif field_name == "ui_access_mode":
+                config["general_settings"].pop("ui_access_mode", None)
+            elif field_name in env_var_mapping:
+                env_var_name = env_var_mapping[field_name]
+                config["environment_variables"].pop(env_var_name, None)
+                os.environ.pop(env_var_name, None)
+            continue
 
         if field_name == "user_email" and value is not None:
             # Store user_email in general_settings instead of environment variables
             config["general_settings"]["proxy_admin_email"] = value
         elif field_name == "ui_access_mode" and value is not None:
-
             config["general_settings"]["ui_access_mode"] = value
         elif field_name in env_var_mapping and value is not None:
             env_var_name = env_var_mapping[field_name]
