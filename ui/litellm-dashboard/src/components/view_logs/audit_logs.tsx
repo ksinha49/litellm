@@ -8,6 +8,7 @@ import { AuditLogEntry, auditLogColumns } from "./columns";
 import { Text } from "@tremor/react";
 import { Team } from "../key_team_helpers/key_list";
 import { formatNumberWithCommas } from "@/utils/dataUtils";
+import Image from "next/image";
 
 interface AuditLogsProps {
   accessToken: string | null;
@@ -401,16 +402,18 @@ export default function AuditLogs({
         <Text style={{ display: 'block', marginBottom: '20px', fontStyle: 'italic' }}>
           Here&apos;s a preview of what Audit Logs offer:
         </Text>
-        <img 
+        <Image
           src={auditLogsPreviewImg}
-          alt="Audit Logs Preview" 
-          style={{ 
-            maxWidth: '100%', 
+          alt="Audit Logs Preview"
+          style={{
+            maxWidth: '100%',
             maxHeight: '700px',
             borderRadius: '8px',
             boxShadow: '0 4px 8px rgba(0,0,0,0.1)',
             margin: '0 auto'
-          }} 
+          }}
+          width={800}
+          height={600}
           onError={(e) => {
             console.error('Failed to load audit logs preview image');
             (e.target as HTMLImageElement).style.display = 'none';

@@ -18,6 +18,7 @@ import { InfoCircleOutlined } from '@ant-design/icons';
 import { CredentialItem, vectorStoreCreateCall } from "../networking";
 import { VectorStoreProviders, vectorStoreProviderLogoMap, vectorStoreProviderMap, getProviderSpecificFields, VectorStoreFieldConfig } from "../vector_store_providers";
 import NotificationsManager from "../molecules/notifications_manager";
+import Image from "next/image";
 
 interface VectorStoreFormProps {
   isVisible: boolean;
@@ -120,10 +121,12 @@ const VectorStoreForm: React.FC<VectorStoreFormProps> = ({
               return (
                 <Select.Option key={providerEnum} value={vectorStoreProviderMap[providerEnum]}>
                   <div className="flex items-center space-x-2">
-                    <img
+                    <Image
                       src={vectorStoreProviderLogoMap[providerDisplayName]}
                       alt={`${providerEnum} logo`}
                       className="w-5 h-5"
+                      width={20}
+                      height={20}
                       onError={(e) => {
                         // Create a div with provider initial as fallback
                         const target = e.target as HTMLImageElement;

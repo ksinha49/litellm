@@ -6,6 +6,7 @@ import { ModelData } from "../../model_dashboard/types";
 import { TrashIcon, PencilIcon, PencilAltIcon, KeyIcon } from "@heroicons/react/outline";
 import DeleteModelButton from "../../delete_model_button";
 import { useState } from "react";
+import Image from "next/image";
 
 export const columns = (
   userRole: string,
@@ -57,11 +58,13 @@ export const columns = (
           <div className="flex items-start space-x-2 min-w-0 w-full max-w-[250px]">
             {/* Provider Icon */}
             <div className="flex-shrink-0 mt-0.5">
-              {model.provider ? (
-                <img
+            {model.provider ? (
+                <Image
                   src={getProviderLogoAndName(model.provider).logo}
                   alt={`${model.provider} logo`}
                   className="w-4 h-4"
+                  width={16}
+                  height={16}
                   onError={(e) => {
                     const target = e.target as HTMLImageElement;
                     const parent = target.parentElement;

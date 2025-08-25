@@ -57,6 +57,7 @@ import { valueFormatterSpend } from "./usage/utils/value_formatters"
 import CloudZeroExportModal from "./cloudzero_export_modal"
 import { ChartLoader } from "./shared/chart_loader"
 import { getProviderLogoAndName } from "./provider_info_helpers"
+import Image from "next/image"
 
 interface NewUsagePageProps {
   accessToken: string | null
@@ -653,10 +654,12 @@ const NewUsagePage: React.FC<NewUsagePageProps> = ({ accessToken, userRole, user
                                         <TableCell>
                                           <div className="flex items-center space-x-2">
                                             {provider.provider && (
-                                              <img
+                                              <Image
                                                 src={getProviderLogoAndName(provider.provider).logo}
                                                 alt={`${provider.provider} logo`}
                                                 className="w-4 h-4"
+                                                width={16}
+                                                height={16}
                                                 onError={(e) => {
                                                   const target = e.target as HTMLImageElement
                                                   const parent = target.parentElement

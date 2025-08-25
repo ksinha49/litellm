@@ -29,6 +29,7 @@ import { ArrowLeftIcon } from "@heroicons/react/outline"
 import { copyToClipboard as utilCopyToClipboard } from "@/utils/dataUtils"
 import { CheckIcon, CopyIcon } from "lucide-react"
 import NotificationsManager from "../molecules/notifications_manager"
+import Image from "next/image"
 
 export interface GuardrailInfoProps {
   guardrailId: string
@@ -367,10 +368,12 @@ const GuardrailInfoView: React.FC<GuardrailInfoProps> = ({ guardrailId, onClose,
                 <Text>Provider</Text>
                 <div className="mt-2 flex items-center space-x-2">
                   {logo && (
-                    <img
+                    <Image
                       src={logo}
                       alt={`${displayName} logo`}
                       className="w-6 h-6"
+                      width={24}
+                      height={24}
                       onError={(e) => {
                         // Hide broken image
                         ;(e.target as HTMLImageElement).style.display = "none"

@@ -18,6 +18,7 @@ import TeamDropdown from "../common_components/team_dropdown";
 import { all_admin_roles } from "@/utils/roles";
 import AddAutoRouterTab from "./add_auto_router_tab";
 import { handleAddAutoRouterSubmit } from "./handle_add_auto_router_submit";
+import Image from "next/image";
 
 interface AddModelTabProps {
   form: FormInstance; // For the Add Model tab
@@ -172,10 +173,12 @@ const AddModelTab: React.FC<AddModelTabProps> = ({
                     value={providerEnum}
                   >
                     <div className="flex items-center space-x-2">
-                      <img
+                      <Image
                         src={providerLogoMap[providerDisplayName]}
                         alt={`${providerEnum} logo`}
                         className="w-5 h-5"
+                        width={20}
+                        height={20}
                         onError={(e) => {
                           // Create a div with provider initial as fallback
                           const target = e.target as HTMLImageElement;

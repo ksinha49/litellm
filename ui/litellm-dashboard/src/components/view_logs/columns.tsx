@@ -6,6 +6,7 @@ import { TimeCell } from "./time_cell";
 import { Button, Badge } from "@tremor/react";
 import { Eye, EyeOff} from "lucide-react"
 import { formatNumberWithCommas } from "@/utils/dataUtils";
+import Image from "next/image";
 
 // Helper to get the appropriate logo URL
 const getLogoUrl = (
@@ -218,10 +219,12 @@ export const columns: ColumnDef<LogEntry>[] = [
       return (
         <div className="flex items-center space-x-2">
           {provider && (
-            <img
+            <Image
               src={getLogoUrl(row, provider)}
               alt=""
               className="w-4 h-4"
+              width={16}
+              height={16}
               onError={(e) => {
                 const target = e.target as HTMLImageElement;
                 target.style.display = 'none';

@@ -1,4 +1,3 @@
-/* eslint-disable @next/next/no-img-element */
 /* eslint-disable react/no-unescaped-entities */
 import React, { useState } from 'react';
 import { Form, Select, Space, Tooltip, Divider } from 'antd';
@@ -6,6 +5,7 @@ import { InfoCircleOutlined } from '@ant-design/icons';
 import { Button, Card, TextInput } from '@tremor/react';
 import { PlusIcon, TrashIcon, CogIcon, BanIcon } from '@heroicons/react/outline';
 import { callbackInfo, Callbacks, callback_map, mapDisplayToInternalNames } from '../callback_info_helpers';
+import Image from 'next/image';
 
 const { Option } = Select;
 
@@ -170,10 +170,12 @@ const LoggingSettings: React.FC<LoggingSettingsProps> = ({
                   <Tooltip title={description} placement="right">
                     <div className="flex items-center space-x-2">
                       {logo && (
-                        <img 
-                          src={logo} 
-                          alt={callbackName} 
-                          className="w-4 h-4 object-contain" 
+                        <Image
+                          src={logo || ""}
+                          alt={callbackName}
+                          className="w-4 h-4 object-contain"
+                          width={16}
+                          height={16}
                         />
                       )}
                       <span>{callbackName}</span>
@@ -229,7 +231,7 @@ const LoggingSettings: React.FC<LoggingSettingsProps> = ({
               <div className="flex justify-between items-start mb-4">
                 <div className="flex items-center space-x-2">
                   {logoUrl && (
-                    <img src={logoUrl} alt={callbackDisplayName} className="w-5 h-5 object-contain" />
+                    <Image src={logoUrl || ""} alt={callbackDisplayName || ""} className="w-5 h-5 object-contain" width={20} height={20} />
                   )}
                   <span className="text-sm font-medium">
                     {callbackDisplayName || 'New Integration'} Configuration
@@ -266,10 +268,12 @@ const LoggingSettings: React.FC<LoggingSettingsProps> = ({
                             <Tooltip title={description} placement="right">
                               <div className="flex items-center space-x-2">
                                 {logo && (
-                                  <img 
-                                    src={logo} 
-                                    alt={callbackName} 
-                                    className="w-4 h-4 object-contain" 
+                                  <Image
+                                    src={logo || ""}
+                                    alt={callbackName}
+                                    className="w-4 h-4 object-contain"
+                                    width={16}
+                                    height={16}
                                   />
                                 )}
                                 <span>{callbackName}</span>

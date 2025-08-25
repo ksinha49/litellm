@@ -30,6 +30,7 @@ import TopKeyView from "./top_key_view";
 import { formatNumberWithCommas } from "@/utils/dataUtils";
 import { valueFormatterSpend } from "./usage/utils/value_formatters";
 import { getProviderLogoAndName } from "./provider_info_helpers";
+import Image from "next/image";
 
 interface EntityMetrics {
   metrics: {
@@ -692,10 +693,12 @@ const EntityUsage: React.FC<EntityUsageProps> = ({
                                 <TableCell>
                                   <div className="flex items-center space-x-2">
                                     {provider.provider && (
-                                      <img
+                                      <Image
                                         src={getProviderLogoAndName(provider.provider).logo}
                                         alt={`${provider.provider} logo`}
                                         className="w-4 h-4"
+                                        width={16}
+                                        height={16}
                                         onError={(e) => {
                                           const target = e.target as HTMLImageElement;
                                           const parent = target.parentElement;

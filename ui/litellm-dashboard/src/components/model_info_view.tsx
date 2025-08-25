@@ -39,6 +39,7 @@ import { CheckIcon, CopyIcon } from "lucide-react";
 import { copyToClipboard as utilCopyToClipboard } from "../utils/dataUtils";
 import EditAutoRouterModal from "./edit_auto_router/edit_auto_router_modal";
 import NotificationsManager from "./molecules/notifications_manager";
+import Image from "next/image";
 
 interface ModelInfoViewProps {
   modelId: string;
@@ -375,10 +376,12 @@ export default function ModelInfoView({
                 <Text>Provider</Text>
                 <div className="mt-2 flex items-center space-x-2">
                   {modelData.provider && (
-                    <img
+                    <Image
                       src={getProviderLogoAndName(modelData.provider).logo}
                       alt={`${modelData.provider} logo`}
                       className="w-4 h-4"
+                      width={16}
+                      height={16}
                       onError={(e) => {
                         // Create a div with provider initial as fallback
                         const target = e.target as HTMLImageElement;

@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import Image from "next/image";
 import {
   Card,
   Table,
@@ -662,10 +663,12 @@ const Settings: React.FC<SettingsPageProps> = ({
                       <div className="flex items-center space-x-2">
                         {callbackInfo[callbackDisplayName]?.logo ? (
                           <div className="w-5 h-5 flex items-center justify-center">
-                            <img
+                            <Image
                               src={callbackInfo[callbackDisplayName].logo}
                               alt={`${callbackEnum} logo`}
                               className="w-5 h-5"
+                              width={20}
+                              height={20}
                               onError={(e) => {
                                 e.currentTarget.style.display = 'none';
                               }}

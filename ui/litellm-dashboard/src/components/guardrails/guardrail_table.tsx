@@ -13,6 +13,7 @@ import {
 } from "@tanstack/react-table"
 import { getGuardrailLogoAndName, guardrail_provider_map } from "./guardrail_info_helpers"
 import EditGuardrailForm from "./edit_guardrail_form"
+import Image from "next/image"
 
 interface GuardrailItem {
   guardrail_id?: string
@@ -108,10 +109,12 @@ const GuardrailTable: React.FC<GuardrailTableProps> = ({
         return (
           <div className="flex items-center space-x-2">
             {logo && (
-              <img
+              <Image
                 src={logo}
                 alt={`${displayName} logo`}
                 className="w-4 h-4"
+                width={16}
+                height={16}
                 onError={(e) => {
                   // Hide broken image
                   ;(e.target as HTMLImageElement).style.display = "none"

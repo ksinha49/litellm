@@ -1,4 +1,5 @@
 import Link from "next/link"
+import Image from "next/image"
 import React, { useState, useEffect } from "react"
 import type { MenuProps } from "antd"
 import { Dropdown, Tooltip } from "antd"
@@ -129,10 +130,12 @@ const Navbar: React.FC<NavbarProps> = ({
           <div className="flex items-center flex-shrink-0">
             <Link href="/" className="flex items-center">
               {logoUrl && (
-                <img
+                <Image
                   src={logoUrl}
                   alt="Ameritas LiteLLM Brand"
                   className="h-8 w-auto"
+                  width={32}
+                  height={32}
                 />
               )}
             </Link>

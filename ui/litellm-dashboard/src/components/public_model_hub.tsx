@@ -18,6 +18,7 @@ import { EndpointType, getEndpointType } from "./chat_ui/mode_endpoint_mapping";
 import { MessageType } from "./chat_ui/types";
 import { getProviderLogoAndName } from "./provider_info_helpers";
 import Navbar from "./navbar";
+import Image from "next/image";
 import { ThemeProvider } from "@/contexts/ThemeContext";
 import NotificationsManager from "./molecules/notifications_manager";
 // Simple approach without react-markdown dependency
@@ -302,10 +303,12 @@ const PublicModelHub: React.FC<PublicModelHubProps> = ({ accessToken }) => {
                   className="flex items-center space-x-1 px-2 py-1 bg-gray-100 rounded text-xs"
                 >
                   {logo && (
-                    <img 
-                      src={logo} 
-                      alt={provider} 
+                    <Image
+                      src={logo}
+                      alt={provider}
                       className="w-3 h-3 flex-shrink-0 object-contain"
+                      width={12}
+                      height={12}
                       onError={(e) => {
                         (e.target as HTMLImageElement).style.display = 'none';
                       }}
@@ -573,10 +576,12 @@ const PublicModelHub: React.FC<PublicModelHubProps> = ({ accessToken }) => {
                   return (
                     <div className="flex items-center space-x-2">
                       {logo && (
-                        <img 
-                          src={logo} 
-                          alt={option.label as string} 
+                        <Image
+                          src={logo}
+                          alt={option.label as string}
                           className="w-5 h-5 flex-shrink-0 object-contain"
+                          width={20}
+                          height={20}
                           onError={(e) => {
                             (e.target as HTMLImageElement).style.display = 'none';
                           }}
@@ -688,10 +693,12 @@ const PublicModelHub: React.FC<PublicModelHubProps> = ({ accessToken }) => {
                         <Tag key={provider} color="blue">
                           <div className="flex items-center space-x-1">
                             {logo && (
-                              <img 
-                                src={logo} 
-                                alt={provider} 
+                              <Image
+                                src={logo}
+                                alt={provider}
                                 className="w-3 h-3 flex-shrink-0 object-contain"
+                                width={12}
+                                height={12}
                                 onError={(e) => {
                                   (e.target as HTMLImageElement).style.display = 'none';
                                 }}
