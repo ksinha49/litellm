@@ -20,7 +20,7 @@ const TagSelector: React.FC<TagSelectorProps> = ({ onChange, value, className, a
       try {
         const response = await tagListCall(accessToken);
         console.log("List tags response:", response);
-        setTags(Object.values(response));
+        setTags(Object.values(response.configured_tags));
       } catch (error) {
         console.error("Error fetching tags:", error);
       }

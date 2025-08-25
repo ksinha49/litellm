@@ -34,6 +34,7 @@ interface TagTableProps {
   onEdit: (tag: Tag) => void;
   onDelete: (tagName: string) => void;
   onSelectTag: (tagName: string) => void;
+  readOnly?: boolean;
 }
 
 const TagTable: React.FC<TagTableProps> = ({
@@ -41,6 +42,7 @@ const TagTable: React.FC<TagTableProps> = ({
   onEdit,
   onDelete,
   onSelectTag,
+  readOnly = false,
 }) => {
   const [sorting, setSorting] = React.useState<SortingState>([
     { id: "created_at", desc: true }
@@ -53,17 +55,26 @@ const TagTable: React.FC<TagTableProps> = ({
       cell: ({ row }) => {
         const tag = row.original;
         return (
-          <div className="overflow-hidden">
-            <Tooltip title={tag.name}>
-              <Button
-                size="xs"
-                variant="light"
-                className="font-mono text-blue-500 bg-blue-50 hover:bg-blue-100 text-xs font-normal px-2 py-0.5"
-                onClick={() => onSelectTag(tag.name)}
-              >
-                {tag.name}
-              </Button>
-            </Tooltip>
+          <div className="overflow-hidden flex items-center">
+            {readOnly ? (
+              <span className="font-mono text-xs">{tag.name}</span>
+            ) : (
+              <Tooltip title={tag.name}>
+                <Button
+                  size="xs"
+                  variant="light"
+                  className="font-mono text-blue-500 bg-blue-50 hover:bg-blue-100 text-xs font-normal px-2 py-0.5"
+                  onClick={() => onSelectTag(tag.name)}
+                >
+                  {tag.name}
+                </Button>
+              </Tooltip>
+            )}
+            {tag.is_dynamic && (
+              <Badge size="xs" className="ml-2" color="gray">
+                Dynamic
+              </Badge>
+            )}
           </div>
         );
       },
@@ -126,7 +137,10 @@ const TagTable: React.FC<TagTableProps> = ({
         );
       },
     },
-    {
+  ];
+
+  if (!readOnly) {
+    columns.push({
       id: "actions",
       header: "",
       cell: ({ row }) => {
@@ -148,8 +162,8 @@ const TagTable: React.FC<TagTableProps> = ({
           </div>
         );
       },
-    },
-  ];
+    });
+  }
 
   const table = useReactTable({
     data,

@@ -30,6 +30,7 @@ from litellm.types.tag_management import (
     TagConfig,
     TagDeleteRequest,
     TagInfoRequest,
+    TagListResponse,
     TagNewRequest,
     TagUpdateRequest,
 )
@@ -348,7 +349,7 @@ async def info_tag(
     "/tag/list",
     tags=["tag management"],
     dependencies=[Depends(user_api_key_auth)],
-    response_model=List[TagConfig],
+    response_model=TagListResponse,
 )
 async def list_tags(
     user_api_key_dict: UserAPIKeyAuth = Depends(user_api_key_auth),
@@ -364,7 +365,10 @@ async def list_tags(
     try:
         ## QUERY STORED TAGS ##
         tags_config = await _get_tags_config(prisma_client)
-        list_of_tags = list(tags_config.values())
+        configured_tags = {
+            name: (tag if isinstance(tag, TagConfig) else TagConfig(**tag))
+            for name, tag in tags_config.items()
+        }
 
         ## QUERY DYNAMIC TAGS ##
         dynamic_tags = await prisma_client.db.litellm_dailytagspend.find_many(
@@ -376,8 +380,8 @@ async def list_tags(
             for dynamic_tag in dynamic_tags
         ]
 
-        dynamic_tag_config = [
-            TagConfig(
+        dynamic_tag_config = {
+            tag.tag: TagConfig(
                 name=tag.tag,
                 description="This is just a spend tag that was passed dynamically in a request. It does not control any LLM models.",
                 models=None,
@@ -385,10 +389,12 @@ async def list_tags(
                 updated_at=tag.updated_at.isoformat(),
             )
             for tag in dynamic_tags_list
-            if tag.tag not in tags_config
-        ]
+            if tag.tag not in configured_tags
+        }
 
-        return list_of_tags + dynamic_tag_config
+        return TagListResponse(
+            configured_tags=configured_tags, dynamic_tags=dynamic_tag_config
+        )
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
