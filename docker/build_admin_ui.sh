@@ -45,8 +45,8 @@ else
 fi
 curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.38.0/install.sh | bash
 source ~/.nvm/nvm.sh
-nvm install v18.17.0
-nvm use v18.17.0
+nvm install v20
+nvm use v20
 npm install -g npm
 
 # copy enterprise colors if available; otherwise, use default LiteLLM UI
@@ -54,7 +54,18 @@ if [ -f "enterprise/enterprise_ui/enterprise_colors.json" ]; then
     cp enterprise/enterprise_ui/enterprise_colors.json ui/litellm-dashboard/ui_colors.json
 else
     echo "Admin UI - using default LiteLLM UI"
-    rm -f ui/litellm-dashboard/ui_colors.json
+    cat <<'EOF' > ui/litellm-dashboard/ui_colors.json
+{
+  "brand": {
+    "faint": "#EFF6FF",
+    "muted": "#DBEAFE",
+    "subtle": "#BFDBFE",
+    "DEFAULT": "#3B82F6",
+    "emphasis": "#1D4ED8",
+    "inverted": "#FFFFFF"
+  }
+}
+EOF
 fi
 
 ls -al ui/litellm-dashboard
