@@ -213,6 +213,9 @@ greenscaleLogger = None
 lunaryLogger = None
 supabaseClient = None
 deepevalLogger = None
+# Sanitize User-Agent header values
+_USER_AGENT_SANITIZE_PATTERN = re.compile(r"[^A-Za-z0-9 \-._/()]")
+_MAX_USER_AGENT_LENGTH = 100
 callback_list: Optional[List[str]] = []
 user_logger_fn = None
 additional_details: Optional[Dict[str, str]] = {}
@@ -4229,15 +4232,23 @@ class StandardLoggingPayloadSetup:
             if "user-agent" in headers:
                 user_agent = headers["user-agent"]
                 if user_agent is not None:
-                    if user_agent_tags is None:
-                        user_agent_tags = []
-                    user_agent_part: Optional[str] = None
-                    if "/" in user_agent:
-                        user_agent_part = user_agent.split("/")[0]
-                    if user_agent_part is not None:
-                        user_agent_tags.append("User-Agent: " + user_agent_part)
-                    if user_agent is not None:
-                        user_agent_tags.append("User-Agent: " + user_agent)
+                    # Remove disallowed characters and enforce max length
+                    sanitized_user_agent = _USER_AGENT_SANITIZE_PATTERN.sub(
+                        "", str(user_agent)
+                    )[:_MAX_USER_AGENT_LENGTH]
+                    if sanitized_user_agent:
+                        if user_agent_tags is None:
+                            user_agent_tags = []
+                        user_agent_part: Optional[str] = None
+                        if "/" in sanitized_user_agent:
+                            user_agent_part = sanitized_user_agent.split("/")[0]
+                        if user_agent_part:
+                            user_agent_tags.append(
+                                "User-Agent: " + user_agent_part
+                            )
+                        user_agent_tags.append(
+                            "User-Agent: " + sanitized_user_agent
+                        )
         return user_agent_tags
 
     @staticmethod
