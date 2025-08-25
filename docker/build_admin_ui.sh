@@ -70,7 +70,11 @@ fi
 
 ls -al ui/litellm-dashboard
 echo "Latest commit:"
-git log -1 --oneline
+if git rev-parse --git-dir > /dev/null 2>&1; then
+    git log -1 --oneline
+else
+    echo "Git metadata not available"
+fi
 
 # Clean existing Admin UI build output to avoid stale files
 rm -rf litellm/proxy/_experimental/out
