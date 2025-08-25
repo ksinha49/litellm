@@ -1,6 +1,20 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react'
 import { getProxyBaseUrl } from '@/components/networking'
 
+const resolveLogoPath = (path: string): string => {
+  const rootPath = process.env.NEXT_PUBLIC_SERVER_ROOT_PATH || ''
+  if (!path) {
+    return path
+  }
+  if (/^https?:\/\//.test(path) || (rootPath && path.startsWith(rootPath))) {
+    return path
+  }
+  if (path.startsWith('/')) {
+    return `${rootPath}${path}`
+  }
+  return `${rootPath}/${path}`
+}
+
 interface ThemeContextType {
   logoUrl: string | null;
   setLogoUrl: (url: string | null) => void;
@@ -22,9 +36,11 @@ interface ThemeProviderProps {
 }
 
 export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children, accessToken }) => {
-  const rootPath = process.env.NEXT_PUBLIC_SERVER_ROOT_PATH || '';
-  const defaultLogoUrl = `${rootPath}/ui/favicon.png`;
-  const [logoUrl, setLogoUrl] = useState<string | null>(process.env.NEXT_PUBLIC_LOGO_PATH || defaultLogoUrl);
+  const defaultLogoUrl = resolveLogoPath('/ui/favicon.png')
+  const initialLogoUrl = process.env.NEXT_PUBLIC_LOGO_PATH
+    ? resolveLogoPath(process.env.NEXT_PUBLIC_LOGO_PATH)
+    : defaultLogoUrl
+  const [logoUrl, setLogoUrl] = useState<string | null>(initialLogoUrl)
 
   // Load logo URL from backend on mount
   useEffect(() => {
@@ -44,7 +60,7 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children, accessTo
           if (response.ok) {
             const data = await response.json();
             if (data.values?.logo_url) {
-              setLogoUrl(data.values.logo_url);
+              setLogoUrl(resolveLogoPath(data.values.logo_url))
             }
           }
         } catch (error) {
