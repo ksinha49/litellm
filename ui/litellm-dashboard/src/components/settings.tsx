@@ -692,8 +692,10 @@ const Settings: React.FC<SettingsPageProps> = ({
 
             {selectedCallbackParams &&
               selectedCallbackParams.map((param) => {
-                const callbackDisplayName = reverse_callback_map[selectedCallback || ''] || selectedCallback;
-                const paramType = callbackInfo[callbackDisplayName]?.dynamic_params?.[param] || 'text';
+                const callbackDisplayName =
+                  reverse_callback_map[selectedCallback || ''] || selectedCallback || '';
+                const paramType =
+                  callbackInfo[callbackDisplayName]?.dynamic_params?.[param] || 'text';
                 return (
                   <FormItem
                     label={param}

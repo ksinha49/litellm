@@ -6031,7 +6031,7 @@ export const tagListCall = async (
     if (!response.ok) {
       const errorData = await response.text();
       await handleError(errorData);
-      return {};
+      return { configured_tags: {}, dynamic_tags: {} };
     }
 
     const data = await response.json();
