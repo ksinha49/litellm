@@ -67,15 +67,14 @@ GOOGLE_CLIENT_SECRET=
 
 **Required .env variables on your Proxy**
 ```shell
-MICROSOFT_CLIENT_ID="84583a4d-"
-MICROSOFT_CLIENT_SECRET="nbk8Q~"
-MICROSOFT_TENANT="5a39737
+MICROSOFT_CLIENT_ID="<your-client-id>"
+MICROSOFT_CLIENT_SECRET="<your-client-secret>"
+MICROSOFT_TENANT="<your-tenant-id>"
 ```
-- Set Redirect URI on your App Registration on https://portal.azure.com/
-    - Set a redirect url = `<your proxy base url>/sso/callback`
-    ```shell
-    http://localhost:4000/sso/callback
-    ```
+These variables must be non-empty strings. The redirect URI configured on your App Registration should be `<PROXY_BASE_URL>/sso/callback`, for example:
+```shell
+http://localhost:4000/sso/callback
+```
 
 </TabItem>
 

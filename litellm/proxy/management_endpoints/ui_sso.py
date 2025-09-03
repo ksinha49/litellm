@@ -560,6 +560,7 @@ async def auth_callback(request: Request, state: Optional[str] = None):  # noqa:
         )
 
     microsoft_client_id = os.getenv("MICROSOFT_CLIENT_ID", None)
+    microsoft_client_secret = os.getenv("MICROSOFT_CLIENT_SECRET", None)
     google_client_id = os.getenv("GOOGLE_CLIENT_ID", None)
     generic_client_id = os.getenv("GENERIC_CLIENT_ID", None)
     received_response: Optional[dict] = None
@@ -584,6 +585,22 @@ async def auth_callback(request: Request, state: Optional[str] = None):  # noqa:
             redirect_url=redirect_url,
         )
     elif microsoft_client_id is not None:
+        # Microsoft SSO requires non-empty client ID/secret and a redirect URI
+        # matching <PROXY_BASE_URL>/sso/callback
+        if (
+            microsoft_client_id.strip() == ""
+            or microsoft_client_secret is None
+            or microsoft_client_secret.strip() == ""
+        ):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=(
+                    "MICROSOFT_CLIENT_ID and MICROSOFT_CLIENT_SECRET must be set to"
+                    " non-empty strings for Microsoft SSO. Configure these environment"
+                    " variables and ensure the redirect URI is <PROXY_BASE_URL>/sso/callback."
+                ),
+            )
+
         result = await MicrosoftSSOHandler.get_microsoft_callback_response(
             request=request,
             microsoft_client_id=microsoft_client_id,
