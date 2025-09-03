@@ -11,6 +11,7 @@ from typing import TYPE_CHECKING, Any, Optional, Union
 
 import click
 import httpx
+import yaml
 from dotenv import load_dotenv
 
 if TYPE_CHECKING:
@@ -362,7 +363,21 @@ def load_proxy_config(
             raise ImportError("yaml needs to be imported. Run - `pip install 'litellm[proxy]'`")
 
         proxy_config = ProxyConfig()
-        _config = asyncio.run(proxy_config.get_config(config_file_path=options.config))
+        try:
+            _config = asyncio.run(
+                proxy_config.get_config(config_file_path=options.config)
+            )
+        except FileNotFoundError:
+            click.echo(
+                f"LiteLLM Proxy: Config file not found: {options.config}", err=True
+            )
+            sys.exit(1)
+        except yaml.YAMLError as e:
+            click.echo(
+                f"LiteLLM Proxy: Failed to parse config file {options.config}: {e}",
+                err=True,
+            )
+            sys.exit(1)
 
         litellm_settings = _config.get("litellm_settings", None)
         if (
