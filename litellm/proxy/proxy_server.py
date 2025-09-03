@@ -2480,6 +2480,9 @@ class ProxyConfig:
         ## ADD MODEL LOGIC
         for m in db_models:
             _litellm_params = m.litellm_params
+            if isinstance(_litellm_params, LiteLLM_Params):
+                _litellm_params = _litellm_params.model_dump()
+
             if isinstance(_litellm_params, dict):
                 # decrypt values
                 for k, v in _litellm_params.items():
@@ -2492,10 +2495,9 @@ class ProxyConfig:
                         if len(_value) > 0:
                             _litellm_params[k] = _value
                 _litellm_params = LiteLLM_Params(**_litellm_params)
-
             else:
                 verbose_proxy_logger.error(
-                    f"Invalid model added to proxy db. Invalid litellm params. litellm_params={_litellm_params}"
+                    f"Invalid model added to proxy db. Invalid litellm params type={type(_litellm_params)} value={_litellm_params}"
                 )
                 continue  # skip to next model
             _model_info = self.get_model_info_with_id(
@@ -2518,6 +2520,9 @@ class ProxyConfig:
         _model_list: list = []
         for m in new_models:
             _litellm_params = m.litellm_params
+            if isinstance(_litellm_params, LiteLLM_Params):
+                _litellm_params = _litellm_params.model_dump()
+
             if isinstance(_litellm_params, dict):
                 # decrypt values
                 for k, v in _litellm_params.items():
@@ -2526,7 +2531,7 @@ class ProxyConfig:
                 _litellm_params = LiteLLM_Params(**_litellm_params)
             else:
                 verbose_proxy_logger.error(
-                    f"Invalid model added to proxy db. Invalid litellm params. litellm_params={_litellm_params}"
+                    f"Invalid model added to proxy db. Invalid litellm params type={type(_litellm_params)} value={_litellm_params}"
                 )
                 continue  # skip to next model
 
