@@ -1718,18 +1718,37 @@ class GoogleSSOHandler:
             redirect_uri=redirect_url,
             client_secret=google_client_secret,
         )
+        from oauthlib.oauth2.rfc6749.errors import InvalidClientIdError
 
         # if user is trying to get the raw sso response for debugging, return the raw sso response
         if return_raw_sso_response:
-            return (
-                await google_sso.verify_and_process(
-                    request=request,
-                    convert_response=False,  # type: ignore
+            try:
+                return (
+                    await google_sso.verify_and_process(
+                        request=request,
+                        convert_response=False,  # type: ignore
+                    )
+                    or {}
                 )
-                or {}
-            )
+            except InvalidClientIdError as e:  # pragma: no cover - defensive
+                verbose_proxy_logger.exception("Google SSO verification failed: %s", e)
+                raise ProxyException(
+                    message="Invalid Google OAuth client configuration. Please verify GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET.",
+                    type=ProxyErrorTypes.auth_error,
+                    param="GOOGLE_CLIENT_ID",
+                    code=status.HTTP_400_BAD_REQUEST,
+                )
 
-        result = await google_sso.verify_and_process(request)
+        try:
+            result = await google_sso.verify_and_process(request)
+        except InvalidClientIdError as e:
+            verbose_proxy_logger.exception("Google SSO verification failed: %s", e)
+            raise ProxyException(
+                message="Invalid Google OAuth client configuration. Please verify GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET.",
+                type=ProxyErrorTypes.auth_error,
+                param="GOOGLE_CLIENT_ID",
+                code=status.HTTP_400_BAD_REQUEST,
+            )
         return result or {}
 
 
