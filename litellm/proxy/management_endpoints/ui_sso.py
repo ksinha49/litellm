@@ -580,12 +580,11 @@ async def auth_callback(request: Request, state: Optional[str] = None):  # noqa:
 
     verbose_proxy_logger.info(f"Redirecting to {redirect_url}")
     result = None
-    if google_client_id is not None:
+    if google_client_id and google_client_secret:
         # Google SSO requires a client ID ending with .apps.googleusercontent.com,
         # a client secret, and a redirect URI matching <PROXY_BASE_URL>/sso/callback
         if (
             google_client_id.strip() == ""
-            or google_client_secret is None
             or google_client_secret.strip() == ""
             or re.match(r"^[\w.-]+\.apps\.googleusercontent\.com$", google_client_id)
             is None
@@ -867,17 +866,10 @@ class SSOAuthenticationHandler:
             RedirectResponse: The redirect response from the SSO provider
         """
         # Google SSO Auth
-        if google_client_id:
+        google_client_secret = os.getenv("GOOGLE_CLIENT_SECRET", None)
+        if google_client_id and google_client_secret:
             from fastapi_sso.sso.google import GoogleSSO
 
-            google_client_secret = os.getenv("GOOGLE_CLIENT_SECRET", None)
-            if google_client_secret is None:
-                raise ProxyException(
-                    message="GOOGLE_CLIENT_SECRET not set. Set it in .env file",
-                    type=ProxyErrorTypes.auth_error,
-                    param="GOOGLE_CLIENT_SECRET",
-                    code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                )
             google_sso = GoogleSSO(
                 client_id=google_client_id,
                 client_secret=google_client_secret,
@@ -1881,6 +1873,7 @@ async def debug_sso_callback(request: Request):
 
     microsoft_client_id = os.getenv("MICROSOFT_CLIENT_ID", None)
     google_client_id = os.getenv("GOOGLE_CLIENT_ID", None)
+    google_client_secret = os.getenv("GOOGLE_CLIENT_SECRET", None)
     generic_client_id = os.getenv("GENERIC_CLIENT_ID", None)
 
     redirect_url = os.getenv("PROXY_BASE_URL", str(request.base_url))
@@ -1890,7 +1883,7 @@ async def debug_sso_callback(request: Request):
         redirect_url += "/sso/debug/callback"
 
     result = None
-    if google_client_id is not None:
+    if google_client_id and google_client_secret:
         result = await GoogleSSOHandler.get_google_callback_response(
             request=request,
             google_client_id=google_client_id,
