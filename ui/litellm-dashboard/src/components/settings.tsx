@@ -48,6 +48,7 @@ import FormItem from "antd/es/form/FormItem";
 import {
   callback_map,
   callbackInfo,
+  reverse_callback_map,
   Callbacks,
 } from "./callback_info_helpers";
 import { parseErrorMessage } from "./shared/errorUtils";
@@ -690,21 +691,25 @@ const Settings: React.FC<SettingsPageProps> = ({
             </FormItem>
 
             {selectedCallbackParams &&
-              selectedCallbackParams.map((param) => (
-                <FormItem
-                  label={param}
-                  name={param}
-                  key={param}
-                  rules={[
-                    {
-                      required: true,
-                      message: "Please enter the value for " + param,
-                    },
-                  ]}
-                >
-                  <Input.Password />
-                </FormItem>
-              ))}
+              selectedCallbackParams.map((param) => {
+                const callbackDisplayName = reverse_callback_map[selectedCallback || ''] || selectedCallback;
+                const paramType = callbackInfo[callbackDisplayName]?.dynamic_params?.[param] || 'text';
+                return (
+                  <FormItem
+                    label={param}
+                    name={param}
+                    key={param}
+                    rules={[
+                      {
+                        required: true,
+                        message: "Please enter the value for " + param,
+                      },
+                    ]}
+                  >
+                    {paramType === 'password' ? <Input.Password /> : <Input />}
+                  </FormItem>
+                );
+              })}
 
             <div style={{ textAlign: "right", marginTop: "10px" }}>
               <Button2 htmlType="submit">Save</Button2>
@@ -733,21 +738,25 @@ const Settings: React.FC<SettingsPageProps> = ({
           <>
             {selectedEditCallback &&
               selectedEditCallback.variables &&
-              Object.entries(selectedEditCallback.variables).map(([param]) => (
-                <FormItem 
-                  label={param} 
-                  name={param} 
-                  key={param}
-                  rules={[
-                    {
-                      required: true,
-                      message: `Please enter the value for ${param}`,
-                    },
-                  ]}
-                >
-                  <Input.Password />
-                </FormItem>
-              ))}
+              Object.entries(selectedEditCallback.variables).map(([param]) => {
+                const callbackDisplayName = reverse_callback_map[selectedEditCallback.name] || selectedEditCallback.name;
+                const paramType = callbackInfo[callbackDisplayName]?.dynamic_params?.[param] || 'text';
+                return (
+                  <FormItem
+                    label={param}
+                    name={param}
+                    key={param}
+                    rules={[
+                      {
+                        required: true,
+                        message: `Please enter the value for ${param}`,
+                      },
+                    ]}
+                  >
+                    {paramType === 'password' ? <Input.Password /> : <Input />}
+                  </FormItem>
+                );
+              })}
           </>
 
           <div style={{ textAlign: "right", marginTop: "10px" }}>
