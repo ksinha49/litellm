@@ -22,7 +22,7 @@ export const callback_map: Record<string, string> = {
   Lago: "lago",
   OpenMeter: "openmeter",
   OTel: "otel",
-  S3: "s3",
+  S3: "s3_v2",
   Arize: "arize",
 }
 
@@ -129,8 +129,15 @@ export const callbackInfo: Record<string, CallbackInfo> = {
     [Callbacks.S3]: {
         logo: `${asset_logos_folder}aws.svg`,
         supports_key_team_logging: false,
-        dynamic_params: {},
-        description: "S3 Bucket (AWS) Logging Integration"
+        dynamic_params: {
+          "s3_bucket_name": "text",
+          "s3_region_name": "text",
+          "s3_aws_access_key_id": "text",
+          "s3_aws_secret_access_key": "password",
+          "s3_path": "text",
+          "s3_endpoint_url": "text",
+        },
+        description: "S3 Bucket (AWS) Logging Integration",
     }
 };
   
