@@ -83,5 +83,5 @@ def test_auth_callback_requires_google_env_vars():
     with pytest.raises(HTTPException) as exc:
         asyncio.run(_call())
 
-    assert exc.value.status_code == status.HTTP_400_BAD_REQUEST
-    assert "GOOGLE_CLIENT_ID" in exc.value.detail
+    assert exc.value.status_code == status.HTTP_401_UNAUTHORIZED
+    assert "GOOGLE_CLIENT_ID" not in exc.value.detail
