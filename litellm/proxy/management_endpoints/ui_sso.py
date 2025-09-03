@@ -11,6 +11,7 @@ Has all /sso/* routes
 import asyncio
 import os
 import uuid
+import re
 from copy import deepcopy
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple, Union, cast
 
@@ -562,6 +563,7 @@ async def auth_callback(request: Request, state: Optional[str] = None):  # noqa:
     microsoft_client_id = os.getenv("MICROSOFT_CLIENT_ID", None)
     microsoft_client_secret = os.getenv("MICROSOFT_CLIENT_SECRET", None)
     google_client_id = os.getenv("GOOGLE_CLIENT_ID", None)
+    google_client_secret = os.getenv("GOOGLE_CLIENT_SECRET", None)
     generic_client_id = os.getenv("GENERIC_CLIENT_ID", None)
     received_response: Optional[dict] = None
     # get url from request
@@ -579,6 +581,27 @@ async def auth_callback(request: Request, state: Optional[str] = None):  # noqa:
     verbose_proxy_logger.info(f"Redirecting to {redirect_url}")
     result = None
     if google_client_id is not None:
+        # Google SSO requires a client ID ending with .apps.googleusercontent.com,
+        # a client secret, and a redirect URI matching <PROXY_BASE_URL>/sso/callback
+        if (
+            google_client_id.strip() == ""
+            or google_client_secret is None
+            or google_client_secret.strip() == ""
+            or re.match(r"^[\w.-]+\.apps\.googleusercontent\.com$", google_client_id)
+            is None
+            or re.match(r"^[A-Za-z0-9-_]{8,}$", google_client_secret) is None
+        ):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=(
+                    "GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET must be set to valid "
+                    "Google OAuth credentials. Set GOOGLE_CLIENT_ID to your OAuth "
+                    "client ID ending with '.apps.googleusercontent.com', set "
+                    "GOOGLE_CLIENT_SECRET to the client secret, and ensure the "
+                    "redirect URI is <PROXY_BASE_URL>/sso/callback."
+                ),
+            )
+
         result = await GoogleSSOHandler.get_google_callback_response(
             request=request,
             google_client_id=google_client_id,
