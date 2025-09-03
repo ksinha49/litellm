@@ -1,8 +1,9 @@
 import sys
 import os
 import types
+import json
+import asyncio
 from types import SimpleNamespace
-import pytest
 from fastapi import APIRouter, FastAPI
 
 # Patch FastAPI to avoid including routers during import
@@ -30,7 +31,8 @@ stub_manager.global_mcp_server_manager = object()
 sys.modules["litellm.proxy._experimental.mcp_server.mcp_server_manager"] = stub_manager
 
 from litellm.proxy import proxy_server
-from litellm.types.router import LiteLLM_Params
+from litellm.proxy.management_endpoints import model_management_endpoints
+from litellm.types.router import LiteLLM_Params, Deployment, ModelInfo
 
 
 class DummyRouter:
@@ -97,3 +99,63 @@ def test_decrypt_model_list_from_db_accepts_dict_and_litellm_params(monkeypatch)
     assert len(models) == 2
     assert models[0]["litellm_params"]["model"] == "gpt-3.5"
     assert models[1]["litellm_params"]["model"] == "gpt-4"
+
+
+def test_decrypt_model_list_from_db_accepts_str(monkeypatch):
+    monkeypatch.setattr(proxy_server, "decrypt_value_helper", lambda value, key: value)
+    proxy_config = proxy_server.ProxyConfig()
+
+    str_model = SimpleNamespace(
+        model_name="gpt-3.5",
+        litellm_params=json.dumps({"model": "gpt-3.5"}),
+        model_info={},
+        model_id="1",
+    )
+
+    models = proxy_config.decrypt_model_list_from_db([str_model])
+    assert len(models) == 1
+    assert models[0]["litellm_params"]["model"] == "gpt-3.5"
+
+
+def test_models_added_via_management_endpoint_reload_without_invalid_log(
+    monkeypatch, caplog
+):
+    async def _run():
+        monkeypatch.setattr(
+            proxy_server, "encrypt_value_helper", lambda value, new_encryption_key=None: value
+        )
+        monkeypatch.setattr(proxy_server, "decrypt_value_helper", lambda value, key: value)
+        proxy_server.master_key = "test-key"
+        proxy_server.llm_router = DummyRouter()
+
+        class DummyTable:
+            async def create(self, data):
+                return SimpleNamespace(**data)
+
+        class DummyDB:
+            litellm_proxymodeltable = DummyTable()
+
+        prisma_client = SimpleNamespace(db=DummyDB())
+        user_api_key = SimpleNamespace(user_id="user")
+
+        deployment = Deployment(
+            model_name="gpt-3.5",
+            litellm_params=LiteLLM_Params(model="gpt-3.5"),
+            model_info=ModelInfo(id="model-id"),
+        )
+
+        model_response = await model_management_endpoints._add_model_to_db(
+            model_params=deployment,
+            user_api_key_dict=user_api_key,
+            prisma_client=prisma_client,
+        )
+
+        proxy_config = proxy_server.ProxyConfig()
+
+        with caplog.at_level("ERROR"):
+            added = proxy_config._add_deployment([model_response])
+
+        assert added == 1
+        assert "Invalid model added to proxy db" not in caplog.text
+
+    asyncio.run(_run())
