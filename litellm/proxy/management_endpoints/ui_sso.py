@@ -16,6 +16,7 @@ from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple, Union, cast
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.responses import RedirectResponse
+from oauthlib.oauth2.rfc6749.errors import InvalidClientIdError
 
 import litellm
 from litellm._logging import verbose_proxy_logger
@@ -43,6 +44,7 @@ from litellm.proxy._types import (
 from litellm.proxy.auth.auth_checks import ExperimentalUIJWTToken, get_user_object
 from litellm.proxy.auth.auth_utils import _has_user_setup_sso
 from litellm.proxy.auth.handle_jwt import JWTHandler
+from litellm.proxy.auth.premium import _premium_user_check
 from litellm.proxy.auth.user_api_key_auth import user_api_key_auth
 from litellm.proxy.common_utils.admin_ui_utils import (
     admin_ui_disabled,
@@ -66,7 +68,6 @@ from litellm.proxy.utils import (
     get_server_root_path,
 )
 from litellm.secret_managers.main import get_secret_bool, str_to_bool
-from litellm.proxy.auth.premium import _premium_user_check
 from litellm.types.proxy.management_endpoints.ui_sso import *
 
 if TYPE_CHECKING:
@@ -1439,13 +1440,24 @@ class MicrosoftSSOHandler:
             redirect_uri=redirect_url,
             allow_insecure_http=True,
         )
-        original_msft_result = (
-            await microsoft_sso.verify_and_process(
-                request=request,
-                convert_response=False,  # type: ignore
+        try:
+            original_msft_result = (
+                await microsoft_sso.verify_and_process(
+                    request=request,
+                    convert_response=False,  # type: ignore
+                )
+                or {}
             )
-            or {}
-        )
+        except InvalidClientIdError as e:
+            verbose_proxy_logger.exception(
+                "Microsoft SSO verification failed: %s", e
+            )
+            raise ProxyException(
+                message="Invalid Microsoft OAuth client configuration. Please verify MICROSOFT_CLIENT_ID and MICROSOFT_CLIENT_SECRET.",
+                type=ProxyErrorTypes.auth_error,
+                param="MICROSOFT_CLIENT_ID",
+                code=status.HTTP_400_BAD_REQUEST,
+            )
 
         user_team_ids = await MicrosoftSSOHandler.get_user_groups_from_graph_api(
             access_token=microsoft_sso.access_token
