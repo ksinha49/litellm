@@ -3,7 +3,7 @@ import sys
 import types
 import asyncio
 import pytest
-from fastapi import status
+from fastapi import HTTPException, status
 from starlette.requests import Request
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
@@ -32,7 +32,11 @@ async def _mock_verify_and_process(self, request, convert_response=True):
 _original_verify_and_process = GoogleSSO.verify_and_process
 GoogleSSO.verify_and_process = _mock_verify_and_process
 
-from litellm.proxy.management_endpoints.ui_sso import GoogleSSOHandler, ProxyException
+from litellm.proxy.management_endpoints.ui_sso import (
+    GoogleSSOHandler,
+    ProxyException,
+    auth_callback,
+)
 
 
 def test_invalid_google_client_id_returns_clear_error():
@@ -55,3 +59,29 @@ def test_invalid_google_client_id_returns_clear_error():
 
     # restore original
     GoogleSSO.verify_and_process = _original_verify_and_process
+
+
+def test_auth_callback_requires_google_env_vars():
+    GoogleSSO.verify_and_process = _original_verify_and_process
+
+    proxy_server = types.ModuleType("litellm.proxy.proxy_server")
+    proxy_server.general_settings = {}
+    proxy_server.jwt_handler = object()
+    proxy_server.master_key = "sk"
+    proxy_server.prisma_client = object()
+    proxy_server.user_api_key_cache = object()
+    sys.modules["litellm.proxy.proxy_server"] = proxy_server
+
+    os.environ["GOOGLE_CLIENT_ID"] = ""
+    os.environ["GOOGLE_CLIENT_SECRET"] = ""
+
+    request = Request(scope={"type": "http", "headers": []})
+
+    async def _call():
+        await auth_callback(request)
+
+    with pytest.raises(HTTPException) as exc:
+        asyncio.run(_call())
+
+    assert exc.value.status_code == status.HTTP_400_BAD_REQUEST
+    assert "GOOGLE_CLIENT_ID" in exc.value.detail

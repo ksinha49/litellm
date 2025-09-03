@@ -43,16 +43,18 @@ On Okta, add the 'callback_url' as `<proxy_base_url>/sso/callback`
 </TabItem>
 <TabItem value="google" label="Google SSO">
 
-- Create a new Oauth 2.0 Client on https://console.cloud.google.com/ 
+- Create a new Oauth 2.0 Client on https://console.cloud.google.com/
 
 **Required .env variables on your Proxy**
 ```shell
 # for Google SSO Login
-GOOGLE_CLIENT_ID=
-GOOGLE_CLIENT_SECRET=
+GOOGLE_CLIENT_ID="<your-client-id>.apps.googleusercontent.com"
+GOOGLE_CLIENT_SECRET="<your-client-secret>"
 ```
 
-- Set Redirect URL on your Oauth 2.0 Client on https://console.cloud.google.com/ 
+These must be non-empty strings. `GOOGLE_CLIENT_ID` should end with `.apps.googleusercontent.com` and `GOOGLE_CLIENT_SECRET` must match the secret from your Google Cloud Console.
+
+- Set Redirect URL on your Oauth 2.0 Client on https://console.cloud.google.com/
     - Set a redirect url = `<your proxy base url>/sso/callback`
     ```shell
     https://litellm-production-7002.up.railway.app/sso/callback
