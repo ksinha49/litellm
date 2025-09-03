@@ -8289,10 +8289,27 @@ async def update_config(config_info: ConfigYAML):  # noqa: PLR0915
         # update the litellm settings
         if config_info.litellm_settings is not None:
             config.setdefault("litellm_settings", {})
+
             updated_litellm_settings = config_info.litellm_settings
+            try:  # pydantic v2
+                updated_litellm_settings = updated_litellm_settings.model_dump(
+                    exclude_none=True
+                )  # type: ignore
+            except Exception:
+                try:  # pydantic v1
+                    updated_litellm_settings = updated_litellm_settings.dict(
+                        exclude_none=True
+                    )  # type: ignore
+                except Exception:
+                    updated_litellm_settings = {
+                        k: v
+                        for k, v in dict(updated_litellm_settings).items()  # type: ignore
+                        if v is not None
+                    }
+
             config["litellm_settings"] = {
-                **updated_litellm_settings,
                 **config["litellm_settings"],
+                **updated_litellm_settings,
             }
 
             # if litellm.success_callback in updated_litellm_settings and config["litellm_settings"]
