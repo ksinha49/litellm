@@ -2522,6 +2522,14 @@ class ProxyConfig:
             _litellm_params = m.litellm_params
             if isinstance(_litellm_params, LiteLLM_Params):
                 _litellm_params = _litellm_params.model_dump()
+            elif isinstance(_litellm_params, str):
+                try:
+                    _litellm_params = json.loads(_litellm_params)
+                except Exception:
+                    verbose_proxy_logger.error(
+                        f"Invalid model added to proxy db. Invalid litellm params type={type(_litellm_params)} value={_litellm_params}"
+                    )
+                    continue  # skip to next model
 
             if isinstance(_litellm_params, dict):
                 # decrypt values

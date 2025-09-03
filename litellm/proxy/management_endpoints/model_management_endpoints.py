@@ -12,7 +12,6 @@ model/{model_id}/update - PATCH endpoint for model update.
 
 import asyncio
 import datetime
-import json
 import uuid
 from typing import Dict, List, Literal, Optional, Tuple, Union, cast
 
@@ -128,16 +127,16 @@ def update_db_model(
         ]
 
     if "litellm_params" in merged_deployment_dict:
-        prisma_compatible_model_dict["litellm_params"] = json.dumps(
-            merged_deployment_dict["litellm_params"]
-        )
+        prisma_compatible_model_dict["litellm_params"] = merged_deployment_dict[
+            "litellm_params"
+        ]
 
     if "model_info" in merged_deployment_dict:
         model_info = merged_deployment_dict["model_info"]
         for key, value in model_info.items():
             if isinstance(value, datetime.datetime):
                 model_info[key] = value.isoformat()
-        prisma_compatible_model_dict["model_info"] = json.dumps(model_info)
+        prisma_compatible_model_dict["model_info"] = model_info
 
     return prisma_compatible_model_dict
 
@@ -280,7 +279,7 @@ async def _add_model_to_db(
     should_create_model_in_db: bool = True,
 ) -> Optional[LiteLLM_ProxyModelTable]:
     # encrypt litellm params #
-    _litellm_params_dict = model_params.litellm_params.dict(exclude_none=True)
+    _litellm_params_dict = model_params.litellm_params.model_dump(exclude_none=True)
     _orignal_litellm_model_name = model_params.litellm_params.model
     for k, v in _litellm_params_dict.items():
         encrypted_value = encrypt_value_helper(
@@ -290,10 +289,12 @@ async def _add_model_to_db(
     _data: dict = {
         "model_id": model_params.model_info.id,
         "model_name": model_params.model_name,
-        "litellm_params": model_params.litellm_params.model_dump_json(exclude_none=True),  # type: ignore
-        "model_info": model_params.model_info.model_dump_json(  # type: ignore
-            exclude_none=True
-        ),
+        "litellm_params": model_params.litellm_params.model_dump(
+            mode="json", exclude_none=True
+        ),  # type: ignore
+        "model_info": model_params.model_info.model_dump(
+            mode="json", exclude_none=True
+        ),  # type: ignore
         "created_by": user_api_key_dict.user_id or LITELLM_PROXY_ADMIN_NAME,
         "updated_by": user_api_key_dict.user_id or LITELLM_PROXY_ADMIN_NAME,
     }
@@ -659,7 +660,7 @@ async def delete_team_model_alias(
             tasks.append(
                 prisma_client.db.litellm_modeltable.update(
                     where={"id": id},
-                    data={"model_aliases": json.dumps(model_aliases)},
+                    data={"model_aliases": model_aliases},
                 )
             )
     await asyncio.gather(*tasks)
@@ -904,7 +905,7 @@ async def update_model(
                     pass
 
             _data: dict = {
-                "litellm_params": json.dumps(merged_dictionary),  # type: ignore
+                "litellm_params": merged_dictionary,  # type: ignore
                 "updated_by": user_api_key_dict.user_id or LITELLM_PROXY_ADMIN_NAME,
             }
             model_response = await prisma_client.db.litellm_proxymodeltable.update(
