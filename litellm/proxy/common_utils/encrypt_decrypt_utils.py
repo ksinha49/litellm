@@ -4,15 +4,25 @@ from typing import Literal, Optional
 
 from litellm._logging import verbose_proxy_logger
 
+_cached_salt_key: Optional[str] = None
 
-def _get_salt_key():
+
+def _get_salt_key() -> str:
+    global _cached_salt_key
+
+    if _cached_salt_key is not None:
+        return _cached_salt_key
+
     from litellm.proxy.proxy_server import master_key
 
-    salt_key = os.getenv("LITELLM_SALT_KEY", None)
+    salt_key = os.getenv("LITELLM_SALT_KEY") or master_key
 
     if salt_key is None:
-        salt_key = master_key
+        raise RuntimeError(
+            "Missing encryption salt key. Set LITELLM_SALT_KEY or provide master_key before startup."
+        )
 
+    _cached_salt_key = salt_key
     return salt_key
 
 
