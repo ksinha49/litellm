@@ -62,8 +62,10 @@ async def cache_ping():
     cleaned_cache_params: Dict[str, Any] = {}
     try:
         if litellm.cache is None:
-            raise HTTPException(
-                status_code=503, detail="Cache not initialized. litellm.cache is None"
+            return CachePingResponse(
+                status="disabled",
+                cache_type="none",
+                set_cache_response="Caching is disabled. Enable by setting 'litellm_settings.cache: true' and appropriate cache_params in proxy_server_config.yaml.",
             )
         litellm_cache_params = masker.mask_dict(vars(litellm.cache))
         # remove field that might reference itself
