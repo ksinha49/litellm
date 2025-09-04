@@ -206,6 +206,7 @@ from litellm.proxy.common_utils.encrypt_decrypt_utils import (
     _get_salt_key,
     decrypt_value_helper,
     encrypt_value_helper,
+    verify_and_store_salt_hash,
 )
 from litellm.proxy.common_utils.html_forms.ui_login import html_form
 from litellm.proxy.common_utils.http_parsing_utils import (
@@ -649,6 +650,9 @@ async def proxy_startup_event(app: FastAPI):
             proxy_logging_obj=proxy_logging_obj,
             user_api_key_cache=user_api_key_cache,
         )
+
+    if prisma_client is not None:
+        await verify_and_store_salt_hash(prisma_client)
 
     ProxyStartupEvent._initialize_startup_logging(
         llm_router=llm_router,

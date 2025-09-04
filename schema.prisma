@@ -530,6 +530,14 @@ model LiteLLM_PromptTable {
   updated_at DateTime @updatedAt
 }
 
+model LiteLLM_MetadataTable {
+  metadata_id String @id @default(uuid())
+  key String @unique
+  value String
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+}
+
 model LiteLLM_HealthCheckTable {
   health_check_id String @id @default(uuid())
   model_name String
