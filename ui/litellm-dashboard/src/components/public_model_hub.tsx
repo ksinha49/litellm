@@ -47,10 +47,11 @@ interface PublicModelHubProps {
 const PublicModelHub: React.FC<PublicModelHubProps> = ({ accessToken }) => {
   const [modelHubData, setModelHubData] = useState<ModelGroupInfo[] | null>(null);
   const [pageTitle, setPageTitle] = useState<string>("Ameritas LLM API");
-  // Store a custom description for the docs page. Default to an empty string
+  const defaultDocsDescription = `Ameritas has deployed a centralized AI Services Hub built on LiteLLM to give every team consistent, secure, and scalable access to generative AI. The hub abstracts over 100 language models behind a unified API, automatically handling authentication, budget controls, rate limits, and observability so developers can focus on building features rather than managing infrastructure.\n\nAcross the enterprise, the hub is used for document summarization, customer-service automation, knowledge retrieval, and bespoke model experimentation. Business units can onboard new models without modifying existing code, while governance teams maintain full visibility into usage and cost. This shared platform has turned AI from a niche experiment into an enterprise-wide capability—accelerating innovation while preserving compliance and operational control.`;
+  // Store a custom description for the docs page. Default to an enterprise-wide description
   // instead of a marketing tagline to keep the UI neutral when no description
   // is provided.
-  const [customDocsDescription, setCustomDocsDescription] = useState<string>("");
+  const [customDocsDescription, setCustomDocsDescription] = useState<string>(defaultDocsDescription);
   const [litellmVersion, setLitellmVersion] = useState<string>("");
   const [usefulLinks, setUsefulLinks] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState<boolean>(true);
@@ -83,8 +84,8 @@ const PublicModelHub: React.FC<PublicModelHubProps> = ({ accessToken }) => {
       const publicModelHubInfo = await getPublicModelHubInfo();
       console.log("Public Model Hub Info:", publicModelHubInfo);
       setPageTitle(publicModelHubInfo.docs_title);
-      // Fall back to an empty string rather than an opinionated tagline
-      setCustomDocsDescription(publicModelHubInfo.custom_docs_description || "");
+      // Fall back to the default enterprise-wide description when none is provided
+      setCustomDocsDescription(publicModelHubInfo.custom_docs_description || defaultDocsDescription);
       setLitellmVersion(publicModelHubInfo.litellm_version);
       setUsefulLinks(publicModelHubInfo.useful_links || {});
     };
@@ -503,7 +504,7 @@ const PublicModelHub: React.FC<PublicModelHubProps> = ({ accessToken }) => {
         {/* About Section */}
           <Card className="mb-10 p-8 bg-white border border-gray-200 rounded-lg shadow-sm">
             <Title className="text-2xl font-semibold mb-6 text-gray-900">About</Title>
-            <p className="text-gray-700 mb-6 text-base leading-relaxed">{customDocsDescription}</p>
+            <p className="text-gray-700 mb-6 text-base leading-relaxed whitespace-pre-line">{customDocsDescription}</p>
             <div className="flex items-center space-x-3 text-sm text-gray-600">
               <span className="flex items-center">
                 <span className="w-4 h-4 mr-2">🔧</span>
