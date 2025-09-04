@@ -487,7 +487,13 @@ def apply_user_info_values_to_sso_user_defined_values(
         user_defined_values["user_id"] = user_info.user_id
 
     if user_info is None or user_info.user_role is None:
-        user_defined_values["user_role"] = LitellmUserRoles.INTERNAL_USER_VIEW_ONLY
+        user_defined_values["user_role"] = (
+            litellm.default_internal_user_params.get(
+                "user_role", LitellmUserRoles.INTERNAL_USER
+            )
+            if litellm.default_internal_user_params
+            else LitellmUserRoles.INTERNAL_USER
+        )
     else:
         user_defined_values["user_role"] = user_info.user_role
 
@@ -784,8 +790,14 @@ async def insert_sso_user(
                 litellm.internal_user_budget_duration
             )
 
-    if user_defined_values["user_role"] is None:
-        user_defined_values["user_role"] = LitellmUserRoles.INTERNAL_USER_VIEW_ONLY
+    if user_defined_values.get("user_role") is None:
+        user_defined_values["user_role"] = (
+            litellm.default_internal_user_params.get(
+                "user_role", LitellmUserRoles.INTERNAL_USER
+            )
+            if litellm.default_internal_user_params
+            else LitellmUserRoles.INTERNAL_USER
+        )
 
     new_user_request = NewUserRequest(
         user_id=user_defined_values["user_id"],
