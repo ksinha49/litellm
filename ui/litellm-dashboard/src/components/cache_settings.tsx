@@ -29,10 +29,23 @@ const cacheTypeOptions = [
   "redis_semantic",
 ];
 
-const cacheTypeParams: Record<string, { key: string; label: string }[]> = {
+interface CacheParamField {
+  key: string;
+  label: string;
+  type?: string;
+  placeholder?: string;
+}
+
+const cacheTypeParams: Record<string, CacheParamField[]> = {
   redis: [
     { key: "host", label: "Host" },
     { key: "port", label: "Port" },
+    {
+      key: "password",
+      label: "Password",
+      type: "password",
+      placeholder: "os.environ/REDIS_PASSWORD",
+    },
   ],
   qdrant: [
     { key: "host", label: "Host" },
@@ -41,10 +54,34 @@ const cacheTypeParams: Record<string, { key: string; label: string }[]> = {
   redis_semantic: [
     { key: "host", label: "Host" },
     { key: "port", label: "Port" },
+    {
+      key: "password",
+      label: "Password",
+      type: "password",
+      placeholder: "os.environ/REDIS_PASSWORD",
+    },
   ],
   s3: [
     { key: "bucket", label: "Bucket" },
     { key: "region", label: "Region" },
+    {
+      key: "aws_access_key_id",
+      label: "AWS Access Key ID",
+      type: "password",
+      placeholder: "os.environ/AWS_ACCESS_KEY_ID",
+    },
+    {
+      key: "aws_secret_access_key",
+      label: "AWS Secret Access Key",
+      type: "password",
+      placeholder: "os.environ/AWS_SECRET_ACCESS_KEY",
+    },
+    {
+      key: "aws_session_token",
+      label: "AWS Session Token",
+      type: "password",
+      placeholder: "os.environ/AWS_SESSION_TOKEN",
+    },
   ],
   disk: [{ key: "cache_dir", label: "Cache Directory" }],
   in_memory: [],
@@ -116,6 +153,8 @@ export const CacheSettings: React.FC<CacheSettingsProps> = ({ accessToken }) => 
           <div key={field.key}>
             <Text className="mb-1">{field.label}</Text>
             <TextInput
+              type={field.type ?? "text"}
+              placeholder={field.placeholder}
               value={params[field.key] ?? ""}
               onChange={(e) => handleParamChange(field.key, e.target.value)}
             />
