@@ -172,20 +172,40 @@ const Settings: React.FC<SettingsPageProps> = ({
       return;
     }
 
-    let env_vars: Record<string, string> = {};
-    // add all other variables
-    Object.entries(formValues).forEach(([key, value]) => {
-      if (key !== "callback") {
-        env_vars[key] = value;
-      }
-    });
-    let payload = {
-      environment_variables: formValues,
+    const callbackName = selectedEditCallback.name;
+    let payload: any = {
+      environment_variables: {},
       litellm_settings: {
-        "success_callback": [selectedEditCallback.name]
-      }
-    }
+        success_callback: [callbackName],
+      },
+    };
 
+    if (callbackName === "s3_v2") {
+      const {
+        s3_bucket_name,
+        s3_region_name,
+        s3_aws_access_key_id,
+        s3_aws_secret_access_key,
+        s3_path,
+        s3_endpoint_url,
+      } = formValues;
+
+      payload.environment_variables = {
+        AWS_ACCESS_KEY_ID: s3_aws_access_key_id,
+        AWS_SECRET_ACCESS_KEY: s3_aws_secret_access_key,
+      };
+
+      payload.litellm_settings.s3_callback_params = {
+        s3_bucket_name,
+        s3_region_name,
+        s3_aws_access_key_id: "os.environ/AWS_ACCESS_KEY_ID",
+        s3_aws_secret_access_key: "os.environ/AWS_SECRET_ACCESS_KEY",
+        s3_path,
+        s3_endpoint_url,
+      };
+    } else {
+      payload.environment_variables = formValues;
+    }
 
     try {
       await setCallbacksCall(accessToken, payload);
@@ -193,7 +213,7 @@ const Settings: React.FC<SettingsPageProps> = ({
       setShowEditCallback(false);
       editForm.resetFields();
       setSelectedEditCallback(null);
-      
+
       // Refresh the callbacks list
       if (userID && userRole) {
         const updatedData = await getCallbacksCall(accessToken, userID, userRole);
@@ -210,20 +230,39 @@ const Settings: React.FC<SettingsPageProps> = ({
     }
     let new_callback = formValues?.callback;
 
-    let env_vars: Record<string, string> = {};
-    // add all other variables
-    Object.entries(formValues).forEach(([key, value]) => {
-      if (key !== "callback") {
-        env_vars[key] = value;
-      }
-    });
-
-    let payload = {
-      environment_variables: formValues,
+    let payload: any = {
+      environment_variables: {},
       litellm_settings: {
         success_callback: [new_callback],
       },
     };
+
+    if (new_callback === "s3_v2") {
+      const {
+        s3_bucket_name,
+        s3_region_name,
+        s3_aws_access_key_id,
+        s3_aws_secret_access_key,
+        s3_path,
+        s3_endpoint_url,
+      } = formValues;
+
+      payload.environment_variables = {
+        AWS_ACCESS_KEY_ID: s3_aws_access_key_id,
+        AWS_SECRET_ACCESS_KEY: s3_aws_secret_access_key,
+      };
+
+      payload.litellm_settings.s3_callback_params = {
+        s3_bucket_name,
+        s3_region_name,
+        s3_aws_access_key_id: "os.environ/AWS_ACCESS_KEY_ID",
+        s3_aws_secret_access_key: "os.environ/AWS_SECRET_ACCESS_KEY",
+        s3_path,
+        s3_endpoint_url,
+      };
+    } else {
+      payload.environment_variables = formValues;
+    }
 
     try {
       await setCallbacksCall(accessToken, payload);
@@ -232,7 +271,7 @@ const Settings: React.FC<SettingsPageProps> = ({
       addForm.resetFields();
       setSelectedCallback(null);
       setSelectedCallbackParams([]);
-      
+
       // Refresh the callbacks list
       const updatedData = await getCallbacksCall(accessToken, userID || "", userRole || "");
       setCallbacks(updatedData.callbacks);
