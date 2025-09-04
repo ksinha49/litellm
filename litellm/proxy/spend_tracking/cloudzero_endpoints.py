@@ -44,10 +44,10 @@ async def _set_cloudzero_settings(api_key: str, connection_id: str, timezone: st
         )
 
     # Encrypt the API key before storing
-    encrypted_api_key = encrypt_value_helper(api_key)
+    prefixed_encrypted_api_key = encrypt_value_helper(api_key)
 
     cloudzero_settings = {
-        "api_key": encrypted_api_key,
+        "api_key": prefixed_encrypted_api_key,
         "connection_id": connection_id,
         "timezone": timezone,
     }

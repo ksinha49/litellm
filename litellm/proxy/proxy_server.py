@@ -206,6 +206,7 @@ from litellm.proxy.common_utils.encrypt_decrypt_utils import (
     _get_salt_key,
     decrypt_value_helper,
     encrypt_value_helper,
+    verify_and_store_salt_hash,
 )
 from litellm.proxy.common_utils.html_forms.ui_login import html_form
 from litellm.proxy.common_utils.http_parsing_utils import (
@@ -522,6 +523,7 @@ ui_message += f"\n\n🔎 [```Ameritas Model Hub```]({model_hub_link}). See avail
 
 ### CUSTOM BRANDING [ENTERPRISE FEATURE] ###
 _title = os.getenv("DOCS_TITLE", "Ameritas LLM API") if premium_user else "Ameritas LLM API"
+
 _description = os.getenv("DOCS_DESCRIPTION", ui_message)
 
 
@@ -646,6 +648,9 @@ async def proxy_startup_event(app: FastAPI):
             proxy_logging_obj=proxy_logging_obj,
             user_api_key_cache=user_api_key_cache,
         )
+
+    if prisma_client is not None:
+        await verify_and_store_salt_hash(prisma_client)
 
     ProxyStartupEvent._initialize_startup_logging(
         llm_router=llm_router,
@@ -2721,10 +2726,10 @@ class ProxyConfig:
         """
         encrypted_env_vars = {}
         for k, v in environment_variables.items():
-            encrypted_value = encrypt_value_helper(
+            prefixed_encrypted_value = encrypt_value_helper(
                 value=v, new_encryption_key=new_encryption_key
             )
-            encrypted_env_vars[k] = encrypted_value
+            encrypted_env_vars[k] = prefixed_encrypted_value
         return encrypted_env_vars
 
     def _decrypt_and_set_db_env_variables(self, environment_variables: dict) -> dict:
@@ -8356,8 +8361,8 @@ async def update_config(config_info: ConfigYAML):  # noqa: PLR0915
 
             # encrypt updated_environment_variables #
             for k, v in _updated_environment_variables.items():
-                encrypted_value = encrypt_value_helper(value=v)
-                _updated_environment_variables[k] = encrypted_value
+                prefixed_encrypted_value = encrypt_value_helper(value=v)
+                _updated_environment_variables[k] = prefixed_encrypted_value
 
             _existing_env_variables = config["environment_variables"]
 

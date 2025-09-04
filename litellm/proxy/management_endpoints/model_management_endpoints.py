@@ -100,15 +100,15 @@ def update_db_model(
 
     # update litellm params
     if updated_patch.litellm_params:
-        # Encrypt any sensitive values
-        encrypted_params = {
+        # Encrypt any sensitive values with salt-key hash prefix
+        prefixed_encrypted_params = {
             k: encrypt_value_helper(v)
             for k, v in updated_patch.litellm_params.model_dump(
                 exclude_none=True
             ).items()
         }
 
-        merged_deployment_dict["litellm_params"].update(encrypted_params)  # type: ignore
+        merged_deployment_dict["litellm_params"].update(prefixed_encrypted_params)  # type: ignore
 
     # update model info
     if updated_patch.model_info:
@@ -127,16 +127,14 @@ def update_db_model(
         ]
 
     if "litellm_params" in merged_deployment_dict:
-        prisma_compatible_model_dict["litellm_params"] = merged_deployment_dict[
-            "litellm_params"
-        ]
+        prisma_compatible_model_dict["litellm_params"] = merged_deployment_dict["litellm_params"]  # type: ignore
 
     if "model_info" in merged_deployment_dict:
         model_info = merged_deployment_dict["model_info"]
         for key, value in model_info.items():
             if isinstance(value, datetime.datetime):
                 model_info[key] = value.isoformat()
-        prisma_compatible_model_dict["model_info"] = model_info
+        prisma_compatible_model_dict["model_info"] = model_info  # type: ignore[assignment]
 
     return prisma_compatible_model_dict
 
@@ -278,14 +276,14 @@ async def _add_model_to_db(
     new_encryption_key: Optional[str] = None,
     should_create_model_in_db: bool = True,
 ) -> Optional[LiteLLM_ProxyModelTable]:
-    # encrypt litellm params #
+    # encrypt litellm params with salt-key hash prefix #
     _litellm_params_dict = model_params.litellm_params.model_dump(exclude_none=True)
     _orignal_litellm_model_name = model_params.litellm_params.model
     for k, v in _litellm_params_dict.items():
-        encrypted_value = encrypt_value_helper(
+        prefixed_encrypted_value = encrypt_value_helper(
             value=v, new_encryption_key=new_encryption_key
         )
-        model_params.litellm_params[k] = encrypted_value
+        model_params.litellm_params[k] = prefixed_encrypted_value
     _data: dict = {
         "model_id": model_params.model_info.id,
         "model_name": model_params.model_name,
@@ -886,8 +884,8 @@ async def update_model(
 
             ### ENCRYPT PARAMS ###
             for k, v in _new_litellm_params_dict.items():
-                encrypted_value = encrypt_value_helper(value=v)
-                model_params.litellm_params[k] = encrypted_value
+                prefixed_encrypted_value = encrypt_value_helper(value=v)
+                model_params.litellm_params[k] = prefixed_encrypted_value
 
             ### MERGE WITH EXISTING DATA ###
             merged_dictionary = {}
