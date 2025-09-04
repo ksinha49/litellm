@@ -21,7 +21,7 @@ const appName = process.env.NEXT_PUBLIC_APP_NAME || "Ameritas LiteLLM";
 export const metadata: Metadata = {
   title: `${appName} Dashboard`,
   description: `${appName} Proxy Admin UI`,
-  icons: { icon: "./favicon.ico" },
+  icons: { icon: "./favicon.png" },
 };
 
 export default function RootLayout({
