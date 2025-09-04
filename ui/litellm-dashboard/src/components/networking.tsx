@@ -5104,6 +5104,46 @@ export const cachingHealthCheckCall = async (accessToken: String) => {
   }
 };
 
+export const getCacheConfig = async (accessToken: String) => {
+  try {
+    const cache = await getConfigFieldSetting(
+      accessToken,
+      "cache",
+      "litellm_settings"
+    );
+    const cacheParams = await getConfigFieldSetting(
+      accessToken,
+      "cache_params",
+      "litellm_settings"
+    );
+    return {
+      cache: cache?.field_value,
+      cache_params: cacheParams?.field_value,
+    };
+  } catch (error) {
+    console.error("Failed to fetch cache config:", error);
+    throw error;
+  }
+};
+
+export const updateCacheConfig = async (
+  accessToken: String,
+  fieldName: "cache" | "cache_params",
+  fieldValue: any
+) => {
+  try {
+    return await updateConfigFieldSetting(
+      accessToken,
+      fieldName,
+      fieldValue,
+      "litellm_settings"
+    );
+  } catch (error) {
+    console.error("Failed to update cache config:", error);
+    throw error;
+  }
+};
+
 export const healthCheckHistoryCall = async (
   accessToken: String,
   model?: string,
