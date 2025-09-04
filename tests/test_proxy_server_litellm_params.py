@@ -208,3 +208,25 @@ def test_models_added_via_management_endpoint_reload_without_invalid_log(
         assert "Invalid model added to proxy db" not in caplog.text
 
     asyncio.run(_run())
+
+
+def test_invalid_litellm_params_skipped(monkeypatch, caplog):
+    monkeypatch.setattr(proxy_server, "decrypt_value_helper", lambda value, key: value)
+    proxy_server.master_key = "test-key"
+    proxy_server.llm_router = DummyRouter()
+
+    proxy_config = proxy_server.ProxyConfig()
+
+    invalid_model = SimpleNamespace(
+        model_name="invalid",
+        litellm_params={"unsupported": "value"},  # missing required 'model'
+        model_info={},
+        model_id="1",
+    )
+
+    with caplog.at_level("WARNING"):
+        added = proxy_config._add_deployment([invalid_model])
+
+    assert added == 0
+    assert len(proxy_server.llm_router.deployments) == 0
+    assert "Invalid litellm_params skipped" in caplog.text

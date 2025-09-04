@@ -1505,7 +1505,10 @@ class ProxyConfig:
                 if len(decrypted_value) > 0:
                     params_dict[k] = decrypted_value
 
-        return LiteLLM_Params(**params_dict)
+        try:
+            return LiteLLM_Params(**params_dict)
+        except Exception as e:
+            raise ValueError(f"Invalid litellm_params: {e}") from e
 
     def is_yaml(self, config_file_path: str) -> bool:
         if not os.path.isfile(config_file_path):
@@ -2576,10 +2579,10 @@ class ProxyConfig:
         for m in db_models:
             try:
                 _litellm_params = self.parse_litellm_params(m.litellm_params)
-            except ValueError as e:
+            except ValueError:
                 masked_params = _mask_litellm_params_for_logging(m.litellm_params)
-                verbose_proxy_logger.error(
-                    f"Invalid model added to proxy db. {e} value={masked_params}"
+                verbose_proxy_logger.warning(
+                    f"Invalid litellm_params skipped: {masked_params}"
                 )
                 continue  # skip to next model
             _model_info = self.get_model_info_with_id(
@@ -2609,10 +2612,10 @@ class ProxyConfig:
         for m in new_models:
             try:
                 _litellm_params = self.parse_litellm_params(m.litellm_params)
-            except ValueError as e:
+            except ValueError:
                 masked_params = _mask_litellm_params_for_logging(m.litellm_params)
-                verbose_proxy_logger.error(
-                    f"Invalid model added to proxy db. {e} value={masked_params}"
+                verbose_proxy_logger.warning(
+                    f"Invalid litellm_params skipped: {masked_params}"
                 )
                 continue  # skip to next model
 
