@@ -47,7 +47,10 @@ interface PublicModelHubProps {
 const PublicModelHub: React.FC<PublicModelHubProps> = ({ accessToken }) => {
   const [modelHubData, setModelHubData] = useState<ModelGroupInfo[] | null>(null);
   const [pageTitle, setPageTitle] = useState<string>("Ameritas LLM API");
-  const [customDocsDescription, setCustomDocsDescription] = useState<string | null>(null);
+  // Store a custom description for the docs page. Default to an empty string
+  // instead of a marketing tagline to keep the UI neutral when no description
+  // is provided.
+  const [customDocsDescription, setCustomDocsDescription] = useState<string>("");
   const [litellmVersion, setLitellmVersion] = useState<string>("");
   const [usefulLinks, setUsefulLinks] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState<boolean>(true);
@@ -80,7 +83,8 @@ const PublicModelHub: React.FC<PublicModelHubProps> = ({ accessToken }) => {
       const publicModelHubInfo = await getPublicModelHubInfo();
       console.log("Public Model Hub Info:", publicModelHubInfo);
       setPageTitle(publicModelHubInfo.docs_title);
-      setCustomDocsDescription(publicModelHubInfo.custom_docs_description);
+      // Fall back to an empty string rather than an opinionated tagline
+      setCustomDocsDescription(publicModelHubInfo.custom_docs_description || "");
       setLitellmVersion(publicModelHubInfo.litellm_version);
       setUsefulLinks(publicModelHubInfo.useful_links || {});
     };
@@ -499,7 +503,7 @@ const PublicModelHub: React.FC<PublicModelHubProps> = ({ accessToken }) => {
         {/* About Section */}
           <Card className="mb-10 p-8 bg-white border border-gray-200 rounded-lg shadow-sm">
             <Title className="text-2xl font-semibold mb-6 text-gray-900">About</Title>
-            <p className="text-gray-700 mb-6 text-base leading-relaxed">{customDocsDescription || ""}</p>
+            <p className="text-gray-700 mb-6 text-base leading-relaxed">{customDocsDescription}</p>
             <div className="flex items-center space-x-3 text-sm text-gray-600">
               <span className="flex items-center">
                 <span className="w-4 h-4 mr-2">🔧</span>
