@@ -2724,10 +2724,10 @@ class ProxyConfig:
         """
         encrypted_env_vars = {}
         for k, v in environment_variables.items():
-            encrypted_value = encrypt_value_helper(
+            prefixed_encrypted_value = encrypt_value_helper(
                 value=v, new_encryption_key=new_encryption_key
             )
-            encrypted_env_vars[k] = encrypted_value
+            encrypted_env_vars[k] = prefixed_encrypted_value
         return encrypted_env_vars
 
     def _decrypt_and_set_db_env_variables(self, environment_variables: dict) -> dict:
@@ -8359,8 +8359,8 @@ async def update_config(config_info: ConfigYAML):  # noqa: PLR0915
 
             # encrypt updated_environment_variables #
             for k, v in _updated_environment_variables.items():
-                encrypted_value = encrypt_value_helper(value=v)
-                _updated_environment_variables[k] = encrypted_value
+                prefixed_encrypted_value = encrypt_value_helper(value=v)
+                _updated_environment_variables[k] = prefixed_encrypted_value
 
             _existing_env_variables = config["environment_variables"]
 
