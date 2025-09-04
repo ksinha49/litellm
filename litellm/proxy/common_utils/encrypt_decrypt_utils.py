@@ -47,6 +47,32 @@ def _get_salt_key() -> str:
     return salt_key
 
 
+async def verify_and_store_salt_hash(prisma_client) -> None:
+    """Ensure the stored salt key hash matches the current salt key.
+
+    If no hash is stored, save the current hash. If hashes differ, raise an error
+    instructing the user to re-encrypt existing data or update the stored hash.
+    """
+
+    if prisma_client is None:
+        return
+
+    try:
+        current_hash = hashlib.sha256(_get_salt_key().encode()).hexdigest()
+        table = prisma_client.db.litellm_metadatable
+        existing = await table.find_first(where={"key": "salt_key_hash"})
+        if existing is None:
+            await table.create(data={"key": "salt_key_hash", "value": current_hash})
+            return
+        if existing.value != current_hash:
+            raise RuntimeError(
+                "Salt key mismatch detected. Re-encrypt existing secrets or "
+                "update stored hash via update_salt_key_hash script."
+            )
+    except Exception as e:
+        raise e
+
+
 def encrypt_value_helper(value: str, new_encryption_key: Optional[str] = None):
     signing_key = new_encryption_key or _get_salt_key()
     prefix = _salt_hash_prefix(signing_key)
