@@ -1546,6 +1546,9 @@ class S3CallbackParams(LiteLLMPydanticObjectBase):
     s3_path: Optional[str] = Field(
         default=None, description="Optional path prefix within the bucket"
     )
+    s3_use_path_style: Optional[bool] = Field(
+        default=False, description="Use path-style addressing for S3 URLs"
+    )
 
 
 class ConfigLiteLLMSettings(LiteLLMPydanticObjectBase):
