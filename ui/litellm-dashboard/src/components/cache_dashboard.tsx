@@ -42,6 +42,7 @@ import {
 
 // Import the new component
 import { CacheHealthTab } from "./cache_health";
+import CacheSettings from "./cache_settings";
 
 const formatDateWithoutTZ = (date: Date | undefined) => {
     if (!date) return undefined;
@@ -301,6 +302,7 @@ const runCachingHealthCheck = async () => {
             <Tab>
               <pre>Cache Health</pre>
             </Tab>
+            <Tab>Cache Settings</Tab>
           </div>
 
           <div className="flex items-center space-x-2">
@@ -316,7 +318,7 @@ const runCachingHealthCheck = async () => {
         </TabList>
         <TabPanels>
           <TabPanel>
-          <Card>      
+          <Card>
       <Grid numItems={3} className="gap-4 mt-4">
         <Col>
           <MultiSelect
@@ -421,11 +423,14 @@ const runCachingHealthCheck = async () => {
       </Card>
           </TabPanel>
           <TabPanel>
-            <CacheHealthTab 
+            <CacheHealthTab
               accessToken={accessToken}
               healthCheckResponse={healthCheckResponse}
               runCachingHealthCheck={runCachingHealthCheck}
             />
+          </TabPanel>
+          <TabPanel>
+            <CacheSettings accessToken={accessToken} />
           </TabPanel>
         </TabPanels>
       </TabGroup>

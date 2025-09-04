@@ -41,6 +41,8 @@ litellm_settings:
     port: 6379
 ```
 
+Caching can also be enabled and configured through the admin UI under **Cache Settings**.
+
 ## Quick Start
 <Tabs>
 
