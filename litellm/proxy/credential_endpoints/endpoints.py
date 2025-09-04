@@ -4,7 +4,7 @@ CRUD endpoints for storing reusable credentials.
 
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Request, Response, Path
+from fastapi import APIRouter, Depends, HTTPException, Path, Request, Response
 
 import litellm
 from litellm._logging import verbose_proxy_logger
@@ -22,11 +22,11 @@ router = APIRouter()
 class CredentialHelperUtils:
     @staticmethod
     def encrypt_credential_values(credential: CredentialItem) -> CredentialItem:
-        """Encrypt values in credential.credential_values and add to DB"""
-        encrypted_credential_values = {}
+        """Encrypt values in credential.credential_values with salt-key hash prefix and add to DB"""
+        prefixed_encrypted_credential_values = {}
         for key, value in credential.credential_values.items():
-            encrypted_credential_values[key] = encrypt_value_helper(value)
-        credential.credential_values = encrypted_credential_values
+            prefixed_encrypted_credential_values[key] = encrypt_value_helper(value)
+        credential.credential_values = prefixed_encrypted_credential_values
         return credential
 
 

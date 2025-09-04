@@ -1068,7 +1068,10 @@ class ExperimentalUIJWTToken:
             user_role=LitellmUserRoles(user_info.user_role),
         )
 
-        return encrypt_value_helper(valid_token.model_dump_json(exclude_none=True))
+        prefixed_encrypted_token = encrypt_value_helper(
+            valid_token.model_dump_json(exclude_none=True)
+        )
+        return prefixed_encrypted_token
 
     @staticmethod
     def get_key_object_from_ui_hash_key(

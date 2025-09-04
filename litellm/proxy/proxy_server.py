@@ -203,9 +203,9 @@ from litellm.proxy.common_utils.callback_utils import initialize_callbacks_on_pr
 from litellm.proxy.common_utils.debug_utils import init_verbose_loggers
 from litellm.proxy.common_utils.debug_utils import router as debugging_endpoints_router
 from litellm.proxy.common_utils.encrypt_decrypt_utils import (
+    _get_salt_key,
     decrypt_value_helper,
     encrypt_value_helper,
-    _get_salt_key,
 )
 from litellm.proxy.common_utils.html_forms.ui_login import html_form
 from litellm.proxy.common_utils.http_parsing_utils import (
@@ -2733,10 +2733,10 @@ class ProxyConfig:
         """
         encrypted_env_vars = {}
         for k, v in environment_variables.items():
-            encrypted_value = encrypt_value_helper(
+            prefixed_encrypted_value = encrypt_value_helper(
                 value=v, new_encryption_key=new_encryption_key
             )
-            encrypted_env_vars[k] = encrypted_value
+            encrypted_env_vars[k] = prefixed_encrypted_value
         return encrypted_env_vars
 
     def _decrypt_and_set_db_env_variables(self, environment_variables: dict) -> dict:
@@ -8368,8 +8368,8 @@ async def update_config(config_info: ConfigYAML):  # noqa: PLR0915
 
             # encrypt updated_environment_variables #
             for k, v in _updated_environment_variables.items():
-                encrypted_value = encrypt_value_helper(value=v)
-                _updated_environment_variables[k] = encrypted_value
+                prefixed_encrypted_value = encrypt_value_helper(value=v)
+                _updated_environment_variables[k] = prefixed_encrypted_value
 
             _existing_env_variables = config["environment_variables"]
 
