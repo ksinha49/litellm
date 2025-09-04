@@ -20,7 +20,26 @@ Cache LLM Responses. LiteLLM's caching system stores and reuses LLM responses to
 - Redis Cache 
 - Qdrant Semantic Cache
 - Redis Semantic Cache
-- s3 Bucket Cache 
+- s3 Bucket Cache
+
+### Checking Cache Status
+
+Use the `/cache/ping` endpoint to verify whether caching is configured. When caching is not set up, the proxy responds with:
+
+```json
+{"status": "disabled"}
+```
+
+Enable caching by adding it to your `proxy_server_config.yaml`:
+
+```yaml
+litellm_settings:
+  cache: true
+  cache_params:
+    type: redis
+    host: localhost
+    port: 6379
+```
 
 ## Quick Start
 <Tabs>
