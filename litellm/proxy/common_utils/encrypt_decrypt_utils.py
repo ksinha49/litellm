@@ -7,6 +7,14 @@ from litellm._logging import verbose_proxy_logger
 _cached_salt_key: Optional[str] = None
 
 
+def _is_base64(value: str) -> bool:
+    try:
+        base64.b64decode(value, validate=True)
+        return True
+    except Exception:
+        return False
+
+
 def _get_salt_key() -> str:
     global _cached_salt_key
 
@@ -54,6 +62,8 @@ def decrypt_value_helper(
 
     try:
         if isinstance(value, str):
+            if not _is_base64(value):
+                return value
             decoded_b64 = base64.b64decode(value)
             value = decrypt_value(value=decoded_b64, signing_key=signing_key)  # type: ignore
             return value
