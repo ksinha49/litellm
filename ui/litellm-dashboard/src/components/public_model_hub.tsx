@@ -46,7 +46,7 @@ interface PublicModelHubProps {
 
 const PublicModelHub: React.FC<PublicModelHubProps> = ({ accessToken }) => {
   const [modelHubData, setModelHubData] = useState<ModelGroupInfo[] | null>(null);
-  const [pageTitle, setPageTitle] = useState<string>("Ameritas LiteLLM Gateway");
+  const [pageTitle, setPageTitle] = useState<string>("Ameritas LLM API");
   const [customDocsDescription, setCustomDocsDescription] = useState<string | null>(null);
   const [litellmVersion, setLitellmVersion] = useState<string>("");
   const [usefulLinks, setUsefulLinks] = useState<Record<string, string>>({});

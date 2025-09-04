@@ -2,8 +2,8 @@
   "openapi": "3.0.0",
   "info": {
     "version": "1.0.0",
-    "title": "LiteLLM API",
-    "description": "API for LiteLLM"
+    "title": "Ameritas LLM API",
+    "description": "API for Ameritas LLM"
   },
   "paths": {
    "/chat/completions": {
