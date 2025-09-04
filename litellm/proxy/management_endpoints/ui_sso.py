@@ -1244,9 +1244,16 @@ class SSOAuthenticationHandler:
         verbose_proxy_logger.info(f"SSO callback result: {result}")
 
         user_email: Optional[str] = getattr(result, "email", None)
+        user_email = user_email or getattr(result, "user_principal_name", None) or getattr(result, "preferred_username", None)
         user_id: Optional[str] = getattr(result, "id", None) if result is not None else None
 
-        if user_email is not None and os.getenv("ALLOWED_EMAIL_DOMAINS") is not None:
+        if user_email is None:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Email address is required for login.",
+            )
+
+        if os.getenv("ALLOWED_EMAIL_DOMAINS") is not None:
             email_domain = user_email.split("@")[1]
             allowed_domains = os.getenv("ALLOWED_EMAIL_DOMAINS").split(",")  # type: ignore
             if email_domain not in allowed_domains:
@@ -1265,7 +1272,12 @@ class SSOAuthenticationHandler:
                 "GENERIC_USER_ROLE_ATTRIBUTE", "role"
             )
             user_id = getattr(result, "id", None)
-            user_email = getattr(result, "email", None)
+            user_email = user_email or getattr(result, "email", None) or getattr(result, "user_principal_name", None) or getattr(result, "preferred_username", None)
+            if user_email is None:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Email address is required for login.",
+                )
             user_role = getattr(result, generic_user_role_attribute_name, None)  # type: ignore
 
         if user_id is None and result is not None:
