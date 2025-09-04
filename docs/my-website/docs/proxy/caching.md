@@ -43,6 +43,19 @@ litellm_settings:
 
 Caching can also be enabled and configured through the admin UI under **Cache Settings**.
 
+### Entering Cache Credentials in the UI
+
+In the dashboard, the **Cache Settings** form lets you supply connection details for Redis, S3, or other cache backends. Sensitive fields such as passwords or access keys accept environment-variable expressions so you can reference values from your runtime environment:
+
+```yaml
+password: os.environ/REDIS_PASSWORD
+s3_aws_secret_access_key: os.environ/AWS_SECRET_ACCESS_KEY
+```
+
+:::warning
+Avoid storing plain-text secrets in your configuration. When possible, use environment variables, a secrets manager, or other secure mechanisms to keep credentials protected.
+:::
+
 ## Quick Start
 <Tabs>
 
