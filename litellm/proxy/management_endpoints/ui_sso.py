@@ -429,11 +429,13 @@ async def get_user_info_from_db(
             if _id is not None and isinstance(_id, str):
                 potential_user_ids.append(_id)
 
-        user_email = (
+        email_from_result = (
             getattr(result, "email", None)
             if not isinstance(result, dict)
             else result.get("email", None)
         )
+        if email_from_result:
+            user_email = email_from_result
 
         user_info: Optional[Union[LiteLLM_UserTable, NewUserResponse]] = None
 
@@ -486,7 +488,7 @@ def apply_user_info_values_to_sso_user_defined_values(
     if user_info is not None and user_info.user_id is not None:
         user_defined_values["user_id"] = user_info.user_id
 
-    if user_info is None or user_info.user_role is None:
+    if user_info is None:
         user_defined_values["user_role"] = (
             litellm.default_internal_user_params.get(
                 "user_role", LitellmUserRoles.INTERNAL_USER
