@@ -8984,6 +8984,39 @@ async def get_config():  # noqa: PLR0915
                         "LANGSMITH_PROJECT",
                         "LANGSMITH_DEFAULT_RUN_NAME",
                     ]
+                elif _callback == "s3_v2":
+                    _s3_callback_params = _litellm_settings.get(
+                        "s3_callback_params", {}
+                    )
+                    _s3_vars = {}
+                    _s3_param_keys = [
+                        "s3_bucket_name",
+                        "s3_region_name",
+                        "s3_aws_access_key_id",
+                        "s3_aws_secret_access_key",
+                        "s3_path",
+                        "s3_endpoint_url",
+                    ]
+                    for _key in _s3_param_keys:
+                        _value = _s3_callback_params.get(_key, None)
+                        if isinstance(_value, str) and _value.startswith(
+                            "os.environ/"
+                        ):
+                            _env_key = _value.split("os.environ/")[-1]
+                            env_variable = environment_variables.get(
+                                _env_key, None
+                            )
+                            if env_variable is None:
+                                _value = os.getenv(_env_key, None)
+                            else:
+                                _value = decrypt_value_helper(
+                                    value=env_variable, key=_env_key
+                                )
+                        _s3_vars[_key] = _value
+                    _data_to_return.append(
+                        {"name": _callback, "variables": _s3_vars}
+                    )
+                    continue
                 else:
                     env_vars = []
 
