@@ -1,11 +1,11 @@
-import asyncio
 import ast
-import re
+import asyncio
 import copy
 import inspect
 import io
 import os
 import random
+import re
 import secrets
 import subprocess
 import sys
@@ -187,6 +187,14 @@ from litellm.proxy.batches_endpoints.endpoints import router as batches_router
 
 ## Import All Misc routes here ##
 from litellm.proxy.caching_routes import router as caching_router
+from litellm.proxy.chat_completion_helpers import (
+    ChatCompletionDependencies,
+    format_chat_completion_response,
+    handle_rejected_request,
+    log_chat_completion_error,
+    route_chat_request,
+    validate_chat_request,
+)
 from litellm.proxy.common_request_processing import (
     ProxyBaseLLMRequestProcessing,
     create_streaming_response,
@@ -210,14 +218,6 @@ from litellm.proxy.common_utils.load_config_utils import (
 )
 from litellm.proxy.common_utils.openai_endpoint_utils import (
     remove_sensitive_info_from_deployment,
-)
-from litellm.proxy.chat_completion_helpers import (
-    ChatCompletionDependencies,
-    format_chat_completion_response,
-    handle_rejected_request,
-    log_chat_completion_error,
-    route_chat_request,
-    validate_chat_request,
 )
 from litellm.proxy.common_utils.proxy_state import ProxyState
 from litellm.proxy.common_utils.reset_budget_job import ResetBudgetJob
@@ -476,6 +476,28 @@ global_max_parallel_request_retries_env: Optional[str] = os.getenv(
 )
 proxy_state = ProxyState()
 SENSITIVE_DATA_MASKER = SensitiveDataMasker()
+
+
+def _mask_litellm_params_for_logging(params: Any) -> str:
+    """Mask sensitive fields in ``litellm_params`` before logging.
+
+    Attempts to parse ``params`` into a dictionary and mask known sensitive
+    values using :class:`SensitiveDataMasker`. If parsing fails, returns a short
+    placeholder description instead of the raw payload.
+    """
+
+    try:
+        if isinstance(params, str):
+            params_dict = json.loads(params)
+        elif isinstance(params, dict):
+            params_dict = params
+        else:
+            return "<invalid litellm_params>"
+
+        masked = SENSITIVE_DATA_MASKER.mask_dict(params_dict)
+        return json.dumps(masked)
+    except Exception:
+        return "<unable to parse litellm_params>"
 if global_max_parallel_request_retries_env is None:
     global_max_parallel_request_retries: int = 3
 else:
@@ -2555,8 +2577,9 @@ class ProxyConfig:
             try:
                 _litellm_params = self.parse_litellm_params(m.litellm_params)
             except ValueError as e:
+                masked_params = _mask_litellm_params_for_logging(m.litellm_params)
                 verbose_proxy_logger.error(
-                    f"Invalid model added to proxy db. {e} value={m.litellm_params}"
+                    f"Invalid model added to proxy db. {e} value={masked_params}"
                 )
                 continue  # skip to next model
             _model_info = self.get_model_info_with_id(
@@ -2587,8 +2610,9 @@ class ProxyConfig:
             try:
                 _litellm_params = self.parse_litellm_params(m.litellm_params)
             except ValueError as e:
+                masked_params = _mask_litellm_params_for_logging(m.litellm_params)
                 verbose_proxy_logger.error(
-                    f"Invalid model added to proxy db. {e} value={m.litellm_params}"
+                    f"Invalid model added to proxy db. {e} value={masked_params}"
                 )
                 continue  # skip to next model
 
