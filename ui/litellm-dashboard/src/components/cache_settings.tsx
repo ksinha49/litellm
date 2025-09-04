@@ -32,7 +32,7 @@ const cacheTypeOptions = [
 interface CacheParamField {
   key: string;
   label: string;
-  type?: string;
+  type?: 'text' | 'url' | 'email' | 'password';
   placeholder?: string;
 }
 
