@@ -47,6 +47,31 @@ class DummyRouter:
         return []
 
 
+def test_parse_litellm_params_accepts_dict(monkeypatch):
+    monkeypatch.setattr(proxy_server, "decrypt_value_helper", lambda value, key: value)
+    proxy_config = proxy_server.ProxyConfig()
+    params = proxy_config.parse_litellm_params({"model": "gpt-3.5"})
+    assert isinstance(params, LiteLLM_Params)
+    assert params.model == "gpt-3.5"
+
+
+def test_parse_litellm_params_accepts_json_string(monkeypatch):
+    monkeypatch.setattr(proxy_server, "decrypt_value_helper", lambda value, key: value)
+    proxy_config = proxy_server.ProxyConfig()
+    params = proxy_config.parse_litellm_params(json.dumps({"model": "gpt-3.5"}))
+    assert isinstance(params, LiteLLM_Params)
+    assert params.model == "gpt-3.5"
+
+
+def test_parse_litellm_params_accepts_pydantic_obj(monkeypatch):
+    monkeypatch.setattr(proxy_server, "decrypt_value_helper", lambda value, key: value)
+    proxy_config = proxy_server.ProxyConfig()
+    pydantic_params = LiteLLM_Params(model="gpt-3.5")
+    params = proxy_config.parse_litellm_params(pydantic_params)
+    assert isinstance(params, LiteLLM_Params)
+    assert params.model == "gpt-3.5"
+
+
 def test_add_deployment_accepts_dict_and_litellm_params(monkeypatch):
     monkeypatch.setattr(proxy_server, "decrypt_value_helper", lambda value, key: value)
     proxy_server.master_key = "test-key"

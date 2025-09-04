@@ -1446,6 +1446,45 @@ class ProxyConfig:
             "litellm_params string is not valid JSON. DB must store litellm_params as JSON."
         )
 
+    @staticmethod
+    def parse_litellm_params(
+        params: Union[str, dict, LiteLLM_Params]
+    ) -> LiteLLM_Params:
+        """Normalize and decrypt ``litellm_params`` into a ``LiteLLM_Params``.
+
+        Accepts a dictionary, JSON-encoded string, or ``LiteLLM_Params``
+        instance. All string values are decrypted using
+        ``decrypt_value_helper``.
+
+        Raises:
+            ValueError: If parsing or decryption fails.
+        """
+
+        if isinstance(params, LiteLLM_Params):
+            params_dict = params.model_dump()
+        elif isinstance(params, str):
+            try:
+                params_dict = json.loads(params)
+            except Exception:
+                params_dict = ProxyConfig._parse_litellm_params_str(params)
+        elif isinstance(params, dict):
+            params_dict = params
+        else:
+            raise ValueError(f"Invalid litellm params type={type(params)}")
+
+        if not isinstance(params_dict, dict):
+            raise ValueError("litellm_params must be a dict")
+
+        for k, v in params_dict.items():
+            if isinstance(v, str):
+                decrypted_value = decrypt_value_helper(value=v, key=k)
+                if decrypted_value is None:
+                    raise ValueError(f"Unable to decrypt value={v}")
+                if len(decrypted_value) > 0:
+                    params_dict[k] = decrypted_value
+
+        return LiteLLM_Params(**params_dict)
+
     def is_yaml(self, config_file_path: str) -> bool:
         if not os.path.isfile(config_file_path):
             return False
@@ -2501,7 +2540,6 @@ class ProxyConfig:
         representations like ``"LiteLLM_Params(...)"`` are parsed on a
         best-effort basis and may raise a ``ValueError`` if conversion fails.
         """
-        import base64
 
         if master_key is None or not isinstance(master_key, str):
             raise Exception(
@@ -2514,36 +2552,11 @@ class ProxyConfig:
         added_models = 0
         ## ADD MODEL LOGIC
         for m in db_models:
-            _litellm_params = m.litellm_params
-            if isinstance(_litellm_params, LiteLLM_Params):
-                _litellm_params = _litellm_params.model_dump()
-            elif isinstance(_litellm_params, str):
-                try:
-                    _litellm_params = json.loads(_litellm_params)
-                except Exception:
-                    try:
-                        _litellm_params = self._parse_litellm_params_str(_litellm_params)
-                    except ValueError as e:
-                        verbose_proxy_logger.error(
-                            f"Invalid model added to proxy db. {e} value={_litellm_params}"
-                        )
-                        continue  # skip to next model
-
-            if isinstance(_litellm_params, dict):
-                # decrypt values
-                for k, v in _litellm_params.items():
-                    if isinstance(v, str):
-                        # decrypt value
-                        _value = decrypt_value_helper(value=v, key=k)
-                        if _value is None:
-                            raise Exception("Unable to decrypt value={}".format(v))
-                        # sanity check if string > size 0
-                        if len(_value) > 0:
-                            _litellm_params[k] = _value
-                _litellm_params = LiteLLM_Params(**_litellm_params)
-            else:
+            try:
+                _litellm_params = self.parse_litellm_params(m.litellm_params)
+            except ValueError as e:
                 verbose_proxy_logger.error(
-                    f"Invalid model added to proxy db. Invalid litellm params type={type(_litellm_params)} value={_litellm_params}"
+                    f"Invalid model added to proxy db. {e} value={m.litellm_params}"
                 )
                 continue  # skip to next model
             _model_info = self.get_model_info_with_id(
@@ -2571,30 +2584,11 @@ class ProxyConfig:
         """
         _model_list: list = []
         for m in new_models:
-            _litellm_params = m.litellm_params
-            if isinstance(_litellm_params, LiteLLM_Params):
-                _litellm_params = _litellm_params.model_dump()
-            elif isinstance(_litellm_params, str):
-                try:
-                    _litellm_params = json.loads(_litellm_params)
-                except Exception:
-                    try:
-                        _litellm_params = self._parse_litellm_params_str(_litellm_params)
-                    except ValueError as e:
-                        verbose_proxy_logger.error(
-                            f"Invalid model added to proxy db. {e} value={_litellm_params}"
-                        )
-                        continue  # skip to next model
-
-            if isinstance(_litellm_params, dict):
-                # decrypt values
-                for k, v in _litellm_params.items():
-                    decrypted_value = decrypt_value_helper(value=v, key=k)
-                    _litellm_params[k] = decrypted_value
-                _litellm_params = LiteLLM_Params(**_litellm_params)
-            else:
+            try:
+                _litellm_params = self.parse_litellm_params(m.litellm_params)
+            except ValueError as e:
                 verbose_proxy_logger.error(
-                    f"Invalid model added to proxy db. Invalid litellm params type={type(_litellm_params)} value={_litellm_params}"
+                    f"Invalid model added to proxy db. {e} value={m.litellm_params}"
                 )
                 continue  # skip to next model
 
