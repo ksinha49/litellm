@@ -46,7 +46,7 @@ class DummyMetadataTable:
 
 class DummyDB:
     def __init__(self, value=None):
-        self.litellm_metadatable = DummyMetadataTable(value)
+        self.litellm_metadatatable = DummyMetadataTable(value)
 
 
 class DummyPrisma:
@@ -60,7 +60,7 @@ def test_verify_and_store_salt_hash_creates(monkeypatch):
     client = DummyPrisma()
     asyncio.run(encrypt_decrypt_utils.verify_and_store_salt_hash(client))
     expected = hashlib.sha256(b"testkey").hexdigest()
-    assert client.db.litellm_metadatable.value == expected
+    assert client.db.litellm_metadatatable.value == expected
 
 
 def test_verify_and_store_salt_hash_mismatch(monkeypatch):

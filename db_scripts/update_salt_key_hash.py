@@ -18,7 +18,12 @@ async def update_salt_key_hash() -> None:
     await prisma.connect()
 
     try:
-        await prisma.litellm_metadatable.upsert(
+        table = getattr(prisma, "litellm_metadatatable", None)
+        if table is None:
+            print("LiteLLM_MetadataTable not found on Prisma client. Skipping update.")  # noqa: T201
+            return
+
+        await table.upsert(
             where={"key": "salt_key_hash"},
             data={
                 "create": {"key": "salt_key_hash", "value": salt_hash},
