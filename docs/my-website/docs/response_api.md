@@ -810,7 +810,8 @@ litellm_settings:
   callbacks: ["s3_v2"]
   s3_callback_params: # learn more https://docs.litellm.ai/docs/proxy/logging#s3-buckets
     s3_bucket_name: litellm-logs   # AWS Bucket Name for S3
-    s3_region_name: us-west-2       
+    s3_region_name: us-west-2
+    s3_use_path_style: false
 
 general_settings:
   cold_storage_custom_logger: s3_v2

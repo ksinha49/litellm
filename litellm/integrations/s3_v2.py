@@ -50,6 +50,7 @@ class S3Logger(CustomBatchLogger, BaseAWSLLM):
         s3_batch_size: Optional[int] = DEFAULT_S3_BATCH_SIZE,
         s3_config=None,
         s3_use_team_prefix: bool = False,
+        s3_use_path_style: bool = False,
         **kwargs,
     ):
         try:
@@ -81,6 +82,7 @@ class S3Logger(CustomBatchLogger, BaseAWSLLM):
                 s3_config=s3_config,
                 s3_path=s3_path,
                 s3_use_team_prefix=s3_use_team_prefix,
+                s3_use_path_style=s3_use_path_style,
             )
             verbose_logger.debug(f"s3 logger using endpoint url {s3_endpoint_url}")
 
@@ -125,6 +127,7 @@ class S3Logger(CustomBatchLogger, BaseAWSLLM):
         s3_config=None,
         s3_path: Optional[str] = None,
         s3_use_team_prefix: bool = False,
+        s3_use_path_style: bool = False,
     ):
         """
         Initialize the s3 params for this logging callback
@@ -194,6 +197,10 @@ class S3Logger(CustomBatchLogger, BaseAWSLLM):
             bool(litellm.s3_callback_params.get("s3_use_team_prefix", False))
             or s3_use_team_prefix
         )
+
+        self.s3_use_path_style = bool(
+            litellm.s3_callback_params.get("s3_use_path_style", False)
+        ) or s3_use_path_style
 
         return
 
@@ -276,7 +283,16 @@ class S3Logger(CustomBatchLogger, BaseAWSLLM):
             )
 
             # Prepare the URL
-            url = f"https://{self.s3_bucket_name}.s3.{self.s3_region_name}.amazonaws.com/{batch_logging_element.s3_object_key}"
+            if self.s3_use_path_style:
+                url = (
+                    f"https://s3.{self.s3_region_name}.amazonaws.com/"
+                    f"{self.s3_bucket_name}/{batch_logging_element.s3_object_key}"
+                )
+            else:
+                url = (
+                    f"https://{self.s3_bucket_name}.s3.{self.s3_region_name}.amazonaws.com/"
+                    f"{batch_logging_element.s3_object_key}"
+                )
 
             if self.s3_endpoint_url:
                 url = self.s3_endpoint_url + "/" + batch_logging_element.s3_object_key
@@ -421,7 +437,16 @@ class S3Logger(CustomBatchLogger, BaseAWSLLM):
             )
 
             # Prepare the URL
-            url = f"https://{self.s3_bucket_name}.s3.{self.s3_region_name}.amazonaws.com/{batch_logging_element.s3_object_key}"
+            if self.s3_use_path_style:
+                url = (
+                    f"https://s3.{self.s3_region_name}.amazonaws.com/"
+                    f"{self.s3_bucket_name}/{batch_logging_element.s3_object_key}"
+                )
+            else:
+                url = (
+                    f"https://{self.s3_bucket_name}.s3.{self.s3_region_name}.amazonaws.com/"
+                    f"{batch_logging_element.s3_object_key}"
+                )
 
             if self.s3_endpoint_url:
                 url = self.s3_endpoint_url + "/" + batch_logging_element.s3_object_key
@@ -514,7 +539,16 @@ class S3Logger(CustomBatchLogger, BaseAWSLLM):
             )
 
             # Prepare the URL
-            url = f"https://{self.s3_bucket_name}.s3.{self.s3_region_name}.amazonaws.com/{s3_object_key}"
+            if self.s3_use_path_style:
+                url = (
+                    f"https://s3.{self.s3_region_name}.amazonaws.com/"
+                    f"{self.s3_bucket_name}/{s3_object_key}"
+                )
+            else:
+                url = (
+                    f"https://{self.s3_bucket_name}.s3.{self.s3_region_name}.amazonaws.com/"
+                    f"{s3_object_key}"
+                )
 
             if self.s3_endpoint_url:
                 url = self.s3_endpoint_url + "/" + s3_object_key
