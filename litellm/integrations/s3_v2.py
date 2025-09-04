@@ -10,6 +10,7 @@ import asyncio
 from datetime import datetime
 from typing import List, Optional, cast
 
+import httpx
 import litellm
 from litellm._logging import print_verbose, verbose_logger
 from litellm.constants import DEFAULT_S3_BATCH_SIZE, DEFAULT_S3_FLUSH_INTERVAL_SECONDS
@@ -316,7 +317,14 @@ class S3Logger(CustomBatchLogger, BaseAWSLLM):
             response = await self.async_httpx_client.put(
                 url, data=json_string, headers=signed_headers
             )
-            response.raise_for_status()
+            try:
+                response.raise_for_status()
+            except httpx.HTTPStatusError as e:
+                status_code = e.response.status_code
+                response_text = e.response.text
+                verbose_logger.exception(
+                    f"Error uploading to s3: status_code={status_code}, response_text={response_text}"
+                )
         except Exception as e:
             verbose_logger.exception(f"Error uploading to s3: {str(e)}")
 
@@ -453,7 +461,14 @@ class S3Logger(CustomBatchLogger, BaseAWSLLM):
             httpx_client = _get_httpx_client()
             # Make the request
             response = httpx_client.put(url, data=json_string, headers=signed_headers)
-            response.raise_for_status()
+            try:
+                response.raise_for_status()
+            except httpx.HTTPStatusError as e:
+                status_code = e.response.status_code
+                response_text = e.response.text
+                verbose_logger.exception(
+                    f"Error uploading to s3: status_code={status_code}, response_text={response_text}"
+                )
         except Exception as e:
             verbose_logger.exception(f"Error uploading to s3: {str(e)}")
 
