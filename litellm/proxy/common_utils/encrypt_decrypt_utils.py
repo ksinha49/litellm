@@ -59,7 +59,13 @@ async def verify_and_store_salt_hash(prisma_client) -> None:
 
     try:
         current_hash = hashlib.sha256(_get_salt_key().encode()).hexdigest()
-        table = prisma_client.db.litellm_metadatable
+        table = getattr(prisma_client.db, "litellm_metadatatable", None)
+        if table is None:
+            verbose_proxy_logger.warning(
+                "LiteLLM_MetadataTable not found on Prisma client. Skipping salt hash verification."
+            )
+            return
+
         existing = await table.find_first(where={"key": "salt_key_hash"})
         if existing is None:
             await table.create(data={"key": "salt_key_hash", "value": current_hash})
