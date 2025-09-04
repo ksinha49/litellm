@@ -46,7 +46,7 @@ interface PublicModelHubProps {
 
 const PublicModelHub: React.FC<PublicModelHubProps> = ({ accessToken }) => {
   const [modelHubData, setModelHubData] = useState<ModelGroupInfo[] | null>(null);
-  const [pageTitle, setPageTitle] = useState<string>("Ameritas LiteLLM Gateway");
+  const [pageTitle, setPageTitle] = useState<string>("Ameritas LLM API");
   const [customDocsDescription, setCustomDocsDescription] = useState<string | null>(null);
   const [litellmVersion, setLitellmVersion] = useState<string>("");
   const [usefulLinks, setUsefulLinks] = useState<Record<string, string>>({});
@@ -499,7 +499,7 @@ const PublicModelHub: React.FC<PublicModelHubProps> = ({ accessToken }) => {
         {/* About Section */}
           <Card className="mb-10 p-8 bg-white border border-gray-200 rounded-lg shadow-sm">
             <Title className="text-2xl font-semibold mb-6 text-gray-900">About</Title>
-            <p className="text-gray-700 mb-6 text-base leading-relaxed">{customDocsDescription ? customDocsDescription : "Proxy Server to call 100+ LLMs in the OpenAI format."}</p>
+            <p className="text-gray-700 mb-6 text-base leading-relaxed">{customDocsDescription || ""}</p>
             <div className="flex items-center space-x-3 text-sm text-gray-600">
               <span className="flex items-center">
                 <span className="w-4 h-4 mr-2">🔧</span>
