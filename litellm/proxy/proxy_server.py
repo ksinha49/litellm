@@ -1,4 +1,6 @@
 import asyncio
+import ast
+import re
 import copy
 import inspect
 import io
@@ -1415,6 +1417,35 @@ class ProxyConfig:
     def __init__(self) -> None:
         self.config: Dict[str, Any] = {}
 
+    @staticmethod
+    def _parse_litellm_params_str(params_str: str) -> dict:
+        """Safely parse LiteLLM_Params from a string representation.
+
+        The database should store ``litellm_params`` as a JSON object. If a
+        Pydantic-style string like ``"LiteLLM_Params(...)"`` is encountered, this
+        helper attempts to convert it into a dictionary. A ``ValueError`` is
+        raised if parsing fails.
+        """
+        stripped = params_str.strip()
+        if stripped.startswith("LiteLLM_Params(") and stripped.endswith(")"):
+            inner = stripped[len("LiteLLM_Params(") : -1]
+            inner = re.sub(r"(\w+)=", r"'\1':", inner)
+            try:
+                parsed = ast.literal_eval("{" + inner + "}")
+            except Exception as e:  # pragma: no cover - defensive
+                raise ValueError(
+                    "Failed to parse LiteLLM_Params string representation. "
+                    "DB must store litellm_params as JSON."
+                ) from e
+            if not isinstance(parsed, dict):  # pragma: no cover - defensive
+                raise ValueError(
+                    "Parsed LiteLLM_Params is not a dict. DB must store litellm_params as JSON."
+                )
+            return parsed
+        raise ValueError(
+            "litellm_params string is not valid JSON. DB must store litellm_params as JSON."
+        )
+
     def is_yaml(self, config_file_path: str) -> bool:
         if not os.path.isfile(config_file_path):
             return False
@@ -2460,11 +2491,15 @@ class ProxyConfig:
 
     def _add_deployment(self, db_models: list) -> int:
         """
-        Iterate through db models
+        Iterate through db models.
 
-        for any not in router - add them.
+        For any not in the router - add them.
 
-        Return - number of deployments added
+        Return - number of deployments added.
+
+        The DB must store ``litellm_params`` as JSON. Pydantic-style string
+        representations like ``"LiteLLM_Params(...)"`` are parsed on a
+        best-effort basis and may raise a ``ValueError`` if conversion fails.
         """
         import base64
 
@@ -2482,6 +2517,17 @@ class ProxyConfig:
             _litellm_params = m.litellm_params
             if isinstance(_litellm_params, LiteLLM_Params):
                 _litellm_params = _litellm_params.model_dump()
+            elif isinstance(_litellm_params, str):
+                try:
+                    _litellm_params = json.loads(_litellm_params)
+                except Exception:
+                    try:
+                        _litellm_params = self._parse_litellm_params_str(_litellm_params)
+                    except ValueError as e:
+                        verbose_proxy_logger.error(
+                            f"Invalid model added to proxy db. {e} value={_litellm_params}"
+                        )
+                        continue  # skip to next model
 
             if isinstance(_litellm_params, dict):
                 # decrypt values
@@ -2517,6 +2563,12 @@ class ProxyConfig:
         return added_models
 
     def decrypt_model_list_from_db(self, new_models: list) -> list:
+        """Decrypt and normalize models fetched from the DB.
+
+        ``litellm_params`` must be stored as JSON. If a Pydantic-style string
+        representation is detected, the method attempts to safely parse it. On
+        failure, the offending model is skipped.
+        """
         _model_list: list = []
         for m in new_models:
             _litellm_params = m.litellm_params
@@ -2526,10 +2578,13 @@ class ProxyConfig:
                 try:
                     _litellm_params = json.loads(_litellm_params)
                 except Exception:
-                    verbose_proxy_logger.error(
-                        f"Invalid model added to proxy db. Invalid litellm params type={type(_litellm_params)} value={_litellm_params}"
-                    )
-                    continue  # skip to next model
+                    try:
+                        _litellm_params = self._parse_litellm_params_str(_litellm_params)
+                    except ValueError as e:
+                        verbose_proxy_logger.error(
+                            f"Invalid model added to proxy db. {e} value={_litellm_params}"
+                        )
+                        continue  # skip to next model
 
             if isinstance(_litellm_params, dict):
                 # decrypt values

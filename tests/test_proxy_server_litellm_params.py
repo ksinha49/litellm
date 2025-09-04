@@ -117,6 +117,30 @@ def test_decrypt_model_list_from_db_accepts_str(monkeypatch):
     assert models[0]["litellm_params"]["model"] == "gpt-3.5"
 
 
+def test_pydantic_style_string_is_parsed(monkeypatch):
+    monkeypatch.setattr(proxy_server, "decrypt_value_helper", lambda value, key: value)
+    proxy_server.master_key = "test-key"
+    proxy_server.llm_router = DummyRouter()
+
+    proxy_config = proxy_server.ProxyConfig()
+
+    params = LiteLLM_Params(model="gpt-4")
+    str_model = SimpleNamespace(
+        model_name="gpt-4",
+        litellm_params=repr(params),
+        model_info={},
+        model_id="1",
+    )
+
+    added = proxy_config._add_deployment([str_model])
+    assert added == 1
+    assert proxy_server.llm_router.deployments[0].litellm_params.model == "gpt-4"
+
+    models = proxy_config.decrypt_model_list_from_db([str_model])
+    assert len(models) == 1
+    assert models[0]["litellm_params"]["model"] == "gpt-4"
+
+
 def test_models_added_via_management_endpoint_reload_without_invalid_log(
     monkeypatch, caplog
 ):
