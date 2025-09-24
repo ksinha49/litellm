@@ -207,6 +207,7 @@ from litellm.proxy.common_utils.encrypt_decrypt_utils import (
     decrypt_value_helper,
     encrypt_value_helper,
     verify_and_store_salt_hash,
+    SaltKeyMismatchError,
 )
 from litellm.proxy.common_utils.html_forms.ui_login import html_form
 from litellm.proxy.common_utils.http_parsing_utils import (
@@ -2741,12 +2742,23 @@ class ProxyConfig:
             eg. `{"LANGFUSE_PUBLIC_KEY": "kFiKa1VZukMmD8RB6WXB9F......."}`
         """
         decrypted_env_vars = {}
+        salt_key_mismatch_logged = False
         for k, v in environment_variables.items():
             try:
                 decrypted_value = decrypt_value_helper(value=v, key=k)
                 if decrypted_value is not None:
                     os.environ[k] = decrypted_value
                     decrypted_env_vars[k] = decrypted_value
+            except SaltKeyMismatchError:
+                if not salt_key_mismatch_logged:
+                    verbose_proxy_logger.error(
+                        "Salt key mismatch detected while decrypting environment variables. "
+                        "Ensure LITELLM_SALT_KEY matches the key used to encrypt stored secrets."
+                    )
+                    salt_key_mismatch_logged = True
+                verbose_proxy_logger.debug(
+                    "Skipping environment variable %s due to salt key mismatch", k
+                )
             except Exception as e:
                 verbose_proxy_logger.error(
                     "Error setting env variable: %s - %s", k, str(e)
