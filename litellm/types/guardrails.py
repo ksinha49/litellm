@@ -314,7 +314,7 @@ class BedrockGuardrailConfigModel(BaseModel):
 
     @model_validator(mode="after")
     def _validate_authentication(self) -> "BedrockGuardrailConfigModel":
-        """Ensure that at least one AWS authentication mechanism is configured."""
+        """Validate consistency among any provided AWS authentication parameters."""
 
         if (
             not self.guardrailIdentifier
@@ -347,7 +347,7 @@ class BedrockGuardrailConfigModel(BaseModel):
             )
 
         if errors:
-            raise ValueError(" ".join(errors))
+            raise ValueError("; ".join(errors))
 
         return self
 
