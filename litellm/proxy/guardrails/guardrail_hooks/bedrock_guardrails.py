@@ -32,7 +32,11 @@ from litellm.llms.custom_httpx.http_handler import (
     httpxSpecialProvider,
 )
 from litellm.proxy._types import UserAPIKeyAuth
-from litellm.types.guardrails import GuardrailEventHooks
+from litellm.types.guardrails import (
+    BedrockGuardrailConfigModel,
+    GuardrailEventHooks,
+    resolve_bedrock_region_name,
+)
 from litellm.types.llms.openai import AllMessageValues
 from litellm.types.proxy.guardrails.guardrail_hooks.bedrock_guardrails import (
     BedrockContentItem,
@@ -105,6 +109,52 @@ class BedrockGuardrail(CustomGuardrail, BaseAWSLLM):
         disable_exception_on_block: Optional[bool] = False,
         **kwargs,
     ):
+        def _is_missing(value: Optional[str]) -> bool:
+            if value is None:
+                return True
+            if isinstance(value, str):
+                return value.strip() == ""
+            return False
+
+        provided_region = kwargs.get("aws_region_name")
+        resolved_region_name = resolve_bedrock_region_name(provided_region)
+        kwargs["aws_region_name"] = resolved_region_name
+        missing_fields = []
+        if _is_missing(guardrailIdentifier):
+            missing_fields.append("guardrailIdentifier")
+        if _is_missing(guardrailVersion):
+            missing_fields.append("guardrailVersion")
+        if _is_missing(resolved_region_name):
+            missing_fields.append("aws_region_name")
+
+        if missing_fields:
+            raise ValueError(
+                "Bedrock guardrail misconfiguration: missing required field(s): "
+                + ", ".join(missing_fields)
+            )
+
+        config_kwargs = {
+            "guardrailIdentifier": guardrailIdentifier,
+            "guardrailVersion": guardrailVersion,
+            "aws_region_name": resolved_region_name,
+            "disable_exception_on_block": disable_exception_on_block,
+        }
+        for key in (
+            "aws_access_key_id",
+            "aws_secret_access_key",
+            "aws_session_token",
+            "aws_session_name",
+            "aws_profile_name",
+            "aws_role_name",
+            "aws_web_identity_token",
+            "aws_sts_endpoint",
+            "aws_bedrock_runtime_endpoint",
+        ):
+            if key in kwargs:
+                config_kwargs[key] = kwargs[key]
+
+        BedrockGuardrailConfigModel(**config_kwargs)
+
         self.async_handler = get_async_httpx_client(
             llm_provider=httpxSpecialProvider.GuardrailCallback
         )

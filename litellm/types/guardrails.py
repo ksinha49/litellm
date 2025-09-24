@@ -2,7 +2,7 @@ from datetime import datetime
 from enum import Enum
 from typing import Any, Dict, List, Literal, Optional, TypedDict, Union
 
-from pydantic import BaseModel, ConfigDict, Field, SecretStr
+from pydantic import BaseModel, ConfigDict, Field, SecretStr, model_validator
 from typing_extensions import Required, TypedDict
 
 from litellm.types.proxy.guardrails.guardrail_hooks.openai.openai_moderation import (
@@ -217,6 +217,36 @@ PII_ENTITY_CATEGORIES_MAP = {
 }
 
 
+def _coerce_non_empty_str(value: Any) -> Optional[str]:
+    if value is None:
+        return None
+    if isinstance(value, SecretStr):
+        value = value.get_secret_value()
+    if isinstance(value, str):
+        stripped_value = value.strip()
+        if stripped_value:
+            return stripped_value
+    return None
+
+
+def resolve_bedrock_region_name(candidate_region: Optional[str]) -> str:
+    """Return the configured AWS region or fall back to environment/defaults."""
+
+    normalized_candidate = _coerce_non_empty_str(candidate_region)
+    if normalized_candidate is not None:
+        return normalized_candidate
+
+    from litellm.secret_managers.main import get_secret
+
+    for env_key in ("AWS_REGION_NAME", "AWS_REGION"):
+        env_value = get_secret(env_key, None)
+        normalized_env_value = _coerce_non_empty_str(env_value)
+        if normalized_env_value is not None:
+            return normalized_env_value
+
+    return "us-west-2"
+
+
 class PiiEntityCategoryMap(TypedDict):
     category: PiiEntityCategory
     entities: List[PiiEntityType]
@@ -268,19 +298,20 @@ class PresidioConfigModel(PresidioPresidioConfigModelUserInterface):
 class BedrockGuardrailConfigModel(BaseModel):
     """Configuration parameters for the AWS Bedrock guardrail"""
 
-    guardrailIdentifier: Optional[str] = Field(
-        default=None, description="The ID of your guardrail on Bedrock"
+    guardrailIdentifier: str = Field(
+        ..., min_length=1, description="The ID of your guardrail on Bedrock"
     )
-    guardrailVersion: Optional[str] = Field(
-        default=None,
+    guardrailVersion: str = Field(
+        ...,
+        min_length=1,
         description="The version of your Bedrock guardrail (e.g., DRAFT or version number)",
     )
     disable_exception_on_block: Optional[bool] = Field(
         default=False,
         description="If True, will not raise an exception when the guardrail is blocked. Useful for OpenWebUI where exceptions can end the chat flow.",
     )
-    aws_region_name: Optional[str] = Field(
-        default=None, description="AWS region where your guardrail is deployed"
+    aws_region_name: str = Field(
+        ..., min_length=1, description="AWS region where your guardrail is deployed"
     )
     aws_access_key_id: Optional[str] = Field(
         default=None, description="AWS access key ID for authentication"
@@ -311,6 +342,52 @@ class BedrockGuardrailConfigModel(BaseModel):
     )
 
 
+    @model_validator(mode="before")
+    @classmethod
+    def _populate_region(cls, data: Any) -> Any:
+        if isinstance(data, dict):
+            resolved_region = resolve_bedrock_region_name(data.get("aws_region_name"))
+            data = {**data, "aws_region_name": resolved_region}
+        return data
+
+    @model_validator(mode="after")
+    def _validate_authentication(self) -> "BedrockGuardrailConfigModel":
+        """Validate consistency among any provided AWS authentication parameters."""
+
+        if (
+            not self.guardrailIdentifier
+            or not self.guardrailVersion
+            or not self.aws_region_name
+        ):
+            return self
+
+        errors: List[str] = []
+
+        has_access_keys = bool(self.aws_access_key_id and self.aws_secret_access_key)
+        if self.aws_access_key_id and not self.aws_secret_access_key:
+            errors.append(
+                "aws_secret_access_key must be provided when aws_access_key_id is set."
+            )
+        if self.aws_secret_access_key and not self.aws_access_key_id:
+            errors.append(
+                "aws_access_key_id must be provided when aws_secret_access_key is set."
+            )
+        if self.aws_session_token and not has_access_keys:
+            errors.append(
+                "aws_session_token requires both aws_access_key_id and aws_secret_access_key."
+            )
+
+        if self.aws_web_identity_token and (
+            not self.aws_role_name or not self.aws_session_name
+        ):
+            errors.append(
+                "aws_role_name and aws_session_name are required when using aws_web_identity_token."
+            )
+
+        if errors:
+            raise ValueError("; ".join(errors))
+
+        return self
 
 class LakeraV2GuardrailConfigModel(BaseModel):
     """Configuration parameters for the Lakera AI v2 guardrail"""
@@ -451,6 +528,21 @@ class LitellmParams(
     mode: Union[str, List[str], Mode] = Field(
         description="When to apply the guardrail (pre_call, post_call, during_call, logging_only)"
     )
+    guardrailIdentifier: Optional[str] = Field(
+        default=None,
+        min_length=1,
+        description="The ID of your guardrail on Bedrock",
+    )
+    guardrailVersion: Optional[str] = Field(
+        default=None,
+        min_length=1,
+        description="The version of your Bedrock guardrail (e.g., DRAFT or version number)",
+    )
+    aws_region_name: Optional[str] = Field(
+        default=None,
+        min_length=1,
+        description="AWS region where your guardrail is deployed",
+    )
 
     def __init__(self, **kwargs):
         default_on = kwargs.pop("default_on", None)
@@ -459,6 +551,28 @@ class LitellmParams(
         else:
             kwargs["default_on"] = False
         super().__init__(**kwargs)
+
+    @model_validator(mode="after")
+    def _validate_bedrock_requirements(self) -> "LitellmParams":
+        guardrail_type = getattr(self, "guardrail", None)
+        if guardrail_type == SupportedGuardrailIntegrations.BEDROCK.value:
+            missing_fields = [
+                field_name
+                for field_name in (
+                    "guardrailIdentifier",
+                    "guardrailVersion",
+                )
+                if not getattr(self, field_name, None)
+            ]
+            self.aws_region_name = resolve_bedrock_region_name(
+                getattr(self, "aws_region_name", None)
+            )
+            if missing_fields:
+                raise ValueError(
+                    "Bedrock guardrail configuration requires the following fields: "
+                    + ", ".join(missing_fields)
+                )
+        return self
 
     def __contains__(self, key):
         # Define custom behavior for the 'in' operator

@@ -36,6 +36,9 @@ class MockResponse:
 
 @pytest.fixture
 def patched_guardrail(monkeypatch):
+    monkeypatch.setenv("AWS_ACCESS_KEY_ID", "test-access-key")
+    monkeypatch.setenv("AWS_SECRET_ACCESS_KEY", "test-secret-key")
+
     monkeypatch.setattr(
         BedrockGuardrail,
         "_load_credentials",
@@ -58,8 +61,68 @@ def patched_guardrail(monkeypatch):
     guardrail = BedrockGuardrail(
         guardrailIdentifier="guardrail-id",
         guardrailVersion="1",
+        aws_region_name="us-west-2",
     )
     return guardrail
+
+
+def test_bedrock_guardrail_missing_required_fields(monkeypatch):
+    monkeypatch.setenv("AWS_ACCESS_KEY_ID", "test-access-key")
+    monkeypatch.setenv("AWS_SECRET_ACCESS_KEY", "test-secret-key")
+
+    with pytest.raises(ValueError) as exc_info:
+        BedrockGuardrail(guardrailVersion="1", aws_region_name="us-west-2")
+
+    assert "guardrailIdentifier" in str(exc_info.value)
+
+
+def test_bedrock_guardrail_region_from_environment(monkeypatch):
+    monkeypatch.delenv("AWS_REGION_NAME", raising=False)
+    monkeypatch.setenv("AWS_REGION", "us-east-2")
+
+    guardrail = BedrockGuardrail(
+        guardrailIdentifier="guardrail-id", guardrailVersion="1"
+    )
+
+    assert guardrail.optional_params["aws_region_name"] == "us-east-2"
+
+
+def test_bedrock_guardrail_allows_default_metadata_credentials(monkeypatch):
+    monkeypatch.delenv("AWS_ACCESS_KEY_ID", raising=False)
+    monkeypatch.delenv("AWS_SECRET_ACCESS_KEY", raising=False)
+    monkeypatch.delenv("AWS_SESSION_TOKEN", raising=False)
+    monkeypatch.delenv("AWS_PROFILE", raising=False)
+    monkeypatch.delenv("AWS_DEFAULT_PROFILE", raising=False)
+    monkeypatch.delenv("AWS_ROLE_ARN", raising=False)
+    monkeypatch.delenv("AWS_WEB_IDENTITY_TOKEN_FILE", raising=False)
+    monkeypatch.delenv("AWS_EC2_METADATA_DISABLED", raising=False)
+
+    guardrail = BedrockGuardrail(
+        guardrailIdentifier="guardrail-id",
+        guardrailVersion="1",
+        aws_region_name="us-west-2",
+    )
+
+    assert guardrail.guardrailIdentifier == "guardrail-id"
+
+
+def test_bedrock_guardrail_metadata_disabled_does_not_raise(monkeypatch):
+    monkeypatch.delenv("AWS_ACCESS_KEY_ID", raising=False)
+    monkeypatch.delenv("AWS_SECRET_ACCESS_KEY", raising=False)
+    monkeypatch.delenv("AWS_SESSION_TOKEN", raising=False)
+    monkeypatch.delenv("AWS_PROFILE", raising=False)
+    monkeypatch.delenv("AWS_DEFAULT_PROFILE", raising=False)
+    monkeypatch.delenv("AWS_ROLE_ARN", raising=False)
+    monkeypatch.delenv("AWS_WEB_IDENTITY_TOKEN_FILE", raising=False)
+    monkeypatch.setenv("AWS_EC2_METADATA_DISABLED", "true")
+
+    guardrail = BedrockGuardrail(
+        guardrailIdentifier="guardrail-id",
+        guardrailVersion="1",
+        aws_region_name="us-west-2",
+    )
+
+    assert guardrail.guardrailIdentifier == "guardrail-id"
 
 
 def test_make_bedrock_api_request_raises_forbidden(patched_guardrail):
