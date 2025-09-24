@@ -36,6 +36,9 @@ class MockResponse:
 
 @pytest.fixture
 def patched_guardrail(monkeypatch):
+    monkeypatch.setenv("AWS_ACCESS_KEY_ID", "test-access-key")
+    monkeypatch.setenv("AWS_SECRET_ACCESS_KEY", "test-secret-key")
+
     monkeypatch.setattr(
         BedrockGuardrail,
         "_load_credentials",
@@ -58,8 +61,19 @@ def patched_guardrail(monkeypatch):
     guardrail = BedrockGuardrail(
         guardrailIdentifier="guardrail-id",
         guardrailVersion="1",
+        aws_region_name="us-west-2",
     )
     return guardrail
+
+
+def test_bedrock_guardrail_missing_required_fields(monkeypatch):
+    monkeypatch.setenv("AWS_ACCESS_KEY_ID", "test-access-key")
+    monkeypatch.setenv("AWS_SECRET_ACCESS_KEY", "test-secret-key")
+
+    with pytest.raises(ValueError) as exc_info:
+        BedrockGuardrail(guardrailVersion="1", aws_region_name="us-west-2")
+
+    assert "guardrailIdentifier" in str(exc_info.value)
 
 
 def test_make_bedrock_api_request_raises_forbidden(patched_guardrail):
