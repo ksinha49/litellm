@@ -428,6 +428,16 @@ class BedrockGuardrail(CustomGuardrail, BaseAWSLLM):
         guardrail_status: Literal["success", "failure"] = (
             "success" if response.status_code == 200 and payload_is_valid else "failure"
         )
+        guardrail_detected: Optional[bool] = None
+        if payload_is_valid and isinstance(guardrail_json_response, dict):
+            guardrail_detected = self._response_indicates_detection(
+                guardrail_json_response
+            )
+            if (
+                guardrail_detected is not None
+                and "detected" not in guardrail_json_response
+            ):
+                guardrail_json_response["detected"] = guardrail_detected
 
         #########################################################
         # Add guardrail information to request trace
@@ -439,6 +449,7 @@ class BedrockGuardrail(CustomGuardrail, BaseAWSLLM):
             start_time=start_time.timestamp(),
             end_time=end_time.timestamp(),
             duration=(end_time - start_time).total_seconds(),
+            guardrail_detected=guardrail_detected,
         )
         #########################################################
         if response.status_code == 200:
@@ -455,6 +466,11 @@ class BedrockGuardrail(CustomGuardrail, BaseAWSLLM):
                 "Bedrock AI response : %s", guardrail_json_response
             )
             bedrock_guardrail_response = BedrockGuardrailResponse(**response_json)
+            if (
+                guardrail_detected is not None
+                and "detected" not in bedrock_guardrail_response
+            ):
+                bedrock_guardrail_response["detected"] = guardrail_detected
             if self._should_raise_guardrail_blocked_exception(
                 bedrock_guardrail_response
             ):
@@ -619,6 +635,91 @@ class BedrockGuardrail(CustomGuardrail, BaseAWSLLM):
 
         # If we got here, intervention occurred but no BLOCKED actions found
         # This means all actions were ANONYMIZED or NONE, so don't raise exception
+        return False
+
+    def _response_indicates_detection(
+        self, response: Union[BedrockGuardrailResponse, dict]
+    ) -> Optional[bool]:
+        """
+        Determine whether the Bedrock response indicates a policy detection.
+
+        Returns:
+            True if a detection occurred, False if the payload explicitly shows
+            no detections, or None if we are unable to determine.
+        """
+
+        if not isinstance(response, dict):
+            return None
+
+        detected_flag = response.get("detected")
+        if isinstance(detected_flag, bool):
+            return detected_flag
+
+        action = response.get("action")
+        if isinstance(action, str) and action.upper() not in {
+            "",
+            "NONE",
+            "NO_ACTION",
+            "ALLOW",
+        }:
+            return True
+
+        if self._response_contains_detection(response):
+            return True
+
+        assessments = response.get("assessments")
+        if isinstance(assessments, list):
+            if any(self._response_contains_detection(assessment) for assessment in assessments):
+                return True
+            if len(assessments) > 0:
+                return False
+
+        return False
+
+    def _response_contains_detection(self, value: Any) -> bool:
+        """Recursively inspect the response for detection signals."""
+
+        if isinstance(value, dict):
+            detected_flag = value.get("detected")
+            if detected_flag is True:
+                return True
+
+            action_value = value.get("action")
+            if isinstance(action_value, str) and action_value.upper() not in {
+                "",
+                "NONE",
+                "NO_ACTION",
+                "ALLOW",
+            }:
+                return True
+
+            for key in (
+                "match",
+                "matches",
+                "annotations",
+                "topics",
+                "filters",
+                "customWords",
+                "managedWordLists",
+                "piiEntities",
+                "regexes",
+                "detections",
+            ):
+                if key in value and value[key]:
+                    return True
+
+            for nested in value.values():
+                if self._response_contains_detection(nested):
+                    return True
+
+            return False
+
+        if isinstance(value, list):
+            for item in value:
+                if self._response_contains_detection(item):
+                    return True
+            return False
+
         return False
 
     @log_guardrail_information
