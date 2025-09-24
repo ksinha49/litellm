@@ -8856,7 +8856,7 @@ async def delete_config_general_settings(
             )
         for field in fields_to_delete:
             default_value = LITELLM_SETTINGS_DEFAULTS.get(field, None)
-            setattr(litellm, field, default_value)
+            setattr(litellm, field, copy.deepcopy(default_value))
         db_param_name = "litellm_settings"
     else:
         raise HTTPException(
