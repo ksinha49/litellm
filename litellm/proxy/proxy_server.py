@@ -8895,6 +8895,7 @@ async def delete_config_general_settings(
     for field in fields_to_remove:
         settings.pop(field, None)
 
+
     response = await prisma_client.db.litellm_config.upsert(
         where={"param_name": db_param_name},
         data={
