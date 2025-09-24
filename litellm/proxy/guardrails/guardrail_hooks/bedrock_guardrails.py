@@ -125,6 +125,7 @@ class BedrockGuardrail(CustomGuardrail, BaseAWSLLM):
         if _is_missing(guardrailVersion):
             missing_fields.append("guardrailVersion")
         if _is_missing(resolved_region_name):
+
             missing_fields.append("aws_region_name")
 
         if missing_fields:
