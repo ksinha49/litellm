@@ -34,6 +34,7 @@ from litellm.constants import (
     DEFAULT_MAX_RECURSE_DEPTH,
     DEFAULT_SLACK_ALERTING_THRESHOLD,
     LITELLM_EMBEDDING_PROVIDERS_SUPPORTING_INPUT_ARRAY_OF_TOKENS,
+    LITELLM_SETTINGS_DEFAULTS,
     LITELLM_SETTINGS_SAFE_DB_OVERRIDES,
 )
 from litellm.litellm_core_utils.safe_json_dumps import safe_dumps
@@ -8806,35 +8807,99 @@ async def delete_config_general_settings(
             },
         )
 
-    if data.field_name not in ConfigGeneralSettings.model_fields:
-        raise HTTPException(
-            status_code=400,
-            detail={"error": "Invalid field={} passed in.".format(data.field_name)},
-        )
-
-    ## get general settings from db
-    db_general_settings = await prisma_client.db.litellm_config.find_first(
-        where={"param_name": "general_settings"}
-    )
-    ### pop the value
-
-    if db_general_settings is None or db_general_settings.param_value is None:
-        raise HTTPException(
-            status_code=400,
-            detail={"error": "Field name={} not in config".format(data.field_name)},
-        )
+    if data.field_names:
+        fields_to_delete = [field for field in data.field_names if field]
+    elif data.field_name:
+        fields_to_delete = [data.field_name]
     else:
-        general_settings = dict(db_general_settings.param_value)
+        raise HTTPException(
+            status_code=400,
+            detail={"error": "Either field_name or field_names must be provided"},
+        )
 
-    ## update db
+    if not fields_to_delete:
+        raise HTTPException(
+            status_code=400,
+            detail={"error": "No valid field names provided"},
+        )
 
-    general_settings.pop(data.field_name, None)
+    if data.config_type == "general_settings":
+        invalid_fields = [
+            field
+            for field in fields_to_delete
+            if field not in ConfigGeneralSettings.model_fields
+        ]
+        if invalid_fields:
+            raise HTTPException(
+                status_code=400,
+                detail={
+                    "error": "Invalid field(s)={} passed in.".format(
+                        ",".join(invalid_fields)
+                    )
+                },
+            )
+        db_param_name = "general_settings"
+    elif data.config_type == "litellm_settings":
+        invalid_fields = [
+            field
+            for field in fields_to_delete
+            if field not in LITELLM_SETTINGS_SAFE_DB_OVERRIDES
+        ]
+        if invalid_fields:
+            raise HTTPException(
+                status_code=400,
+                detail={
+                    "error": "Invalid field(s)={} passed in.".format(
+                        ",".join(invalid_fields)
+                    )
+                },
+            )
+        for field in fields_to_delete:
+            default_value = LITELLM_SETTINGS_DEFAULTS.get(field, None)
+            setattr(litellm, field, copy.deepcopy(default_value))
+        db_param_name = "litellm_settings"
+    else:
+        raise HTTPException(
+            status_code=400,
+            detail={"error": "Invalid config_type passed in."},
+        )
+
+    db_settings = await prisma_client.db.litellm_config.find_first(
+        where={"param_name": db_param_name}
+    )
+
+    if db_settings is None or db_settings.param_value is None:
+        if data.field_name is not None and data.field_names is None:
+            raise HTTPException(
+                status_code=400,
+                detail={"error": "Field name={} not in config".format(data.field_name)},
+            )
+        settings = {}
+    else:
+        settings = dict(db_settings.param_value)
+
+    existing_fields = set(settings.keys())
+
+    if data.field_name is not None and data.field_names is None:
+        if data.field_name not in existing_fields:
+            raise HTTPException(
+                status_code=400,
+                detail={"error": "Field name={} not in config".format(data.field_name)},
+            )
+        fields_to_remove = [data.field_name]
+    else:
+        fields_to_remove = [
+            field for field in fields_to_delete if field in existing_fields
+        ]
+
+    for field in fields_to_remove:
+        settings.pop(field, None)
 
     response = await prisma_client.db.litellm_config.upsert(
-        where={"param_name": "general_settings"},
+        where={"param_name": db_param_name},
         data={
-            "create": {"param_name": "general_settings", "param_value": json.dumps(general_settings)},  # type: ignore
-            "update": {"param_value": json.dumps(general_settings)},  # type: ignore
+            "create": {"param_name": db_param_name, "param_value": json.dumps(settings)},  # type: ignore
+            "update": {"param_value": json.dumps(settings)},  # type: ignore
         },
     )
 
@@ -8958,7 +9023,52 @@ async def get_config():  # noqa: PLR0915
         environment_variables = config_data.get("environment_variables", {})
 
         # check if "langfuse" in litellm_settings
-        _success_callbacks = _litellm_settings.get("success_callback", [])
+        def _normalize_callback_list(value: Any) -> List[str]:
+            if value is None:
+                return []
+            if isinstance(value, list):
+                return value
+            return [value]
+
+        _success_callbacks = _normalize_callback_list(
+            _litellm_settings.get("success_callback", [])
+        )
+        _failure_callbacks = _normalize_callback_list(
+            _litellm_settings.get("failure_callback")
+        )
+        _callbacks = _normalize_callback_list(_litellm_settings.get("callbacks"))
+        _langfuse_default_tags = _normalize_callback_list(
+            _litellm_settings.get("langfuse_default_tags")
+        )
+        logging_settings_payload = {
+            "success_callback": _success_callbacks,
+            "failure_callback": _failure_callbacks,
+            "callbacks": _callbacks,
+            "turn_off_message_logging": bool(
+                _litellm_settings.get(
+                    "turn_off_message_logging",
+                    getattr(litellm, "turn_off_message_logging", False),
+                )
+            ),
+            "redact_user_api_key_info": bool(
+                _litellm_settings.get(
+                    "redact_user_api_key_info",
+                    getattr(litellm, "redact_user_api_key_info", False),
+                )
+            ),
+            "langfuse_default_tags": _langfuse_default_tags,
+            "enable_preview_features": bool(
+                _litellm_settings.get(
+                    "enable_preview_features",
+                    getattr(litellm, "enable_preview_features", False),
+                )
+            ),
+            "json_logs": bool(
+                _litellm_settings.get(
+                    "json_logs", getattr(litellm, "json_logs", False)
+                )
+            ),
+        }
         _data_to_return = []
         """
         [
@@ -9141,6 +9251,7 @@ async def get_config():  # noqa: PLR0915
             "alerts": alerting_data,
             "router_settings": _router_settings,
             "available_callbacks": all_available_callbacks,
+            "litellm_logging_settings": logging_settings_payload,
         }
     except Exception as e:
         verbose_proxy_logger.exception(
