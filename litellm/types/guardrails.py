@@ -244,7 +244,7 @@ def resolve_bedrock_region_name(candidate_region: Optional[str]) -> str:
         if normalized_env_value is not None:
             return normalized_env_value
 
-    return "us-west-2"
+    return "us-east-2"
 
 
 class PiiEntityCategoryMap(TypedDict):
