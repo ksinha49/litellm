@@ -1338,7 +1338,13 @@ litellm_settings:
     s3_path: my-test-path # [OPTIONAL] set path in bucket you want to write logs to
     s3_endpoint_url: https://s3.amazonaws.com  # [OPTIONAL] S3 endpoint URL, if you want to use Backblaze/cloudflare s3 buckets
     s3_use_path_style: false # [OPTIONAL] Use path-style URLs (https://s3.{region}.amazonaws.com/{bucket}/{key})
+    s3_server_side_encryption: AES256 # [OPTIONAL] Add x-amz-server-side-encryption header (AES256 or aws:kms)
+    s3_sse_kms_key_id: os.environ/S3_KMS_KEY # [OPTIONAL] When using aws:kms, provide the key id/arn
+    s3_additional_headers: # [OPTIONAL] Merge custom headers into the signed upload request
+      x-amz-meta-team: platform
 ```
+
+When your bucket enforces policies such as mandatory server-side encryption or custom metadata, populate the new optional fields above. LiteLLM now signs every PUT/GET with the necessary encryption headers so uploads succeed even when a bucket requires `x-amz-server-side-encryption`, a KMS key, canned ACLs, or guardrail-specific metadata.
 
 **Step 3**: Start the proxy, make a test request
 

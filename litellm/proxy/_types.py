@@ -1549,6 +1549,38 @@ class S3CallbackParams(LiteLLMPydanticObjectBase):
     s3_use_path_style: Optional[bool] = Field(
         default=False, description="Use path-style addressing for S3 URLs"
     )
+    s3_server_side_encryption: Optional[str] = Field(
+        default=None,
+        description="Value for x-amz-server-side-encryption header (e.g. AES256, aws:kms)",
+    )
+    s3_sse_kms_key_id: Optional[str] = Field(
+        default=None,
+        description="Optional KMS key id/ARN when using aws:kms server-side encryption",
+    )
+    s3_sse_customer_algorithm: Optional[str] = Field(
+        default=None,
+        description="Algorithm name when using customer-provided encryption keys",
+    )
+    s3_sse_customer_key: Optional[str] = Field(
+        default=None,
+        description="Base64-encoded customer key when using SSE-C",
+    )
+    s3_sse_customer_key_md5: Optional[str] = Field(
+        default=None,
+        description="Base64-encoded MD5 of the SSE-C customer key",
+    )
+    s3_object_acl: Optional[str] = Field(
+        default=None,
+        description="Optional canned ACL to send via x-amz-acl",
+    )
+    s3_storage_class: Optional[str] = Field(
+        default=None,
+        description="Optional S3 storage class to set via x-amz-storage-class",
+    )
+    s3_additional_headers: Optional[Dict[str, str]] = Field(
+        default=None,
+        description="Additional headers to merge into the signed S3 PUT/GET requests",
+    )
 
 
 class ConfigLiteLLMSettings(LiteLLMPydanticObjectBase):

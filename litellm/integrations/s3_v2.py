@@ -7,8 +7,10 @@ NOTE 1: S3 does not provide a BATCH PUT API endpoint, so we create tasks to uplo
 """
 
 import asyncio
+import json
 from datetime import datetime
-from typing import List, Optional, cast
+from typing import Dict, List, Optional, cast
+from xml.etree import ElementTree
 
 import httpx
 import litellm
@@ -51,6 +53,14 @@ class S3Logger(CustomBatchLogger, BaseAWSLLM):
         s3_config=None,
         s3_use_team_prefix: bool = False,
         s3_use_path_style: bool = False,
+        s3_server_side_encryption: Optional[str] = None,
+        s3_sse_kms_key_id: Optional[str] = None,
+        s3_sse_customer_algorithm: Optional[str] = None,
+        s3_sse_customer_key: Optional[str] = None,
+        s3_sse_customer_key_md5: Optional[str] = None,
+        s3_additional_headers: Optional[Dict[str, str]] = None,
+        s3_object_acl: Optional[str] = None,
+        s3_storage_class: Optional[str] = None,
         **kwargs,
     ):
         try:
@@ -83,6 +93,14 @@ class S3Logger(CustomBatchLogger, BaseAWSLLM):
                 s3_path=s3_path,
                 s3_use_team_prefix=s3_use_team_prefix,
                 s3_use_path_style=s3_use_path_style,
+                s3_server_side_encryption=s3_server_side_encryption,
+                s3_sse_kms_key_id=s3_sse_kms_key_id,
+                s3_sse_customer_algorithm=s3_sse_customer_algorithm,
+                s3_sse_customer_key=s3_sse_customer_key,
+                s3_sse_customer_key_md5=s3_sse_customer_key_md5,
+                s3_additional_headers=s3_additional_headers,
+                s3_object_acl=s3_object_acl,
+                s3_storage_class=s3_storage_class,
             )
             verbose_logger.debug(f"s3 logger using endpoint url {s3_endpoint_url}")
 
@@ -128,6 +146,14 @@ class S3Logger(CustomBatchLogger, BaseAWSLLM):
         s3_path: Optional[str] = None,
         s3_use_team_prefix: bool = False,
         s3_use_path_style: bool = False,
+        s3_server_side_encryption: Optional[str] = None,
+        s3_sse_kms_key_id: Optional[str] = None,
+        s3_sse_customer_algorithm: Optional[str] = None,
+        s3_sse_customer_key: Optional[str] = None,
+        s3_sse_customer_key_md5: Optional[str] = None,
+        s3_additional_headers: Optional[Dict[str, str]] = None,
+        s3_object_acl: Optional[str] = None,
+        s3_storage_class: Optional[str] = None,
     ):
         """
         Initialize the s3 params for this logging callback
@@ -202,7 +228,97 @@ class S3Logger(CustomBatchLogger, BaseAWSLLM):
             litellm.s3_callback_params.get("s3_use_path_style", False)
         ) or s3_use_path_style
 
+        self.s3_server_side_encryption = (
+            litellm.s3_callback_params.get("s3_server_side_encryption")
+            or s3_server_side_encryption
+        )
+        self.s3_sse_kms_key_id = (
+            litellm.s3_callback_params.get("s3_sse_kms_key_id")
+            or s3_sse_kms_key_id
+        )
+        self.s3_sse_customer_algorithm = (
+            litellm.s3_callback_params.get("s3_sse_customer_algorithm")
+            or s3_sse_customer_algorithm
+        )
+        self.s3_sse_customer_key = (
+            litellm.s3_callback_params.get("s3_sse_customer_key")
+            or s3_sse_customer_key
+        )
+        self.s3_sse_customer_key_md5 = (
+            litellm.s3_callback_params.get("s3_sse_customer_key_md5")
+            or s3_sse_customer_key_md5
+        )
+
+        configured_headers = (
+            litellm.s3_callback_params.get("s3_additional_headers")
+            or s3_additional_headers
+            or {}
+        )
+        if isinstance(configured_headers, dict):
+            self.s3_additional_headers: Dict[str, str] = {}
+            for header_key, header_value in configured_headers.items():
+                if header_value is None:
+                    continue
+                if isinstance(header_value, str) and header_value.startswith(
+                    "os.environ/"
+                ):
+                    resolved_value = litellm.get_secret(header_value)
+                else:
+                    resolved_value = header_value
+                self.s3_additional_headers[str(header_key)] = str(resolved_value)
+        else:
+            self.s3_additional_headers = {}
+
+        self.s3_object_acl = (
+            litellm.s3_callback_params.get("s3_object_acl") or s3_object_acl
+        )
+        self.s3_storage_class = (
+            litellm.s3_callback_params.get("s3_storage_class")
+            or s3_storage_class
+        )
+
         return
+
+    def _apply_optional_headers(
+        self, headers: Dict[str, str], *, include_put_headers: bool
+    ) -> None:
+        """Apply optional encryption and user-provided headers to the request."""
+
+        if self.s3_server_side_encryption:
+            headers.setdefault(
+                "x-amz-server-side-encryption", self.s3_server_side_encryption
+            )
+        if self.s3_sse_kms_key_id:
+            headers.setdefault(
+                "x-amz-server-side-encryption-aws-kms-key-id",
+                self.s3_sse_kms_key_id,
+            )
+        if self.s3_sse_customer_algorithm:
+            headers.setdefault(
+                "x-amz-server-side-encryption-customer-algorithm",
+                self.s3_sse_customer_algorithm,
+            )
+        if self.s3_sse_customer_key:
+            headers.setdefault(
+                "x-amz-server-side-encryption-customer-key",
+                self.s3_sse_customer_key,
+            )
+        if self.s3_sse_customer_key_md5:
+            headers.setdefault(
+                "x-amz-server-side-encryption-customer-key-md5",
+                self.s3_sse_customer_key_md5,
+            )
+        if include_put_headers:
+            if self.s3_object_acl:
+                headers.setdefault("x-amz-acl", self.s3_object_acl)
+            if self.s3_storage_class:
+                headers.setdefault("x-amz-storage-class", self.s3_storage_class)
+
+        for header_key, header_value in self.s3_additional_headers.items():
+            if header_key.lower().startswith("x-amz-server-side-encryption"):
+                headers.setdefault(header_key, header_value)
+            elif include_put_headers:
+                headers.setdefault(header_key, header_value)
 
     async def async_log_success_event(self, kwargs, response_obj, start_time, end_time):
         await self._async_log_event_base(
@@ -311,6 +427,7 @@ class S3Logger(CustomBatchLogger, BaseAWSLLM):
                 "Content-Disposition": f'inline; filename="{batch_logging_element.s3_object_download_filename}"',
                 "Cache-Control": "private, immutable, max-age=31536000, s-maxage=0",
             }
+            self._apply_optional_headers(headers, include_put_headers=True)
             req = requests.Request("PUT", url, data=json_string, headers=headers)
             prepped = req.prepare()
 
@@ -336,10 +453,10 @@ class S3Logger(CustomBatchLogger, BaseAWSLLM):
             try:
                 response.raise_for_status()
             except httpx.HTTPStatusError as e:
-                status_code = e.response.status_code
-                response_text = e.response.text
-                verbose_logger.exception(
-                    f"Error uploading to s3: status_code={status_code}, response_text={response_text}"
+                self._log_http_status_error(
+                    error=e,
+                    batch_logging_element=batch_logging_element,
+                    signed_headers=signed_headers,
                 )
         except Exception as e:
             verbose_logger.exception(f"Error uploading to s3: {str(e)}")
@@ -415,6 +532,105 @@ class S3Logger(CustomBatchLogger, BaseAWSLLM):
             s3_object_download_filename=s3_object_download_filename,
         )
 
+    @staticmethod
+    def _sanitize_headers(headers: Dict[str, str]) -> Dict[str, str]:
+        redacted_headers: Dict[str, str] = {}
+        sensitive_headers = {
+            "authorization",
+            "x-amz-security-token",
+            "x-amz-credential",
+            "x-amz-signature",
+            "x-amz-server-side-encryption-customer-key",
+            "x-amz-server-side-encryption-customer-key-md5",
+            "cookie",
+            "set-cookie",
+            "api-key",
+            "x-api-key",
+        }
+        for key, value in headers.items():
+            value_str = "" if value is None else str(value)
+            if key.lower() in sensitive_headers:
+                redacted_headers[key] = "<redacted>"
+            else:
+                redacted_headers[key] = value_str
+        return redacted_headers
+
+    @classmethod
+    def _parse_s3_error_response(cls, response: httpx.Response) -> Dict[str, str]:
+        if response is None:
+            return {}
+        body = response.text or ""
+        details: Dict[str, str] = {}
+        if not body:
+            return details
+        try:
+            json_payload = json.loads(body)
+            if isinstance(json_payload, dict):
+                for key, value in json_payload.items():
+                    if value is None:
+                        continue
+                    details[str(key)] = str(value)
+                if details:
+                    return details
+        except json.JSONDecodeError:
+            pass
+        try:
+            root = ElementTree.fromstring(body)
+        except ElementTree.ParseError:
+            return details
+        for element in root.iter():
+            if element is root:
+                continue
+            tag = element.tag
+            if "}" in tag:
+                tag = tag.split("}", 1)[1]
+            text = element.text.strip() if element.text else ""
+            if text:
+                details[tag] = text
+        return details
+
+    def _log_http_status_error(
+        self,
+        error: httpx.HTTPStatusError,
+        batch_logging_element: s3BatchLoggingElement,
+        signed_headers: Dict[str, str],
+    ) -> None:
+        response = error.response
+        status_code = response.status_code if response is not None else "unknown"
+        sanitized_headers = self._sanitize_headers(signed_headers)
+        aws_details = self._parse_s3_error_response(response) if response else {}
+        aws_error_code = aws_details.get("Code") or aws_details.get("errorCode")
+        aws_error_message = aws_details.get("Message") or aws_details.get("message")
+        aws_host_id = aws_details.get("HostId")
+        aws_request_id = aws_details.get("RequestId") or aws_details.get("requestId")
+
+        log_context = {
+            "status_code": status_code,
+            "bucket": self.s3_bucket_name,
+            "region": self.s3_region_name,
+            "object_key": batch_logging_element.s3_object_key,
+            "path_style": self.s3_use_path_style,
+            "endpoint_url": self.s3_endpoint_url,
+            "headers": sanitized_headers,
+            "aws_error_code": aws_error_code,
+            "aws_error_message": aws_error_message,
+            "aws_host_id": aws_host_id,
+            "aws_request_id": aws_request_id,
+        }
+
+        verbose_logger.error("Error uploading to s3: %s", log_context, exc_info=error)
+
+        if status_code == 403:
+            guidance_message = (
+                "S3 responded with 403 Forbidden. Verify IAM permissions (s3:PutObject), "
+                "bucket region, and bucket policies such as required server-side encryption headers."
+            )
+            if aws_error_code:
+                guidance_message += f" AWS error code: {aws_error_code}."
+            if aws_error_message:
+                guidance_message += f" AWS message: {aws_error_message}."
+            verbose_logger.error(guidance_message)
+
     def upload_data_to_s3(self, batch_logging_element: s3BatchLoggingElement):
         try:
             import hashlib
@@ -465,6 +681,7 @@ class S3Logger(CustomBatchLogger, BaseAWSLLM):
                 "Content-Disposition": f'inline; filename="{batch_logging_element.s3_object_download_filename}"',
                 "Cache-Control": "private, immutable, max-age=31536000, s-maxage=0",
             }
+            self._apply_optional_headers(headers, include_put_headers=True)
             req = requests.Request("PUT", url, data=json_string, headers=headers)
             prepped = req.prepare()
 
@@ -489,10 +706,10 @@ class S3Logger(CustomBatchLogger, BaseAWSLLM):
             try:
                 response.raise_for_status()
             except httpx.HTTPStatusError as e:
-                status_code = e.response.status_code
-                response_text = e.response.text
-                verbose_logger.exception(
-                    f"Error uploading to s3: status_code={status_code}, response_text={response_text}"
+                self._log_http_status_error(
+                    error=e,
+                    batch_logging_element=batch_logging_element,
+                    signed_headers=signed_headers,
                 )
         except Exception as e:
             verbose_logger.exception(f"Error uploading to s3: {str(e)}")
@@ -559,6 +776,7 @@ class S3Logger(CustomBatchLogger, BaseAWSLLM):
             headers = {
                 "x-amz-content-sha256": empty_string_hash,
             }
+            self._apply_optional_headers(headers, include_put_headers=False)
             req = requests.Request("GET", url, headers=headers)
             prepped = req.prepare()
 
