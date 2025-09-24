@@ -357,23 +357,41 @@ class BedrockGuardrailConfigModel(BaseModel):
             and self.aws_role_name
             and self.aws_session_name
         )
-        has_authentication = any(
+        environment_credentials_configured = any(
             [
-                has_access_keys,
-                has_profile,
-                has_role,
-                has_web_identity,
-                bool(os.getenv("AWS_ACCESS_KEY_ID") and os.getenv("AWS_SECRET_ACCESS_KEY")),
+                bool(
+                    os.getenv("AWS_ACCESS_KEY_ID")
+                    and os.getenv("AWS_SECRET_ACCESS_KEY")
+                ),
                 bool(os.getenv("AWS_PROFILE") or os.getenv("AWS_DEFAULT_PROFILE")),
                 bool(os.getenv("AWS_ROLE_ARN")),
                 bool(os.getenv("AWS_WEB_IDENTITY_TOKEN_FILE")),
             ]
         )
 
+        has_authentication = any(
+            [
+                has_access_keys,
+                has_profile,
+                has_role,
+                has_web_identity,
+                environment_credentials_configured,
+            ]
+        )
+
         if not has_authentication:
-            raise ValueError(
-                "Bedrock guardrail configuration requires AWS credentials. Provide access keys, an AWS profile, an assumable role, a web identity token, or configure the equivalent environment variables."
+            metadata_disabled_raw = os.getenv("AWS_EC2_METADATA_DISABLED")
+            metadata_disabled = bool(
+                metadata_disabled_raw
+                and metadata_disabled_raw.lower() in {"true", "1", "yes"}
             )
+
+            if metadata_disabled:
+                raise ValueError(
+                    "Bedrock guardrail configuration requires AWS credentials. Provide access keys, an AWS profile, an assumable role, a web identity token, configure the equivalent environment variables, or allow the default AWS credential provider chain by unsetting AWS_EC2_METADATA_DISABLED."
+                )
+
+            return self
 
         return self
 
