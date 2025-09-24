@@ -200,3 +200,41 @@ def test_make_bedrock_api_request_raises_on_json_decode_failure(patched_guardrai
     assert exc_info.value.detail["aws_response"] == mock_response.text
     logging_mock.assert_called_once()
     assert logging_mock.call_args.kwargs["guardrail_status"] == "failure"
+
+
+def test_make_bedrock_api_request_logs_detection(patched_guardrail):
+    guardrail = patched_guardrail
+    logging_mock = MagicMock()
+    guardrail.add_standard_logging_guardrail_information_to_request_data = logging_mock
+
+    response_payload = {
+        "action": "NONE",
+        "assessments": [
+            {
+                "sensitiveInformationPolicy": {
+                    "piiEntities": [
+                        {"match": "john.doe@example.com", "action": "ANONYMIZED"}
+                    ]
+                }
+            }
+        ],
+    }
+
+    guardrail.async_handler.post = AsyncMock(
+        return_value=MockResponse(200, response_payload)
+    )
+
+    result = asyncio.run(
+        guardrail.make_bedrock_api_request(
+            source="INPUT",
+            messages=[{"role": "user", "content": "hello"}],
+            request_data={"metadata": {}},
+        )
+    )
+
+    logging_mock.assert_called_once()
+    assert logging_mock.call_args.kwargs["guardrail_detected"] is True
+    logged_response = logging_mock.call_args.kwargs["guardrail_json_response"]
+    assert isinstance(logged_response, dict)
+    assert logged_response.get("detected") is True
+    assert result.get("detected") is True

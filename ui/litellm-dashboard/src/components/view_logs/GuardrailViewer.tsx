@@ -18,15 +18,23 @@ interface MaskedEntityCount {
   [key: string]: number;
 }
 
+type GuardrailResponse =
+  | GuardrailEntity[]
+  | Record<string, unknown>
+  | string
+  | null
+  | undefined
+
 interface GuardrailInformation {
-  duration: number;
-  end_time: number;
-  start_time: number;
-  guardrail_mode: string;
-  guardrail_name: string;
-  guardrail_status: string;
-  guardrail_response: GuardrailEntity[];
-  masked_entity_count: MaskedEntityCount;
+  duration?: number;
+  end_time?: number;
+  start_time?: number;
+  guardrail_mode?: string;
+  guardrail_name?: string;
+  guardrail_status?: string;
+  guardrail_response?: GuardrailResponse;
+  masked_entity_count?: MaskedEntityCount;
+  detected?: boolean;
 }
 
 interface GuardrailViewerProps {
@@ -38,17 +46,39 @@ export function GuardrailViewer({ data }: GuardrailViewerProps) {
   const [entityListExpanded, setEntityListExpanded] = useState(true);
   const [expandedEntities, setExpandedEntities] = useState<Record<number, boolean>>({});
 
+  const guardrailResponse = data.guardrail_response;
+  const guardrailEntities = Array.isArray(guardrailResponse)
+    ? (guardrailResponse as GuardrailEntity[])
+    : null;
+  const hasStructuredResponse =
+    guardrailResponse !== null &&
+    typeof guardrailResponse === "object" &&
+    !Array.isArray(guardrailResponse);
+  const detectedStatus = typeof data.detected === "boolean"
+    ? data.detected
+    : guardrailEntities
+      ? guardrailEntities.length > 0
+      : undefined;
+
   if (!data) {
     return null;
   }
 
   // Calculate total masked entities
-  const totalMaskedEntities = data.masked_entity_count ? 
-    Object.values(data.masked_entity_count).reduce((sum, count) => sum + count, 0) : 0;
+  const totalMaskedEntities = data.masked_entity_count
+    ? Object.values(data.masked_entity_count).reduce((sum, count) => sum + count, 0)
+    : 0;
 
   const formatTime = (timestamp: number): string => {
     const date = new Date(timestamp * 1000);
     return date.toLocaleString();
+  };
+
+  const formatOptionalTime = (timestamp?: number): string => {
+    if (typeof timestamp !== "number") {
+      return "-";
+    }
+    return formatTime(timestamp);
   };
 
   const toggleEntity = (index: number) => {
@@ -79,13 +109,22 @@ export function GuardrailViewer({ data }: GuardrailViewerProps) {
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
           </svg>
           <h3 className="text-lg font-medium">Guardrail Information</h3>
-          <span className={`ml-3 px-2 py-1 rounded-md text-xs font-medium inline-block ${
-            data.guardrail_status === "success" 
-              ? 'bg-green-100 text-green-800' 
-              : 'bg-red-100 text-red-800'
-          }`}>
-            {data.guardrail_status}
-          </span>
+          {data.guardrail_status && (
+            <span className={`ml-3 px-2 py-1 rounded-md text-xs font-medium inline-block ${
+              data.guardrail_status === "success"
+                ? 'bg-green-100 text-green-800'
+                : 'bg-red-100 text-red-800'
+            }`}>
+              {data.guardrail_status}
+            </span>
+          )}
+          {typeof detectedStatus === "boolean" && (
+            <span className={`ml-3 px-2 py-1 rounded-md text-xs font-medium inline-block ${
+              detectedStatus ? 'bg-orange-100 text-orange-800' : 'bg-gray-100 text-gray-600'
+            }`}>
+              {detectedStatus ? 'Detection flagged' : 'No detections'}
+            </span>
+          )}
           {totalMaskedEntities > 0 && (
             <span className="ml-3 px-2 py-1 bg-blue-50 text-blue-700 rounded-md text-xs font-medium">
               {totalMaskedEntities} masked {totalMaskedEntities === 1 ? 'entity' : 'entities'}
@@ -102,35 +141,39 @@ export function GuardrailViewer({ data }: GuardrailViewerProps) {
               <div className="space-y-2">
                 <div className="flex">
                   <span className="font-medium w-1/3">Guardrail Name:</span>
-                  <span className="font-mono">{data.guardrail_name}</span>
+                  <span className="font-mono">{data.guardrail_name || '-'}</span>
                 </div>
                 <div className="flex">
                   <span className="font-medium w-1/3">Mode:</span>
-                  <span className="font-mono">{data.guardrail_mode}</span>
+                  <span className="font-mono">{data.guardrail_mode || '-'}</span>
                 </div>
                 <div className="flex">
                   <span className="font-medium w-1/3">Status:</span>
-                  <span className={`px-2 py-1 rounded-md text-xs font-medium inline-block ${
-                    data.guardrail_status === "success" 
-                      ? 'bg-green-100 text-green-800' 
-                      : 'bg-red-100 text-red-800'
-                  }`}>
-                    {data.guardrail_status}
-                  </span>
+                  {data.guardrail_status ? (
+                    <span className={`px-2 py-1 rounded-md text-xs font-medium inline-block ${
+                      data.guardrail_status === "success"
+                        ? 'bg-green-100 text-green-800'
+                        : 'bg-red-100 text-red-800'
+                    }`}>
+                      {data.guardrail_status}
+                    </span>
+                  ) : (
+                    <span>-</span>
+                  )}
                 </div>
               </div>
               <div className="space-y-2">
                 <div className="flex">
                   <span className="font-medium w-1/3">Start Time:</span>
-                  <span>{formatTime(data.start_time)}</span>
+                  <span>{formatOptionalTime(data.start_time)}</span>
                 </div>
                 <div className="flex">
                   <span className="font-medium w-1/3">End Time:</span>
-                  <span>{formatTime(data.end_time)}</span>
+                  <span>{formatOptionalTime(data.end_time)}</span>
                 </div>
                 <div className="flex">
                   <span className="font-medium w-1/3">Duration:</span>
-                  <span>{data.duration.toFixed(4)}s</span>
+                  <span>{typeof data.duration === "number" ? `${data.duration.toFixed(4)}s` : '-'}</span>
                 </div>
               </div>
             </div>
@@ -151,9 +194,9 @@ export function GuardrailViewer({ data }: GuardrailViewerProps) {
           </div>
 
           {/* Detected Entities Section */}
-          {data.guardrail_response && data.guardrail_response.length > 0 && (
+          {guardrailEntities && guardrailEntities.length > 0 && (
             <div className="mt-4">
-              <div 
+              <div
                 className="flex items-center mb-2 cursor-pointer"
                 onClick={() => setEntityListExpanded(!entityListExpanded)}
               >
@@ -165,12 +208,12 @@ export function GuardrailViewer({ data }: GuardrailViewerProps) {
                 >
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                 </svg>
-                <h4 className="font-medium">Detected Entities ({data.guardrail_response.length})</h4>
+                <h4 className="font-medium">Detected Entities ({guardrailEntities.length})</h4>
               </div>
-              
+
               {entityListExpanded && (
                 <div className="space-y-2">
-                  {data.guardrail_response.map((entity, index) => {
+                  {guardrailEntities.map((entity, index) => {
                     const isExpanded = expandedEntities[index] || false;
                     
                     return (
@@ -250,8 +293,26 @@ export function GuardrailViewer({ data }: GuardrailViewerProps) {
               )}
             </div>
           )}
+
+          {hasStructuredResponse && !guardrailEntities && (
+            <div className="mt-4">
+              <h4 className="font-medium mb-2">Guardrail Response</h4>
+              <pre className="bg-gray-900 text-gray-100 text-xs p-3 rounded-md overflow-auto">
+                {JSON.stringify(guardrailResponse, null, 2)}
+              </pre>
+            </div>
+          )}
+
+          {typeof guardrailResponse === "string" && guardrailResponse.trim().length > 0 && (
+            <div className="mt-4">
+              <h4 className="font-medium mb-2">Guardrail Response</h4>
+              <pre className="bg-gray-900 text-gray-100 text-xs p-3 rounded-md overflow-auto">
+                {guardrailResponse}
+              </pre>
+            </div>
+          )}
         </div>
       )}
     </div>
   );
-} 
+}

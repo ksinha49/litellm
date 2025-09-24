@@ -360,6 +360,7 @@ class CustomGuardrail(CustomLogger):
         end_time: Optional[float] = None,
         duration: Optional[float] = None,
         masked_entity_count: Optional[Dict[str, int]] = None,
+        guardrail_detected: Optional[bool] = None,
     ) -> None:
         """
         Builds `StandardLoggingGuardrailInformation` and adds it to the request metadata so it can be used for logging to DataDog, Langfuse, etc.
@@ -377,6 +378,7 @@ class CustomGuardrail(CustomLogger):
             ),
             guardrail_response=guardrail_json_response,
             guardrail_status=guardrail_status,
+            detected=guardrail_detected,
             start_time=start_time,
             end_time=end_time,
             duration=duration,
