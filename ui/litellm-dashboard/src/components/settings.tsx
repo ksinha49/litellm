@@ -171,6 +171,29 @@ const LOGGING_SETTING_FIELDS: (keyof LitellmLoggingSettingsState)[] = [
   "json_logs",
 ];
 
+type LoggingSettingArrayField =
+  | "success_callback"
+  | "failure_callback"
+  | "callbacks"
+  | "langfuse_default_tags";
+
+type LoggingSettingBooleanField = Exclude<
+  keyof LitellmLoggingSettingsState,
+  LoggingSettingArrayField
+>;
+
+const ARRAY_LOGGING_SETTING_FIELDS = new Set<LoggingSettingArrayField>([
+  "success_callback",
+  "failure_callback",
+  "callbacks",
+  "langfuse_default_tags",
+]);
+
+const isArrayLoggingSettingField = (
+  field: keyof LitellmLoggingSettingsState
+): field is LoggingSettingArrayField =>
+  ARRAY_LOGGING_SETTING_FIELDS.has(field as LoggingSettingArrayField);
+
 const loggingSettingValueEquals = (
   a: LitellmLoggingSettingsState[keyof LitellmLoggingSettingsState],
   b: LitellmLoggingSettingsState[keyof LitellmLoggingSettingsState]
@@ -363,10 +386,14 @@ const Settings: React.FC<SettingsPageProps> = ({
       const updatedLoggingSettings: Partial<LitellmLoggingSettingsState> = {};
 
       updatedFields.forEach((field) => {
-        const value = litellmLoggingSettings[field];
-        updatedLoggingSettings[field] = Array.isArray(value)
-          ? [...value]
-          : value;
+        if (isArrayLoggingSettingField(field)) {
+          const value = litellmLoggingSettings[field];
+          updatedLoggingSettings[field] = [...value];
+        } else {
+          const value =
+            litellmLoggingSettings[field as LoggingSettingBooleanField];
+          updatedLoggingSettings[field] = value;
+        }
       });
 
       await setCallbacksCall(accessToken, {
