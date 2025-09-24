@@ -871,10 +871,10 @@ LITELLM_SETTINGS_SAFE_DB_OVERRIDES = [
 ]
 
 LITELLM_SETTINGS_DEFAULTS = {
-    "default_internal_user_params": {},
-    "public_model_groups": [],
-    "public_model_groups_links": [],
-    "store_audit_logs": False,
+    "default_internal_user_params": None,
+    "public_model_groups": None,
+    "public_model_groups_links": {},
+    "store_audit_logs": True,
     "success_callback": [],
     "failure_callback": [],
     "callbacks": [],
