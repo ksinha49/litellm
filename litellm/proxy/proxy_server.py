@@ -8807,21 +8807,56 @@ async def delete_config_general_settings(
             },
         )
 
+    if data.field_names:
+        fields_to_delete = [field for field in data.field_names if field]
+    elif data.field_name:
+        fields_to_delete = [data.field_name]
+    else:
+        raise HTTPException(
+            status_code=400,
+            detail={"error": "Either field_name or field_names must be provided"},
+        )
+
+    if not fields_to_delete:
+        raise HTTPException(
+            status_code=400,
+            detail={"error": "No valid field names provided"},
+        )
+
     if data.config_type == "general_settings":
-        if data.field_name not in ConfigGeneralSettings.model_fields:
+        invalid_fields = [
+            field
+            for field in fields_to_delete
+            if field not in ConfigGeneralSettings.model_fields
+        ]
+        if invalid_fields:
             raise HTTPException(
                 status_code=400,
-                detail={"error": "Invalid field={} passed in.".format(data.field_name)},
+                detail={
+                    "error": "Invalid field(s)={} passed in.".format(
+                        ",".join(invalid_fields)
+                    )
+                },
             )
         db_param_name = "general_settings"
     elif data.config_type == "litellm_settings":
-        if data.field_name not in LITELLM_SETTINGS_SAFE_DB_OVERRIDES:
+        invalid_fields = [
+            field
+            for field in fields_to_delete
+            if field not in LITELLM_SETTINGS_SAFE_DB_OVERRIDES
+        ]
+        if invalid_fields:
             raise HTTPException(
                 status_code=400,
-                detail={"error": "Invalid field={} passed in.".format(data.field_name)},
+                detail={
+                    "error": "Invalid field(s)={} passed in.".format(
+                        ",".join(invalid_fields)
+                    )
+                },
             )
-        default_value = LITELLM_SETTINGS_DEFAULTS.get(data.field_name, None)
-        setattr(litellm, data.field_name, default_value)
+        for field in fields_to_delete:
+            default_value = LITELLM_SETTINGS_DEFAULTS.get(field, None)
+            setattr(litellm, field, default_value)
         db_param_name = "litellm_settings"
     else:
         raise HTTPException(
@@ -8834,20 +8869,31 @@ async def delete_config_general_settings(
     )
 
     if db_settings is None or db_settings.param_value is None:
-        raise HTTPException(
-            status_code=400,
-            detail={"error": "Field name={} not in config".format(data.field_name)},
-        )
+        if data.field_name is not None and data.field_names is None:
+            raise HTTPException(
+                status_code=400,
+                detail={"error": "Field name={} not in config".format(data.field_name)},
+            )
+        settings = {}
+    else:
+        settings = dict(db_settings.param_value)
 
-    settings = dict(db_settings.param_value)
+    existing_fields = set(settings.keys())
 
-    if data.field_name not in settings:
-        raise HTTPException(
-            status_code=400,
-            detail={"error": "Field name={} not in config".format(data.field_name)},
-        )
+    if data.field_name is not None and data.field_names is None:
+        if data.field_name not in existing_fields:
+            raise HTTPException(
+                status_code=400,
+                detail={"error": "Field name={} not in config".format(data.field_name)},
+            )
+        fields_to_remove = [data.field_name]
+    else:
+        fields_to_remove = [
+            field for field in fields_to_delete if field in existing_fields
+        ]
 
-    settings.pop(data.field_name, None)
+    for field in fields_to_remove:
+        settings.pop(field, None)
 
     response = await prisma_client.db.litellm_config.upsert(
         where={"param_name": db_param_name},

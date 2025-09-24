@@ -4886,8 +4886,8 @@ export const updateConfigFieldSetting = async (
 };
 
 export const deleteConfigFieldSetting = async (
-  accessToken: String,
-  fieldName: String,
+  accessToken: string,
+  fieldNameOrNames: string | string[],
   configType: string = "general_settings",
   options?: { suppressNotifications?: boolean }
 ) => {
@@ -4896,10 +4896,15 @@ export const deleteConfigFieldSetting = async (
       ? `${proxyBaseUrl}/config/field/delete`
       : `/config/field/delete`;
 
-    let formData = {
-      field_name: fieldName,
-      config_type: configType,
-    };
+    const formData = Array.isArray(fieldNameOrNames)
+      ? {
+          field_names: fieldNameOrNames,
+          config_type: configType,
+        }
+      : {
+          field_name: fieldNameOrNames,
+          config_type: configType,
+        };
     //NotificationsManager.info("Requesting model data");
     const response = await fetch(url, {
       method: "POST",

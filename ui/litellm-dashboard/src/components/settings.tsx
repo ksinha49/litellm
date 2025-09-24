@@ -398,21 +398,14 @@ const Settings: React.FC<SettingsPageProps> = ({
 
     setIsResettingLoggingSettings(true);
     try {
-      for (const field of LOGGING_SETTING_FIELDS) {
-        try {
-          await deleteConfigFieldSetting(accessToken, field, "litellm_settings", {
-            suppressNotifications: true,
-          });
-        } catch (error) {
-          if (
-            error instanceof Error &&
-            error.message?.toLowerCase().includes("not in config")
-          ) {
-            continue;
-          }
-          throw error;
+      await deleteConfigFieldSetting(
+        accessToken,
+        LOGGING_SETTING_FIELDS,
+        "litellm_settings",
+        {
+          suppressNotifications: true,
         }
-      }
+      );
       NotificationsManager.success("Logging settings reset to defaults");
       await fetchCallbacksData();
     } catch (error) {
