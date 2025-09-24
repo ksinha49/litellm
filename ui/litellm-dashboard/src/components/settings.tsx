@@ -288,15 +288,6 @@ const Settings: React.FC<SettingsPageProps> = ({
       setCallbacks(data.callbacks || []);
       setAllCallbacks(data.available_callbacks || []);
 
-      let router_settings = data.router_settings || {};
-      if (router_settings && typeof router_settings === "object") {
-        router_settings = { ...router_settings };
-        if ("model_group_retry_policy" in router_settings) {
-          delete router_settings["model_group_retry_policy"];
-        }
-      }
-      setRouterSettings(router_settings);
-
       const alerts_data = Array.isArray(data.alerts) ? data.alerts : [];
       setAlerts(alerts_data);
       if (alerts_data.length > 0) {
