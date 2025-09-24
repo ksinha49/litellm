@@ -217,6 +217,36 @@ PII_ENTITY_CATEGORIES_MAP = {
 }
 
 
+def _coerce_non_empty_str(value: Any) -> Optional[str]:
+    if value is None:
+        return None
+    if isinstance(value, SecretStr):
+        value = value.get_secret_value()
+    if isinstance(value, str):
+        stripped_value = value.strip()
+        if stripped_value:
+            return stripped_value
+    return None
+
+
+def resolve_bedrock_region_name(candidate_region: Optional[str]) -> str:
+    """Return the configured AWS region or fall back to environment/defaults."""
+
+    normalized_candidate = _coerce_non_empty_str(candidate_region)
+    if normalized_candidate is not None:
+        return normalized_candidate
+
+    from litellm.secret_managers.main import get_secret
+
+    for env_key in ("AWS_REGION_NAME", "AWS_REGION"):
+        env_value = get_secret(env_key, None)
+        normalized_env_value = _coerce_non_empty_str(env_value)
+        if normalized_env_value is not None:
+            return normalized_env_value
+
+    return "us-west-2"
+
+
 class PiiEntityCategoryMap(TypedDict):
     category: PiiEntityCategory
     entities: List[PiiEntityType]
@@ -311,6 +341,14 @@ class BedrockGuardrailConfigModel(BaseModel):
         default=None, description="AWS Bedrock runtime endpoint URL"
     )
 
+
+    @model_validator(mode="before")
+    @classmethod
+    def _populate_region(cls, data: Any) -> Any:
+        if isinstance(data, dict):
+            resolved_region = resolve_bedrock_region_name(data.get("aws_region_name"))
+            data = {**data, "aws_region_name": resolved_region}
+        return data
 
     @model_validator(mode="after")
     def _validate_authentication(self) -> "BedrockGuardrailConfigModel":
@@ -523,10 +561,12 @@ class LitellmParams(
                 for field_name in (
                     "guardrailIdentifier",
                     "guardrailVersion",
-                    "aws_region_name",
                 )
                 if not getattr(self, field_name, None)
             ]
+            self.aws_region_name = resolve_bedrock_region_name(
+                getattr(self, "aws_region_name", None)
+            )
             if missing_fields:
                 raise ValueError(
                     "Bedrock guardrail configuration requires the following fields: "

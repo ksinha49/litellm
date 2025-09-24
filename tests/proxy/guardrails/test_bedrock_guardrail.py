@@ -76,6 +76,17 @@ def test_bedrock_guardrail_missing_required_fields(monkeypatch):
     assert "guardrailIdentifier" in str(exc_info.value)
 
 
+def test_bedrock_guardrail_region_from_environment(monkeypatch):
+    monkeypatch.delenv("AWS_REGION_NAME", raising=False)
+    monkeypatch.setenv("AWS_REGION", "us-east-2")
+
+    guardrail = BedrockGuardrail(
+        guardrailIdentifier="guardrail-id", guardrailVersion="1"
+    )
+
+    assert guardrail.optional_params["aws_region_name"] == "us-east-2"
+
+
 def test_bedrock_guardrail_allows_default_metadata_credentials(monkeypatch):
     monkeypatch.delenv("AWS_ACCESS_KEY_ID", raising=False)
     monkeypatch.delenv("AWS_SECRET_ACCESS_KEY", raising=False)

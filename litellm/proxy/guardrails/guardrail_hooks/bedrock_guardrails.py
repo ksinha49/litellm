@@ -32,7 +32,11 @@ from litellm.llms.custom_httpx.http_handler import (
     httpxSpecialProvider,
 )
 from litellm.proxy._types import UserAPIKeyAuth
-from litellm.types.guardrails import BedrockGuardrailConfigModel, GuardrailEventHooks
+from litellm.types.guardrails import (
+    BedrockGuardrailConfigModel,
+    GuardrailEventHooks,
+    resolve_bedrock_region_name,
+)
 from litellm.types.llms.openai import AllMessageValues
 from litellm.types.proxy.guardrails.guardrail_hooks.bedrock_guardrails import (
     BedrockContentItem,
@@ -112,13 +116,16 @@ class BedrockGuardrail(CustomGuardrail, BaseAWSLLM):
                 return value.strip() == ""
             return False
 
-        aws_region_name = kwargs.get("aws_region_name")
+        provided_region = kwargs.get("aws_region_name")
+        resolved_region_name = resolve_bedrock_region_name(provided_region)
+        kwargs["aws_region_name"] = resolved_region_name
         missing_fields = []
         if _is_missing(guardrailIdentifier):
             missing_fields.append("guardrailIdentifier")
         if _is_missing(guardrailVersion):
             missing_fields.append("guardrailVersion")
-        if _is_missing(aws_region_name):
+        if _is_missing(resolved_region_name):
+
             missing_fields.append("aws_region_name")
 
         if missing_fields:
@@ -130,7 +137,7 @@ class BedrockGuardrail(CustomGuardrail, BaseAWSLLM):
         config_kwargs = {
             "guardrailIdentifier": guardrailIdentifier,
             "guardrailVersion": guardrailVersion,
-            "aws_region_name": aws_region_name,
+            "aws_region_name": resolved_region_name,
             "disable_exception_on_block": disable_exception_on_block,
         }
         for key in (
