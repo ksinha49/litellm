@@ -7,8 +7,10 @@ NOTE 1: S3 does not provide a BATCH PUT API endpoint, so we create tasks to uplo
 """
 
 import asyncio
+import json
 from datetime import datetime
-from typing import List, Optional, cast
+from typing import Dict, List, Optional, cast
+from xml.etree import ElementTree
 
 import httpx
 import litellm
@@ -336,10 +338,10 @@ class S3Logger(CustomBatchLogger, BaseAWSLLM):
             try:
                 response.raise_for_status()
             except httpx.HTTPStatusError as e:
-                status_code = e.response.status_code
-                response_text = e.response.text
-                verbose_logger.exception(
-                    f"Error uploading to s3: status_code={status_code}, response_text={response_text}"
+                self._log_http_status_error(
+                    error=e,
+                    batch_logging_element=batch_logging_element,
+                    signed_headers=signed_headers,
                 )
         except Exception as e:
             verbose_logger.exception(f"Error uploading to s3: {str(e)}")
@@ -415,6 +417,93 @@ class S3Logger(CustomBatchLogger, BaseAWSLLM):
             s3_object_download_filename=s3_object_download_filename,
         )
 
+    @staticmethod
+    def _sanitize_headers(headers: Dict[str, str]) -> Dict[str, str]:
+        redacted_headers: Dict[str, str] = {}
+        for key, value in headers.items():
+            value_str = "" if value is None else str(value)
+            if key.lower() in {"authorization", "x-amz-security-token"}:
+                redacted_headers[key] = "<redacted>"
+            else:
+                redacted_headers[key] = value_str
+        return redacted_headers
+
+    @classmethod
+    def _parse_s3_error_response(cls, response: httpx.Response) -> Dict[str, str]:
+        if response is None:
+            return {}
+        body = response.text or ""
+        details: Dict[str, str] = {}
+        if not body:
+            return details
+        try:
+            json_payload = json.loads(body)
+            if isinstance(json_payload, dict):
+                for key, value in json_payload.items():
+                    if value is None:
+                        continue
+                    details[str(key)] = str(value)
+                if details:
+                    return details
+        except json.JSONDecodeError:
+            pass
+        try:
+            root = ElementTree.fromstring(body)
+        except ElementTree.ParseError:
+            return details
+        for element in root.iter():
+            if element is root:
+                continue
+            tag = element.tag
+            if "}" in tag:
+                tag = tag.split("}", 1)[1]
+            text = element.text.strip() if element.text else ""
+            if text:
+                details[tag] = text
+        return details
+
+    def _log_http_status_error(
+        self,
+        error: httpx.HTTPStatusError,
+        batch_logging_element: s3BatchLoggingElement,
+        signed_headers: Dict[str, str],
+    ) -> None:
+        response = error.response
+        status_code = response.status_code if response is not None else "unknown"
+        sanitized_headers = self._sanitize_headers(signed_headers)
+        aws_details = self._parse_s3_error_response(response) if response else {}
+        aws_error_code = aws_details.get("Code") or aws_details.get("errorCode")
+        aws_error_message = aws_details.get("Message") or aws_details.get("message")
+        aws_host_id = aws_details.get("HostId")
+        aws_request_id = aws_details.get("RequestId") or aws_details.get("requestId")
+
+        log_context = {
+            "status_code": status_code,
+            "bucket": self.s3_bucket_name,
+            "region": self.s3_region_name,
+            "object_key": batch_logging_element.s3_object_key,
+            "path_style": self.s3_use_path_style,
+            "endpoint_url": self.s3_endpoint_url,
+            "headers": sanitized_headers,
+            "aws_error_code": aws_error_code,
+            "aws_error_message": aws_error_message,
+            "aws_host_id": aws_host_id,
+            "aws_request_id": aws_request_id,
+        }
+
+        verbose_logger.error("Error uploading to s3: %s", log_context, exc_info=error)
+
+        if status_code == 403:
+            guidance_message = (
+                "S3 responded with 403 Forbidden. Verify IAM permissions (s3:PutObject), "
+                "bucket region, and bucket policies such as required server-side encryption headers."
+            )
+            if aws_error_code:
+                guidance_message += f" AWS error code: {aws_error_code}."
+            if aws_error_message:
+                guidance_message += f" AWS message: {aws_error_message}."
+            verbose_logger.error(guidance_message)
+
     def upload_data_to_s3(self, batch_logging_element: s3BatchLoggingElement):
         try:
             import hashlib
@@ -489,10 +578,10 @@ class S3Logger(CustomBatchLogger, BaseAWSLLM):
             try:
                 response.raise_for_status()
             except httpx.HTTPStatusError as e:
-                status_code = e.response.status_code
-                response_text = e.response.text
-                verbose_logger.exception(
-                    f"Error uploading to s3: status_code={status_code}, response_text={response_text}"
+                self._log_http_status_error(
+                    error=e,
+                    batch_logging_element=batch_logging_element,
+                    signed_headers=signed_headers,
                 )
         except Exception as e:
             verbose_logger.exception(f"Error uploading to s3: {str(e)}")
