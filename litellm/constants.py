@@ -860,7 +860,30 @@ LITELLM_SETTINGS_SAFE_DB_OVERRIDES = [
     "public_model_groups",
     "public_model_groups_links",
     "store_audit_logs",
+    "success_callback",
+    "failure_callback",
+    "callbacks",
+    "turn_off_message_logging",
+    "redact_user_api_key_info",
+    "langfuse_default_tags",
+    "enable_preview_features",
+    "json_logs",
 ]
+
+LITELLM_SETTINGS_DEFAULTS = {
+    "default_internal_user_params": {},
+    "public_model_groups": [],
+    "public_model_groups_links": [],
+    "store_audit_logs": False,
+    "success_callback": [],
+    "failure_callback": [],
+    "callbacks": [],
+    "turn_off_message_logging": False,
+    "redact_user_api_key_info": False,
+    "langfuse_default_tags": None,
+    "enable_preview_features": False,
+    "json_logs": False,
+}
 SPECIAL_LITELLM_AUTH_TOKEN = ["ui-token"]
 DEFAULT_MANAGEMENT_OBJECT_IN_MEMORY_CACHE_TTL = int(
     os.getenv("DEFAULT_MANAGEMENT_OBJECT_IN_MEMORY_CACHE_TTL", 60)
