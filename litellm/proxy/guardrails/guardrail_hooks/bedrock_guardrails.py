@@ -340,24 +340,70 @@ class BedrockGuardrail(CustomGuardrail, BaseAWSLLM):
             data=prepared_request.body,  # type: ignore
             headers=prepared_request.headers,  # type: ignore
         )
+
+        try:
+            response_json = response.json()
+        except (json.JSONDecodeError, ValueError) as exc:
+            end_time = datetime.now()
+            guardrail_status: Literal["success", "failure"] = "failure"
+            raw_response_text = getattr(response, "text", "")
+            guardrail_json_response = {"raw_response": raw_response_text}
+            self.add_standard_logging_guardrail_information_to_request_data(
+                guardrail_json_response=guardrail_json_response,
+                request_data=request_data or {},
+                guardrail_status=guardrail_status,
+                start_time=start_time.timestamp(),
+                end_time=end_time.timestamp(),
+                duration=(end_time - start_time).total_seconds(),
+            )
+            raise HTTPException(
+                status_code=500,
+                detail={
+                    "error": "Failed to decode AWS Bedrock guardrail response JSON.",
+                    "aws_response": raw_response_text,
+                },
+            ) from exc
+
+        end_time = datetime.now()
+        raw_response_text = getattr(response, "text", "")
+        payload_is_valid = isinstance(response_json, dict)
+
+        guardrail_json_response = (
+            _redact_pii_matches(response_json)
+            if payload_is_valid
+            else {"raw_response": raw_response_text}
+        )
+
+        guardrail_status: Literal["success", "failure"] = (
+            "success" if response.status_code == 200 and payload_is_valid else "failure"
+        )
+
         #########################################################
         # Add guardrail information to request trace
         #########################################################
         self.add_standard_logging_guardrail_information_to_request_data(
-            guardrail_json_response=response.json(),
+            guardrail_json_response=guardrail_json_response,
             request_data=request_data or {},
-            guardrail_status=self._get_bedrock_guardrail_response_status(response=response),
+            guardrail_status=guardrail_status,
             start_time=start_time.timestamp(),
-            end_time=datetime.now().timestamp(),
-            duration=(datetime.now() - start_time).total_seconds(),
+            end_time=end_time.timestamp(),
+            duration=(end_time - start_time).total_seconds(),
         )
         #########################################################
         if response.status_code == 200:
             # check if the response was flagged
-            _json_response = response.json()
-            redacted_response = _redact_pii_matches(_json_response)
-            verbose_proxy_logger.debug("Bedrock AI response : %s", redacted_response)
-            bedrock_guardrail_response = BedrockGuardrailResponse(**_json_response)
+            if not payload_is_valid:
+                raise HTTPException(
+                    status_code=500,
+                    detail={
+                        "error": "Unexpected Bedrock guardrail response format.",
+                        "aws_response": raw_response_text,
+                    },
+                )
+            verbose_proxy_logger.debug(
+                "Bedrock AI response : %s", guardrail_json_response
+            )
+            bedrock_guardrail_response = BedrockGuardrailResponse(**response_json)
             if self._should_raise_guardrail_blocked_exception(
                 bedrock_guardrail_response
             ):
@@ -369,6 +415,46 @@ class BedrockGuardrail(CustomGuardrail, BaseAWSLLM):
                 "Bedrock AI: error in response. Status code: %s, response: %s",
                 response.status_code,
                 response.text,
+            )
+            aws_error_message: str = ""
+            if isinstance(response_json, dict):
+                aws_error_message = (
+                    response_json.get("message")
+                    or response_json.get("Message")
+                    or response_json.get("errorMessage")
+                    or response_json.get("ErrorMessage")
+                    or response_json.get("detail")
+                    or ""
+                )
+            if not aws_error_message:
+                aws_error_message = getattr(response, "text", "")
+
+            if response.status_code == 403:
+                base_error_message = (
+                    "AWS Bedrock Guardrails request failed with status 403 (Forbidden). "
+                    "Verify that the IAM principal calling the guardrail has the `bedrock:ApplyGuardrail` "
+                    "and `bedrock:ApplyGuardrailAction` IAM permissions."
+                )
+            else:
+                base_error_message = (
+                    f"AWS Bedrock Guardrails request failed with status {response.status_code}."
+                )
+
+            if aws_error_message:
+                base_error_message = (
+                    f"{base_error_message} AWS response message: {aws_error_message}"
+                )
+
+            aws_response_detail: Union[dict, str] = (
+                response_json if isinstance(response_json, dict) else aws_error_message
+            )
+
+            raise HTTPException(
+                status_code=response.status_code,
+                detail={
+                    "error": base_error_message,
+                    "aws_response": aws_response_detail,
+                },
             )
 
         return bedrock_guardrail_response
