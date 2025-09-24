@@ -1,7 +1,13 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Form, Modal, Select, Switch, Input } from 'antd';
 import { Button, TextInput } from '@tremor/react';
-import { guardrail_provider_map, guardrailLogoMap, getGuardrailProviders } from './guardrail_info_helpers';
+import {
+  guardrail_provider_map,
+  guardrailLogoMap,
+  getGuardrailProviders,
+  populateGuardrailProviders,
+  populateGuardrailProviderMap,
+} from './guardrail_info_helpers';
 import { getGuardrailProviderSpecificParams, getGuardrailUISettings } from '../networking';
 import PiiConfiguration from './pii_configuration';
 import GuardrailProviderFields from './guardrail_provider_fields';
@@ -122,6 +128,15 @@ const EditGuardrailForm: React.FC<EditGuardrailFormProps> = ({
 
     fetchGuardrailData();
   }, [accessToken]);
+
+  useEffect(() => {
+    if (!providerParams) {
+      return;
+    }
+
+    populateGuardrailProviders(providerParams);
+    populateGuardrailProviderMap(providerParams);
+  }, [providerParams]);
 
   useEffect(() => {
     if (initialValues?.pii_entities_config && Object.keys(initialValues.pii_entities_config).length > 0) {
