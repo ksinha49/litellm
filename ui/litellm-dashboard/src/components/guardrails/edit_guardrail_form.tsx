@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Form, Modal, Select, Switch } from 'antd';
+import { Form, Modal, Select, Switch, Input } from 'antd';
 import { Button, TextInput } from '@tremor/react';
 import { guardrail_provider_map, guardrailLogoMap, getGuardrailProviders } from './guardrail_info_helpers';
 import { getGuardrailProviderSpecificParams, getGuardrailUISettings } from '../networking';
@@ -332,6 +332,124 @@ const EditGuardrailForm: React.FC<EditGuardrailFormProps> = ({
     );
   };
 
+  const renderLegacyProviderConfigFields = () => {
+    if (!selectedProvider) {
+      return null;
+    }
+
+    switch (selectedProvider) {
+      case 'Aporia':
+        return (
+          <Form.Item
+            label="Aporia Configuration"
+            name="config"
+            tooltip="JSON configuration for Aporia"
+          >
+            <Input.TextArea
+              rows={4}
+              placeholder={`{
+  "api_key": "your_aporia_api_key",
+  "project_name": "your_project_name"
+}`}
+            />
+          </Form.Item>
+        );
+      case 'AimSecurity':
+        return (
+          <Form.Item
+            label="Aim Security Configuration"
+            name="config"
+            tooltip="JSON configuration for Aim Security"
+          >
+            <Input.TextArea
+              rows={4}
+              placeholder={`{
+  "api_key": "your_aim_api_key"
+}`}
+            />
+          </Form.Item>
+        );
+      case 'Bedrock':
+        return (
+          <Form.Item
+            label="Amazon Bedrock Configuration"
+            name="config"
+            tooltip="JSON configuration for Amazon Bedrock guardrails"
+          >
+            <Input.TextArea
+              rows={4}
+              placeholder={`{
+  "guardrail_id": "your_guardrail_id",
+  "guardrail_version": "your_guardrail_version"
+}`}
+            />
+          </Form.Item>
+        );
+      case 'GuardrailsAI':
+        return (
+          <Form.Item
+            label="Guardrails.ai Configuration"
+            name="config"
+            tooltip="JSON configuration for Guardrails.ai"
+          >
+            <Input.TextArea
+              rows={4}
+              placeholder={`{
+  "api_key": "your_guardrails_api_key",
+  "guardrail_id": "your_guardrail_id"
+}`}
+            />
+          </Form.Item>
+        );
+      case 'LakeraAI':
+        return (
+          <Form.Item
+            label="Lakera AI Configuration"
+            name="config"
+            tooltip="JSON configuration for Lakera AI"
+          >
+            <Input.TextArea
+              rows={4}
+              placeholder={`{
+  "api_key": "your_lakera_api_key"
+}`}
+            />
+          </Form.Item>
+        );
+      case 'PromptInjection':
+        return (
+          <Form.Item
+            label="Prompt Injection Configuration"
+            name="config"
+            tooltip="JSON configuration for prompt injection detection"
+          >
+            <Input.TextArea
+              rows={4}
+              placeholder={`{
+  "threshold": 0.8
+}`}
+            />
+          </Form.Item>
+        );
+      default:
+        return (
+          <Form.Item
+            label="Custom Configuration"
+            name="config"
+            tooltip="JSON configuration for your custom guardrail"
+          >
+            <Input.TextArea
+              rows={4}
+              placeholder={`{
+  "key1": "value1",
+  "key2": "value2"
+}`}
+            />
+          </Form.Item>
+        );
+    }
+  };
+
   const renderProviderSpecificFields = () => {
     if (!selectedProvider) return null;
 
@@ -339,13 +457,33 @@ const EditGuardrailForm: React.FC<EditGuardrailFormProps> = ({
       return renderPiiConfiguration();
     }
 
+    // Preserve the legacy JSON config textarea for providers that
+    // don't yet expose structured metadata via the guardrail params API.
+    let shouldRenderLegacyFields = false;
+
+    if (providerParams && selectedProvider) {
+      const providerKey = guardrail_provider_map[selectedProvider]?.toLowerCase();
+      const providerSpecificParams = providerKey ? providerParams[providerKey] : undefined;
+
+      if (!providerSpecificParams) {
+        shouldRenderLegacyFields = true;
+      } else {
+        const allowedParams = new Set<string>();
+        collectAllowedParamKeys(providerSpecificParams, allowedParams);
+        shouldRenderLegacyFields = allowedParams.size === 0;
+      }
+    }
+
     return (
-      <GuardrailProviderFields
-        selectedProvider={selectedProvider}
-        accessToken={accessToken}
-        providerParams={providerParams}
-        value={providerFieldValues}
-      />
+      <>
+        <GuardrailProviderFields
+          selectedProvider={selectedProvider}
+          accessToken={accessToken}
+          providerParams={providerParams}
+          value={providerFieldValues}
+        />
+        {shouldRenderLegacyFields && renderLegacyProviderConfigFields()}
+      </>
     );
   };
 
