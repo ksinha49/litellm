@@ -538,8 +538,14 @@ class S3Logger(CustomBatchLogger, BaseAWSLLM):
         sensitive_headers = {
             "authorization",
             "x-amz-security-token",
+            "x-amz-credential",
+            "x-amz-signature",
             "x-amz-server-side-encryption-customer-key",
             "x-amz-server-side-encryption-customer-key-md5",
+            "cookie",
+            "set-cookie",
+            "api-key",
+            "x-api-key",
         }
         for key, value in headers.items():
             value_str = "" if value is None else str(value)
