@@ -42,6 +42,7 @@ import {
   setCallbacksCall,
   serviceHealthCheck,
   deleteCallback,
+  deleteConfigFieldSetting,
 } from "./networking";
 import AlertingSettings from "./alerting/alerting_settings";
 import FormItem from "antd/es/form/FormItem";
@@ -368,16 +369,19 @@ const Settings: React.FC<SettingsPageProps> = ({
 
     setIsSavingLoggingSettings(true);
     try {
-      await Promise.all(
-        updatedFields.map((field) =>
-          updateConfigFieldSetting(
-            accessToken,
-            field,
-            litellmLoggingSettings[field],
-            "litellm_settings"
-          )
-        )
-      );
+      const updatedLoggingSettings: Partial<LitellmLoggingSettingsState> = {};
+
+      updatedFields.forEach((field) => {
+        const value = litellmLoggingSettings[field];
+        updatedLoggingSettings[field] = Array.isArray(value)
+          ? [...value]
+          : value;
+      });
+
+      await setCallbacksCall(accessToken, {
+        litellm_settings: updatedLoggingSettings,
+      });
+
       NotificationsManager.success("Logging settings updated successfully");
       await fetchCallbacksData();
     } catch (error) {
@@ -394,24 +398,13 @@ const Settings: React.FC<SettingsPageProps> = ({
 
     setIsResettingLoggingSettings(true);
     try {
-      await Promise.all(
-        LOGGING_SETTING_FIELDS.map(async (field) => {
-          try {
-            await deleteConfigFieldSetting(
-              accessToken,
-              field,
-              "litellm_settings"
-            );
-          } catch (error) {
-            if (
-              error instanceof Error &&
-              error.message?.toLowerCase().includes("not in config")
-            ) {
-              return;
-            }
-            throw error;
-          }
-        })
+      await deleteConfigFieldSetting(
+        accessToken,
+        LOGGING_SETTING_FIELDS,
+        "litellm_settings",
+        {
+          suppressNotifications: true,
+        }
       );
       NotificationsManager.success("Logging settings reset to defaults");
       await fetchCallbacksData();
