@@ -304,6 +304,7 @@ const GuardrailTable: React.FC<GuardrailTableProps> = ({
             pii_entities_config: selectedGuardrail.litellm_params.pii_entities_config,
             ...selectedGuardrail.guardrail_info,
           }}
+          initialLitellmParams={selectedGuardrail.litellm_params}
         />
       )}
     </div>
