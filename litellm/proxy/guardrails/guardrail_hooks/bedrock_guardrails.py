@@ -343,8 +343,26 @@ class BedrockGuardrail(CustomGuardrail, BaseAWSLLM):
 
         try:
             response_json = response.json()
-        except Exception:
-            response_json = {}
+        except (json.JSONDecodeError, ValueError) as exc:
+            end_time = datetime.now()
+            guardrail_status: Literal["success", "failure"] = "failure"
+            raw_response_text = getattr(response, "text", "")
+            guardrail_json_response = {"raw_response": raw_response_text}
+            self.add_standard_logging_guardrail_information_to_request_data(
+                guardrail_json_response=guardrail_json_response,
+                request_data=request_data or {},
+                guardrail_status=guardrail_status,
+                start_time=start_time.timestamp(),
+                end_time=end_time.timestamp(),
+                duration=(end_time - start_time).total_seconds(),
+            )
+            raise HTTPException(
+                status_code=500,
+                detail={
+                    "error": "Failed to decode AWS Bedrock guardrail response JSON.",
+                    "aws_response": raw_response_text,
+                },
+            ) from exc
 
         guardrail_status: Literal["success", "failure"] = (
             "success" if response.status_code == 200 else "failure"
