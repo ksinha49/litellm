@@ -4887,7 +4887,8 @@ export const updateConfigFieldSetting = async (
 
 export const deleteConfigFieldSetting = async (
   accessToken: String,
-  fieldName: String
+  fieldName: String,
+  configType: string = "general_settings"
 ) => {
   try {
     let url = proxyBaseUrl
@@ -4896,7 +4897,7 @@ export const deleteConfigFieldSetting = async (
 
     let formData = {
       field_name: fieldName,
-      config_type: "general_settings",
+      config_type: configType,
     };
     //NotificationsManager.info("Requesting model data");
     const response = await fetch(url, {

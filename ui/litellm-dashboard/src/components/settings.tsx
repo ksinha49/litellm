@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import Image from "next/image";
 import {
   Card,
@@ -50,6 +50,8 @@ import {
   callbackInfo,
   reverse_callback_map,
   Callbacks,
+  mapDisplayToInternalNames,
+  mapInternalToDisplayNames,
 } from "./callback_info_helpers";
 import { parseErrorMessage } from "./shared/errorUtils";
 interface SettingsPageProps {
@@ -78,6 +80,114 @@ interface AlertingObject {
   variables: AlertingVariables;
 }
 
+interface LitellmLoggingSettingsState {
+  success_callback: string[];
+  failure_callback: string[];
+  callbacks: string[];
+  turn_off_message_logging: boolean;
+  redact_user_api_key_info: boolean;
+  langfuse_default_tags: string[];
+  enable_preview_features: boolean;
+  json_logs: boolean;
+}
+
+const createDefaultLoggingSettings = (): LitellmLoggingSettingsState => ({
+  success_callback: [],
+  failure_callback: [],
+  callbacks: [],
+  turn_off_message_logging: false,
+  redact_user_api_key_info: false,
+  langfuse_default_tags: [],
+  enable_preview_features: false,
+  json_logs: false,
+});
+
+const normalizeLoggingSettings = (
+  settings?: Record<string, any> | null
+): LitellmLoggingSettingsState => {
+  const normalized = createDefaultLoggingSettings();
+
+  const toList = (value: any): string[] => {
+    if (value == null) {
+      return [];
+    }
+    if (Array.isArray(value)) {
+      return value.map((item) => String(item));
+    }
+    return [String(value)];
+  };
+
+  const toBoolean = (value: any): boolean => {
+    if (typeof value === "boolean") {
+      return value;
+    }
+    if (typeof value === "string") {
+      return value.toLowerCase() === "true";
+    }
+    if (value == null) {
+      return false;
+    }
+    return Boolean(value);
+  };
+
+  if (!settings) {
+    return normalized;
+  }
+
+  normalized.success_callback = toList(settings.success_callback);
+  normalized.failure_callback = toList(settings.failure_callback);
+  normalized.callbacks = toList(settings.callbacks);
+  normalized.langfuse_default_tags = toList(settings.langfuse_default_tags);
+  normalized.turn_off_message_logging = toBoolean(
+    settings.turn_off_message_logging
+  );
+  normalized.redact_user_api_key_info = toBoolean(
+    settings.redact_user_api_key_info
+  );
+  normalized.enable_preview_features = toBoolean(
+    settings.enable_preview_features
+  );
+  normalized.json_logs = toBoolean(settings.json_logs);
+
+  return normalized;
+};
+
+const arraysEqual = (a: string[], b: string[]): boolean => {
+  if (a.length !== b.length) {
+    return false;
+  }
+  return a.every((value, index) => value === b[index]);
+};
+
+const LOGGING_SETTING_FIELDS: (keyof LitellmLoggingSettingsState)[] = [
+  "success_callback",
+  "failure_callback",
+  "callbacks",
+  "turn_off_message_logging",
+  "redact_user_api_key_info",
+  "langfuse_default_tags",
+  "enable_preview_features",
+  "json_logs",
+];
+
+const loggingSettingValueEquals = (
+  a: LitellmLoggingSettingsState[keyof LitellmLoggingSettingsState],
+  b: LitellmLoggingSettingsState[keyof LitellmLoggingSettingsState]
+): boolean => {
+  if (Array.isArray(a) && Array.isArray(b)) {
+    return arraysEqual(a, b);
+  }
+  return a === b;
+};
+
+const areLoggingSettingsEqual = (
+  a: LitellmLoggingSettingsState,
+  b: LitellmLoggingSettingsState
+): boolean =>
+  LOGGING_SETTING_FIELDS.every((field) =>
+    loggingSettingValueEquals(a[field], b[field])
+  );
+
 const Settings: React.FC<SettingsPageProps> = ({
   accessToken,
   userRole,
@@ -102,6 +212,16 @@ const Settings: React.FC<SettingsPageProps> = ({
   const [selectedCallbackParams, setSelectedCallbackParams] = useState<
     string[]
   >([]);
+
+  const [litellmLoggingSettings, setLitellmLoggingSettings] = useState<
+    LitellmLoggingSettingsState
+  >(() => createDefaultLoggingSettings());
+  const [initialLoggingSettings, setInitialLoggingSettings] = useState<
+    LitellmLoggingSettingsState
+  >(() => createDefaultLoggingSettings());
+  const [isSavingLoggingSettings, setIsSavingLoggingSettings] = useState(false);
+  const [isResettingLoggingSettings, setIsResettingLoggingSettings] =
+    useState(false);
 
   const [showEditCallback, setShowEditCallback] = useState(false);
   const [selectedEditCallback, setSelectedEditCallback] = useState<any | null>(
@@ -137,31 +257,181 @@ const Settings: React.FC<SettingsPageProps> = ({
     region_outage_alerts: "Region Outage Alerts",
   };
 
-  useEffect(() => {
+  const loggingSettingsChanged = !areLoggingSettingsEqual(
+    litellmLoggingSettings,
+    initialLoggingSettings
+  );
+
+  const callbackSelectOptions = Object.keys(callback_map).map((displayName) => ({
+    label: displayName,
+    value: displayName,
+  }));
+
+  const langfuseTagSuggestions = [
+    "cache_hit",
+    "cache_key",
+    "proxy_base_url",
+    "user_api_key_alias",
+    "user_api_key_user_id",
+    "user_api_key_user_email",
+    "user_api_key_team_alias",
+    "semantic-similarity",
+  ].map((tag) => ({ label: tag, value: tag }));
+
+  const fetchCallbacksData = useCallback(async () => {
     if (!accessToken || !userRole || !userID) {
       return;
     }
-    getCallbacksCall(accessToken, userID, userRole).then((data) => {
-      setCallbacks(data.callbacks);
-      setAllCallbacks(data.available_callbacks);
-      // setCallbacks(callbacks_data);
+    try {
+      const data = await getCallbacksCall(accessToken, userID, userRole);
+      setCallbacks(data.callbacks || []);
+      setAllCallbacks(data.available_callbacks || []);
 
-      let alerts_data = data.alerts;
-      if (alerts_data) {
-        if (alerts_data.length > 0) {
-          let _alert_info = alerts_data[0];
-          let catch_all_webhook = _alert_info.variables.SLACK_WEBHOOK_URL;
-
-          let active_alerts = _alert_info.active_alerts;
-          setActiveAlerts(active_alerts);
-          setCatchAllWebhookURL(catch_all_webhook);
-          setAlertToWebhooks(_alert_info.alerts_to_webhook);
+      let router_settings = data.router_settings || {};
+      if (router_settings && typeof router_settings === "object") {
+        router_settings = { ...router_settings };
+        if ("model_group_retry_policy" in router_settings) {
+          delete router_settings["model_group_retry_policy"];
         }
       }
+      setRouterSettings(router_settings);
 
+      const alerts_data = Array.isArray(data.alerts) ? data.alerts : [];
       setAlerts(alerts_data);
-    });
+      if (alerts_data.length > 0) {
+        const alertInfo = alerts_data[0];
+        const catchAllWebhook =
+          alertInfo?.variables?.SLACK_WEBHOOK_URL ?? "";
+        const activeAlertsList = Array.isArray(alertInfo?.active_alerts)
+          ? alertInfo.active_alerts
+          : [];
+        const alertsToWebhook =
+          alertInfo?.alerts_to_webhook &&
+          typeof alertInfo.alerts_to_webhook === "object"
+            ? alertInfo.alerts_to_webhook
+            : {};
+
+        setActiveAlerts(activeAlertsList);
+        setCatchAllWebhookURL(catchAllWebhook ?? "");
+        setAlertToWebhooks(alertsToWebhook);
+      } else {
+        setCatchAllWebhookURL("");
+        setActiveAlerts([]);
+        setAlertToWebhooks({});
+      }
+
+      const normalizedLogging = normalizeLoggingSettings(
+        data.litellm_logging_settings
+      );
+      setLitellmLoggingSettings(normalizedLogging);
+      setInitialLoggingSettings(
+        normalizeLoggingSettings(data.litellm_logging_settings)
+      );
+    } catch (error) {
+      NotificationsManager.fromBackend(error);
+    }
   }, [accessToken, userRole, userID]);
+
+  useEffect(() => {
+    fetchCallbacksData();
+  }, [fetchCallbacksData]);
+
+  const updateLoggingSetting = <
+    K extends keyof LitellmLoggingSettingsState
+  >(
+    field: K,
+    value: LitellmLoggingSettingsState[K]
+  ) => {
+    setLitellmLoggingSettings((prev) => ({
+      ...prev,
+      [field]: value,
+    }));
+  };
+
+  const handleSaveLoggingSettings = async () => {
+    if (!accessToken) {
+      return;
+    }
+
+    const updatedFields = LOGGING_SETTING_FIELDS.filter(
+      (field) =>
+        !loggingSettingValueEquals(
+          litellmLoggingSettings[field],
+          initialLoggingSettings[field]
+        )
+    );
+
+    if (updatedFields.length === 0) {
+      NotificationsManager.info("No logging changes to save.");
+      return;
+    }
+
+    setIsSavingLoggingSettings(true);
+    try {
+      await Promise.all(
+        updatedFields.map((field) =>
+          updateConfigFieldSetting(
+            accessToken,
+            field,
+            litellmLoggingSettings[field],
+            "litellm_settings"
+          )
+        )
+      );
+      NotificationsManager.success("Logging settings updated successfully");
+      await fetchCallbacksData();
+    } catch (error) {
+      NotificationsManager.fromBackend(error);
+    } finally {
+      setIsSavingLoggingSettings(false);
+    }
+  };
+
+  const handleResetLoggingSettings = async () => {
+    if (!accessToken) {
+      return;
+    }
+
+    setIsResettingLoggingSettings(true);
+    try {
+      await Promise.all(
+        LOGGING_SETTING_FIELDS.map(async (field) => {
+          try {
+            await deleteConfigFieldSetting(
+              accessToken,
+              field,
+              "litellm_settings"
+            );
+          } catch (error) {
+            if (
+              error instanceof Error &&
+              error.message?.toLowerCase().includes("not in config")
+            ) {
+              return;
+            }
+            throw error;
+          }
+        })
+      );
+      NotificationsManager.success("Logging settings reset to defaults");
+      await fetchCallbacksData();
+    } catch (error) {
+      NotificationsManager.fromBackend(error);
+    } finally {
+      setIsResettingLoggingSettings(false);
+    }
+  };
+
+  const normalizeCallbackSelection = (values: string[]): string[] =>
+    Array.from(
+      new Set(
+        mapDisplayToInternalNames(
+          values
+            .map((value) => value.trim())
+            .filter((value) => value.length > 0)
+        )
+      )
+    );
 
   const isAlertOn = (alertName: string) => {
     return activeAlerts && activeAlerts.includes(alertName);
@@ -542,6 +812,215 @@ const Settings: React.FC<SettingsPageProps> = ({
               >
                 Add Callback
               </Button>
+              <Card className="mt-6 space-y-6">
+                <div className="space-y-1">
+                  <Text className="text-lg font-semibold text-gray-900">
+                    Global Logging Settings
+                  </Text>
+                  <Text className="text-sm text-gray-500">
+                    Configure callback routing and logging safeguards applied to every request.
+                  </Text>
+                </div>
+                <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+                  <div>
+                    <Text className="text-sm font-medium text-gray-700">
+                      Success callbacks
+                    </Text>
+                    <Select
+                      mode="tags"
+                      value={mapInternalToDisplayNames(
+                        litellmLoggingSettings.success_callback
+                      )}
+                      onChange={(values) =>
+                        updateLoggingSetting(
+                          "success_callback",
+                          normalizeCallbackSelection(values as string[])
+                        )
+                      }
+                      options={callbackSelectOptions}
+                      style={{ width: "100%" }}
+                      placeholder="Run after successful requests"
+                    />
+                    <Text className="text-xs text-gray-500 mt-1">
+                      LiteLLM sends successful calls to these callbacks.
+                    </Text>
+                  </div>
+                  <div>
+                    <Text className="text-sm font-medium text-gray-700">
+                      Failure callbacks
+                    </Text>
+                    <Select
+                      mode="tags"
+                      value={mapInternalToDisplayNames(
+                        litellmLoggingSettings.failure_callback
+                      )}
+                      onChange={(values) =>
+                        updateLoggingSetting(
+                          "failure_callback",
+                          normalizeCallbackSelection(values as string[])
+                        )
+                      }
+                      options={callbackSelectOptions}
+                      style={{ width: "100%" }}
+                      placeholder="Run when a request fails"
+                    />
+                    <Text className="text-xs text-gray-500 mt-1">
+                      Triggered only when a request fails.
+                    </Text>
+                  </div>
+                  <div>
+                    <Text className="text-sm font-medium text-gray-700">
+                      Callbacks (success & failure)
+                    </Text>
+                    <Select
+                      mode="tags"
+                      value={mapInternalToDisplayNames(
+                        litellmLoggingSettings.callbacks
+                      )}
+                      onChange={(values) =>
+                        updateLoggingSetting(
+                          "callbacks",
+                          normalizeCallbackSelection(values as string[])
+                        )
+                      }
+                      options={callbackSelectOptions}
+                      style={{ width: "100%" }}
+                      placeholder="Run for every request"
+                    />
+                    <Text className="text-xs text-gray-500 mt-1">
+                      These callbacks run regardless of the request outcome.
+                    </Text>
+                  </div>
+                  <div>
+                    <Text className="text-sm font-medium text-gray-700">
+                      Langfuse default tags
+                    </Text>
+                    <Select
+                      mode="tags"
+                      value={litellmLoggingSettings.langfuse_default_tags}
+                      onChange={(values) =>
+                        updateLoggingSetting(
+                          "langfuse_default_tags",
+                          Array.from(
+                            new Set(
+                              (values as string[])
+                                .map((value) => value.trim())
+                                .filter((value) => value.length > 0)
+                            )
+                          )
+                        )
+                      }
+                      options={langfuseTagSuggestions}
+                      style={{ width: "100%" }}
+                      placeholder="Choose tags to send to Langfuse"
+                    />
+                    <Text className="text-xs text-gray-500 mt-1">
+                      Controls which LiteLLM metadata is forwarded as Langfuse tags.
+                    </Text>
+                  </div>
+                </div>
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                  <div className="flex items-start justify-between rounded-lg border border-gray-200 p-4">
+                    <div className="mr-4">
+                      <Text className="text-sm font-medium text-gray-700">
+                        Turn off message logging
+                      </Text>
+                      <Text className="text-xs text-gray-500">
+                        Prevent prompts and responses from being sent to logging callbacks.
+                      </Text>
+                    </div>
+                    <Switch
+                      id="toggle-turn-off-message-logging"
+                      checked={litellmLoggingSettings.turn_off_message_logging}
+                      onChange={() =>
+                        updateLoggingSetting(
+                          "turn_off_message_logging",
+                          !litellmLoggingSettings.turn_off_message_logging
+                        )
+                      }
+                    />
+                  </div>
+                  <div className="flex items-start justify-between rounded-lg border border-gray-200 p-4">
+                    <div className="mr-4">
+                      <Text className="text-sm font-medium text-gray-700">
+                        Redact API key metadata
+                      </Text>
+                      <Text className="text-xs text-gray-500">
+                        Remove user API key identifiers from logs sent to callbacks.
+                      </Text>
+                    </div>
+                    <Switch
+                      id="toggle-redact-api-key"
+                      checked={litellmLoggingSettings.redact_user_api_key_info}
+                      onChange={() =>
+                        updateLoggingSetting(
+                          "redact_user_api_key_info",
+                          !litellmLoggingSettings.redact_user_api_key_info
+                        )
+                      }
+                    />
+                  </div>
+                  <div className="flex items-start justify-between rounded-lg border border-gray-200 p-4">
+                    <div className="mr-4">
+                      <Text className="text-sm font-medium text-gray-700">
+                        Enable preview logging features
+                      </Text>
+                      <Text className="text-xs text-gray-500">
+                        Opt into experimental logging capabilities.
+                      </Text>
+                    </div>
+                    <Switch
+                      id="toggle-enable-preview-features"
+                      checked={litellmLoggingSettings.enable_preview_features}
+                      onChange={() =>
+                        updateLoggingSetting(
+                          "enable_preview_features",
+                          !litellmLoggingSettings.enable_preview_features
+                        )
+                      }
+                    />
+                  </div>
+                  <div className="flex items-start justify-between rounded-lg border border-gray-200 p-4">
+                    <div className="mr-4">
+                      <Text className="text-sm font-medium text-gray-700">
+                        JSON formatted logs
+                      </Text>
+                      <Text className="text-xs text-gray-500">
+                        Output proxy logs in structured JSON format.
+                      </Text>
+                    </div>
+                    <Switch
+                      id="toggle-json-logs"
+                      checked={litellmLoggingSettings.json_logs}
+                      onChange={() =>
+                        updateLoggingSetting(
+                          "json_logs",
+                          !litellmLoggingSettings.json_logs
+                        )
+                      }
+                    />
+                  </div>
+                </div>
+                <div className="flex flex-wrap gap-3">
+                  <Button
+                    onClick={handleSaveLoggingSettings}
+                    disabled={!loggingSettingsChanged || isSavingLoggingSettings}
+                  >
+                    {isSavingLoggingSettings
+                      ? "Saving..."
+                      : "Save Logging Settings"}
+                  </Button>
+                  <Button
+                    variant="secondary"
+                    onClick={handleResetLoggingSettings}
+                    disabled={isResettingLoggingSettings}
+                  >
+                    {isResettingLoggingSettings
+                      ? "Resetting..."
+                      : "Reset Overrides"}
+                  </Button>
+                </div>
+              </Card>
             </TabPanel>
             <TabPanel>
               <Card>
