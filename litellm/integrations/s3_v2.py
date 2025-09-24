@@ -53,6 +53,14 @@ class S3Logger(CustomBatchLogger, BaseAWSLLM):
         s3_config=None,
         s3_use_team_prefix: bool = False,
         s3_use_path_style: bool = False,
+        s3_server_side_encryption: Optional[str] = None,
+        s3_sse_kms_key_id: Optional[str] = None,
+        s3_sse_customer_algorithm: Optional[str] = None,
+        s3_sse_customer_key: Optional[str] = None,
+        s3_sse_customer_key_md5: Optional[str] = None,
+        s3_additional_headers: Optional[Dict[str, str]] = None,
+        s3_object_acl: Optional[str] = None,
+        s3_storage_class: Optional[str] = None,
         **kwargs,
     ):
         try:
@@ -85,6 +93,14 @@ class S3Logger(CustomBatchLogger, BaseAWSLLM):
                 s3_path=s3_path,
                 s3_use_team_prefix=s3_use_team_prefix,
                 s3_use_path_style=s3_use_path_style,
+                s3_server_side_encryption=s3_server_side_encryption,
+                s3_sse_kms_key_id=s3_sse_kms_key_id,
+                s3_sse_customer_algorithm=s3_sse_customer_algorithm,
+                s3_sse_customer_key=s3_sse_customer_key,
+                s3_sse_customer_key_md5=s3_sse_customer_key_md5,
+                s3_additional_headers=s3_additional_headers,
+                s3_object_acl=s3_object_acl,
+                s3_storage_class=s3_storage_class,
             )
             verbose_logger.debug(f"s3 logger using endpoint url {s3_endpoint_url}")
 
@@ -130,6 +146,14 @@ class S3Logger(CustomBatchLogger, BaseAWSLLM):
         s3_path: Optional[str] = None,
         s3_use_team_prefix: bool = False,
         s3_use_path_style: bool = False,
+        s3_server_side_encryption: Optional[str] = None,
+        s3_sse_kms_key_id: Optional[str] = None,
+        s3_sse_customer_algorithm: Optional[str] = None,
+        s3_sse_customer_key: Optional[str] = None,
+        s3_sse_customer_key_md5: Optional[str] = None,
+        s3_additional_headers: Optional[Dict[str, str]] = None,
+        s3_object_acl: Optional[str] = None,
+        s3_storage_class: Optional[str] = None,
     ):
         """
         Initialize the s3 params for this logging callback
@@ -204,7 +228,97 @@ class S3Logger(CustomBatchLogger, BaseAWSLLM):
             litellm.s3_callback_params.get("s3_use_path_style", False)
         ) or s3_use_path_style
 
+        self.s3_server_side_encryption = (
+            litellm.s3_callback_params.get("s3_server_side_encryption")
+            or s3_server_side_encryption
+        )
+        self.s3_sse_kms_key_id = (
+            litellm.s3_callback_params.get("s3_sse_kms_key_id")
+            or s3_sse_kms_key_id
+        )
+        self.s3_sse_customer_algorithm = (
+            litellm.s3_callback_params.get("s3_sse_customer_algorithm")
+            or s3_sse_customer_algorithm
+        )
+        self.s3_sse_customer_key = (
+            litellm.s3_callback_params.get("s3_sse_customer_key")
+            or s3_sse_customer_key
+        )
+        self.s3_sse_customer_key_md5 = (
+            litellm.s3_callback_params.get("s3_sse_customer_key_md5")
+            or s3_sse_customer_key_md5
+        )
+
+        configured_headers = (
+            litellm.s3_callback_params.get("s3_additional_headers")
+            or s3_additional_headers
+            or {}
+        )
+        if isinstance(configured_headers, dict):
+            self.s3_additional_headers: Dict[str, str] = {}
+            for header_key, header_value in configured_headers.items():
+                if header_value is None:
+                    continue
+                if isinstance(header_value, str) and header_value.startswith(
+                    "os.environ/"
+                ):
+                    resolved_value = litellm.get_secret(header_value)
+                else:
+                    resolved_value = header_value
+                self.s3_additional_headers[str(header_key)] = str(resolved_value)
+        else:
+            self.s3_additional_headers = {}
+
+        self.s3_object_acl = (
+            litellm.s3_callback_params.get("s3_object_acl") or s3_object_acl
+        )
+        self.s3_storage_class = (
+            litellm.s3_callback_params.get("s3_storage_class")
+            or s3_storage_class
+        )
+
         return
+
+    def _apply_optional_headers(
+        self, headers: Dict[str, str], *, include_put_headers: bool
+    ) -> None:
+        """Apply optional encryption and user-provided headers to the request."""
+
+        if self.s3_server_side_encryption:
+            headers.setdefault(
+                "x-amz-server-side-encryption", self.s3_server_side_encryption
+            )
+        if self.s3_sse_kms_key_id:
+            headers.setdefault(
+                "x-amz-server-side-encryption-aws-kms-key-id",
+                self.s3_sse_kms_key_id,
+            )
+        if self.s3_sse_customer_algorithm:
+            headers.setdefault(
+                "x-amz-server-side-encryption-customer-algorithm",
+                self.s3_sse_customer_algorithm,
+            )
+        if self.s3_sse_customer_key:
+            headers.setdefault(
+                "x-amz-server-side-encryption-customer-key",
+                self.s3_sse_customer_key,
+            )
+        if self.s3_sse_customer_key_md5:
+            headers.setdefault(
+                "x-amz-server-side-encryption-customer-key-md5",
+                self.s3_sse_customer_key_md5,
+            )
+        if include_put_headers:
+            if self.s3_object_acl:
+                headers.setdefault("x-amz-acl", self.s3_object_acl)
+            if self.s3_storage_class:
+                headers.setdefault("x-amz-storage-class", self.s3_storage_class)
+
+        for header_key, header_value in self.s3_additional_headers.items():
+            if header_key.lower().startswith("x-amz-server-side-encryption"):
+                headers.setdefault(header_key, header_value)
+            elif include_put_headers:
+                headers.setdefault(header_key, header_value)
 
     async def async_log_success_event(self, kwargs, response_obj, start_time, end_time):
         await self._async_log_event_base(
@@ -313,6 +427,7 @@ class S3Logger(CustomBatchLogger, BaseAWSLLM):
                 "Content-Disposition": f'inline; filename="{batch_logging_element.s3_object_download_filename}"',
                 "Cache-Control": "private, immutable, max-age=31536000, s-maxage=0",
             }
+            self._apply_optional_headers(headers, include_put_headers=True)
             req = requests.Request("PUT", url, data=json_string, headers=headers)
             prepped = req.prepare()
 
@@ -420,9 +535,15 @@ class S3Logger(CustomBatchLogger, BaseAWSLLM):
     @staticmethod
     def _sanitize_headers(headers: Dict[str, str]) -> Dict[str, str]:
         redacted_headers: Dict[str, str] = {}
+        sensitive_headers = {
+            "authorization",
+            "x-amz-security-token",
+            "x-amz-server-side-encryption-customer-key",
+            "x-amz-server-side-encryption-customer-key-md5",
+        }
         for key, value in headers.items():
             value_str = "" if value is None else str(value)
-            if key.lower() in {"authorization", "x-amz-security-token"}:
+            if key.lower() in sensitive_headers:
                 redacted_headers[key] = "<redacted>"
             else:
                 redacted_headers[key] = value_str
@@ -554,6 +675,7 @@ class S3Logger(CustomBatchLogger, BaseAWSLLM):
                 "Content-Disposition": f'inline; filename="{batch_logging_element.s3_object_download_filename}"',
                 "Cache-Control": "private, immutable, max-age=31536000, s-maxage=0",
             }
+            self._apply_optional_headers(headers, include_put_headers=True)
             req = requests.Request("PUT", url, data=json_string, headers=headers)
             prepped = req.prepare()
 
@@ -648,6 +770,7 @@ class S3Logger(CustomBatchLogger, BaseAWSLLM):
             headers = {
                 "x-amz-content-sha256": empty_string_hash,
             }
+            self._apply_optional_headers(headers, include_put_headers=False)
             req = requests.Request("GET", url, headers=headers)
             prepped = req.prepare()
 
