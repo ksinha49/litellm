@@ -4886,18 +4886,25 @@ export const updateConfigFieldSetting = async (
 };
 
 export const deleteConfigFieldSetting = async (
-  accessToken: String,
-  fieldName: String
+  accessToken: string,
+  fieldNameOrNames: string | string[],
+  configType: string = "general_settings",
+  options?: { suppressNotifications?: boolean }
 ) => {
   try {
     let url = proxyBaseUrl
       ? `${proxyBaseUrl}/config/field/delete`
       : `/config/field/delete`;
 
-    let formData = {
-      field_name: fieldName,
-      config_type: "general_settings",
-    };
+    const formData = Array.isArray(fieldNameOrNames)
+      ? {
+          field_names: fieldNameOrNames,
+          config_type: configType,
+        }
+      : {
+          field_name: fieldNameOrNames,
+          config_type: configType,
+        };
     //NotificationsManager.info("Requesting model data");
     const response = await fetch(url, {
       method: "POST",
@@ -4917,7 +4924,9 @@ export const deleteConfigFieldSetting = async (
 
 
     const data = await response.json();
-    NotificationsManager.success("Field reset on proxy");
+    if (!options?.suppressNotifications) {
+      NotificationsManager.success("Field reset on proxy");
+    }
     return data;
     // Handle success - you might want to update some state or UI based on the created key
   } catch (error) {
