@@ -1,4 +1,3 @@
-import os
 from datetime import datetime
 from enum import Enum
 from typing import Any, Dict, List, Literal, Optional, TypedDict, Union
@@ -349,49 +348,6 @@ class BedrockGuardrailConfigModel(BaseModel):
 
         if errors:
             raise ValueError(" ".join(errors))
-
-        has_profile = bool(self.aws_profile_name)
-        has_role = bool(self.aws_role_name)
-        has_web_identity = bool(
-            self.aws_web_identity_token
-            and self.aws_role_name
-            and self.aws_session_name
-        )
-        environment_credentials_configured = any(
-            [
-                bool(
-                    os.getenv("AWS_ACCESS_KEY_ID")
-                    and os.getenv("AWS_SECRET_ACCESS_KEY")
-                ),
-                bool(os.getenv("AWS_PROFILE") or os.getenv("AWS_DEFAULT_PROFILE")),
-                bool(os.getenv("AWS_ROLE_ARN")),
-                bool(os.getenv("AWS_WEB_IDENTITY_TOKEN_FILE")),
-            ]
-        )
-
-        has_authentication = any(
-            [
-                has_access_keys,
-                has_profile,
-                has_role,
-                has_web_identity,
-                environment_credentials_configured,
-            ]
-        )
-
-        if not has_authentication:
-            metadata_disabled_raw = os.getenv("AWS_EC2_METADATA_DISABLED")
-            metadata_disabled = bool(
-                metadata_disabled_raw
-                and metadata_disabled_raw.lower() in {"true", "1", "yes"}
-            )
-
-            if metadata_disabled:
-                raise ValueError(
-                    "Bedrock guardrail configuration requires AWS credentials. Provide access keys, an AWS profile, an assumable role, a web identity token, configure the equivalent environment variables, or allow the default AWS credential provider chain by unsetting AWS_EC2_METADATA_DISABLED."
-                )
-
-            return self
 
         return self
 

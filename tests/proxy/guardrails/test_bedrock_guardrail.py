@@ -95,7 +95,7 @@ def test_bedrock_guardrail_allows_default_metadata_credentials(monkeypatch):
     assert guardrail.guardrailIdentifier == "guardrail-id"
 
 
-def test_bedrock_guardrail_rejects_when_metadata_disabled(monkeypatch):
+def test_bedrock_guardrail_metadata_disabled_does_not_raise(monkeypatch):
     monkeypatch.delenv("AWS_ACCESS_KEY_ID", raising=False)
     monkeypatch.delenv("AWS_SECRET_ACCESS_KEY", raising=False)
     monkeypatch.delenv("AWS_SESSION_TOKEN", raising=False)
@@ -105,14 +105,13 @@ def test_bedrock_guardrail_rejects_when_metadata_disabled(monkeypatch):
     monkeypatch.delenv("AWS_WEB_IDENTITY_TOKEN_FILE", raising=False)
     monkeypatch.setenv("AWS_EC2_METADATA_DISABLED", "true")
 
-    with pytest.raises(ValueError) as exc_info:
-        BedrockGuardrail(
-            guardrailIdentifier="guardrail-id",
-            guardrailVersion="1",
-            aws_region_name="us-west-2",
-        )
+    guardrail = BedrockGuardrail(
+        guardrailIdentifier="guardrail-id",
+        guardrailVersion="1",
+        aws_region_name="us-west-2",
+    )
 
-    assert "AWS_EC2_METADATA_DISABLED" in str(exc_info.value)
+    assert guardrail.guardrailIdentifier == "guardrail-id"
 
 
 def test_make_bedrock_api_request_raises_forbidden(patched_guardrail):
