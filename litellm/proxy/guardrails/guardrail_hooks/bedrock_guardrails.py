@@ -364,15 +364,18 @@ class BedrockGuardrail(CustomGuardrail, BaseAWSLLM):
                 },
             ) from exc
 
-        guardrail_status: Literal["success", "failure"] = (
-            "success" if response.status_code == 200 else "failure"
-        )
-
         end_time = datetime.now()
+        raw_response_text = getattr(response, "text", "")
+        payload_is_valid = isinstance(response_json, dict)
+
         guardrail_json_response = (
             _redact_pii_matches(response_json)
-            if isinstance(response_json, dict)
-            else {"raw_response": getattr(response, "text", "")}
+            if payload_is_valid
+            else {"raw_response": raw_response_text}
+        )
+
+        guardrail_status: Literal["success", "failure"] = (
+            "success" if response.status_code == 200 and payload_is_valid else "failure"
         )
 
         #########################################################
@@ -389,12 +392,12 @@ class BedrockGuardrail(CustomGuardrail, BaseAWSLLM):
         #########################################################
         if response.status_code == 200:
             # check if the response was flagged
-            if not isinstance(response_json, dict):
+            if not payload_is_valid:
                 raise HTTPException(
                     status_code=500,
                     detail={
                         "error": "Unexpected Bedrock guardrail response format.",
-                        "aws_response": getattr(response, "text", ""),
+                        "aws_response": raw_response_text,
                     },
                 )
             verbose_proxy_logger.debug(
