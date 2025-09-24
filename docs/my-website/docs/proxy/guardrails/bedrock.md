@@ -42,7 +42,7 @@ guardrails:
 litellm --config config.yaml --detailed_debug
 ```
 
-### 3. Test request 
+### 3. Test request
 
 **[Langchain, OpenAI SDK Usage Examples](../proxy/user_keys#request-format)**
 
@@ -136,6 +136,19 @@ curl -i http://localhost:4000/v1/chat/completions \
 
 
 </Tabs>
+
+## Permissions and Troubleshooting
+
+To successfully call Bedrock guardrails through LiteLLM, the AWS identity specified by `aws_role_name` (or the process's defaul
+t credentials) must be able to perform the following IAM actions on the guardrail resource:
+
+- `bedrock:ApplyGuardrail` – required to run the guardrail during a request
+- `bedrock:GetGuardrail` – lets LiteLLM look up metadata about the configured guardrail
+- `bedrock:ListGuardrails` – enables discovery of available guardrails when validating configuration
+
+If you still receive authorization errors, double-check that the guardrail and the credentials you are using live in the same 
+AWS account and region. The `aws_region_name` parameter must match the region where the guardrail was created; a mismatch will r
+esult in `ResourceNotFoundException` or similar Bedrock errors.
 
 ## PII Masking with Bedrock Guardrails
 

@@ -5,6 +5,9 @@ import TabItem from '@theme/TabItem';
 
 Use this endpoint to directly call a guardrail configured on your LiteLLM instance. This is useful when you have services that need to directly call a guardrail. 
 
+:::note Bedrock guardrails
+When the guardrail is backed by Amazon Bedrock, ensure the IAM role or user has permission to call `bedrock:ApplyGuardrail`, `bedrock:GetGuardrail`, and `bedrock:ListGuardrails`, and that `aws_region_name` matches the region in which the guardrail exists. See the [Bedrock guardrail permissions guide](proxy/guardrails/bedrock#permissions-and-troubleshooting) for more details.
+:::
 
 ## Usage
 ---
