@@ -1629,7 +1629,15 @@ class ConfigFieldUpdate(LiteLLMPydanticObjectBase):
 
 class ConfigFieldDelete(LiteLLMPydanticObjectBase):
     config_type: str
-    field_name: str
+    field_name: Optional[str] = None
+    field_names: Optional[List[str]] = None
+
+    @model_validator(mode="after")
+    def validate_field_names(self) -> "ConfigFieldDelete":
+        # Ensure at least one of field_name / field_names is provided
+        if self.field_name is None and not self.field_names:
+            raise ValueError("Either field_name or field_names must be provided")
+        return self
 
 
 class CallbackDelete(LiteLLMPydanticObjectBase):
