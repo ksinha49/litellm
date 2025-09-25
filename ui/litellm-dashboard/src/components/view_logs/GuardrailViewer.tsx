@@ -25,6 +25,8 @@ type GuardrailResponse =
   | null
   | undefined
 
+type AssessmentDetails = unknown | unknown[];
+
 interface GuardrailInformation {
   duration?: number;
   end_time?: number;
@@ -36,8 +38,7 @@ interface GuardrailInformation {
   masked_entity_count?: MaskedEntityCount;
   detected?: boolean;
   // New fields from enhanced backend logging
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  assessment_details?: any[] | any;
+  assessment_details?: AssessmentDetails;
   guardrail_coverage?: {
     textCharacters?: { guarded: number; total: number };
     images?: { guarded: number; total: number };
@@ -78,16 +79,17 @@ const GuardrailViewerComponent = React.memo(({ data }: GuardrailViewerProps) => 
         : undefined;
   }, [data.detected, guardrailEntities]);
 
-  if (!data) {
-    return null;
-  }
-
   // Calculate total masked entities
   const totalMaskedEntities = useMemo(() => {
     return data.masked_entity_count
       ? Object.values(data.masked_entity_count).reduce((sum, count) => sum + count, 0)
       : 0;
   }, [data.masked_entity_count]);
+
+  const assessmentDetails = data.assessment_details;
+  const showAssessmentDetails = Array.isArray(assessmentDetails)
+    ? assessmentDetails.length > 0
+    : Boolean(assessmentDetails);
 
   const formatTime = useCallback((timestamp: number): string => {
     const date = new Date(timestamp * 1000);
@@ -113,8 +115,10 @@ const GuardrailViewerComponent = React.memo(({ data }: GuardrailViewerProps) => 
     return "text-yellow-600";
   }, []);
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const formatAssessmentDetails = useCallback((details: any): string => {
+  const formatAssessmentDetails = useCallback((details: AssessmentDetails | undefined): string => {
+    if (typeof details === "undefined") {
+      return "";
+    }
     try {
       return JSON.stringify(details, null, 2);
     } catch (error) {
@@ -284,12 +288,12 @@ const GuardrailViewerComponent = React.memo(({ data }: GuardrailViewerProps) => 
           </div>
 
           {/* Assessment Details Section */}
-          {(data.assessment_details && Array.isArray(data.assessment_details) && data.assessment_details.length > 0) && (
+          {showAssessmentDetails && (
             <div className="mt-4">
               <h4 className="font-medium mb-2">Assessment Details</h4>
               <div className="bg-gray-50 p-3 rounded-md">
                 <pre className="text-xs overflow-auto max-h-64 text-gray-800">
-                  {formatAssessmentDetails(data.assessment_details)}
+                  {formatAssessmentDetails(assessmentDetails)}
                 </pre>
               </div>
             </div>
