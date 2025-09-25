@@ -1031,13 +1031,30 @@ def move_guardrails_to_metadata(
     - If guardrails set on API Key metadata then sets guardrails on request metadata
     - If guardrails not set on API key, then checks request metadata
     """
-    # Check key-level guardrails
+    from litellm._logging import verbose_proxy_logger
+
+    # Initialize metadata if not present
+    if _metadata_variable_name not in data:
+        data[_metadata_variable_name] = {}
+
+    # Check key-level and team-level guardrails
+    initial_guardrails = list(data[_metadata_variable_name].get("guardrails", []))
+
     _add_guardrails_from_key_or_team_metadata(
         key_metadata=user_api_key_dict.metadata,
         team_metadata=user_api_key_dict.team_metadata,
         data=data,
         metadata_variable_name=_metadata_variable_name,
     )
+
+    # Log team guardrail assignment for debugging
+    final_guardrails = list(data[_metadata_variable_name].get("guardrails", []))
+    if final_guardrails != initial_guardrails:
+        team_id = getattr(user_api_key_dict, "team_id", None)
+        verbose_proxy_logger.info(
+            f"Team guardrails applied - team: {team_id}, "
+            f"guardrails: {final_guardrails}"
+        )
 
     # Check request-level guardrails
     if "guardrails" in data:
