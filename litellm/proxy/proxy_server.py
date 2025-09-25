@@ -3175,9 +3175,53 @@ class ProxyConfig:
                 "guardrails from the DB %s", str(guardrails_in_db)
             )
             for guardrail in guardrails_in_db:
-                IN_MEMORY_GUARDRAIL_HANDLER.initialize_guardrail(
+                initialized_guardrail = IN_MEMORY_GUARDRAIL_HANDLER.initialize_guardrail(
                     guardrail=cast(Guardrail, guardrail),
                 )
+
+                if initialized_guardrail:
+                    guardrail_name = cast(
+                        Optional[str], guardrail.get("guardrail_name")
+                    )
+                    raw_litellm_params = guardrail.get("litellm_params")
+                    guardrail_type: Optional[str]
+                    if isinstance(raw_litellm_params, dict):
+                        guardrail_type = cast(
+                            Optional[str], raw_litellm_params.get("guardrail")
+                        )
+                    else:
+                        guardrail_type = cast(
+                            Optional[str],
+                            getattr(raw_litellm_params, "guardrail", None),
+                        )
+
+                    verbose_proxy_logger.info(
+                        "Initialized guardrail: %s (type: %s)",
+                        guardrail_name,
+                        guardrail_type,
+                    )
+
+                    if guardrail_type == "bedrock":
+                        guardrail_id = cast(
+                            Optional[str],
+                            initialized_guardrail.get("guardrail_id")
+                            if isinstance(initialized_guardrail, dict)
+                            else getattr(initialized_guardrail, "get", lambda *_: None)(
+                                "guardrail_id"
+                            ),
+                        )
+                        if guardrail_id:
+                            callback = (
+                                IN_MEMORY_GUARDRAIL_HANDLER.guardrail_id_to_custom_guardrail.get(
+                                    guardrail_id
+                                )
+                            )
+                            if callback and callback not in litellm.callbacks:
+                                litellm.callbacks.append(callback)
+                                verbose_proxy_logger.info(
+                                    "Registered Bedrock guardrail callback: %s",
+                                    guardrail_name,
+                                )
         except Exception as e:
             verbose_proxy_logger.exception(
                 "litellm.proxy.proxy_server.py::ProxyConfig:_init_guardrails_in_db - {}".format(
