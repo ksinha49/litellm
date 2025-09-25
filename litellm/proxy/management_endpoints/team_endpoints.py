@@ -2327,12 +2327,30 @@ async def debug_team_guardrails(
     if team is None:
         raise HTTPException(status_code=404, detail="Team not found")
 
+    team_dict: Dict[str, Any] = {}
     team_metadata: Dict[str, Any] = {}
     if hasattr(team, "model_dump"):
         team_dict = team.model_dump()
         metadata = team_dict.get("metadata") if isinstance(team_dict, dict) else None
+    elif isinstance(team, dict):
+        team_dict = team
+        metadata = team.get("metadata")
     else:
-        metadata = getattr(team, "metadata", None)
+        team_dict = dict(getattr(team, "__dict__", {}))
+        metadata = team_dict.get("metadata")
+
+    try:
+        team_table = LiteLLM_TeamTable(**team_dict)
+    except Exception as exc:
+        raise HTTPException(
+            status_code=500,
+            detail={"error": f"Failed to parse team data for membership validation: {exc}"},
+        ) from exc
+
+    validate_membership(
+        user_api_key_dict=user_api_key_dict,
+        team_table=team_table,
+    )
 
     if isinstance(metadata, dict):
         team_metadata = metadata
