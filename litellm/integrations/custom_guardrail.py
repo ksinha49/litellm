@@ -361,6 +361,7 @@ class CustomGuardrail(CustomLogger):
         duration: Optional[float] = None,
         masked_entity_count: Optional[Dict[str, int]] = None,
         guardrail_detected: Optional[bool] = None,
+        assessment_details: Optional[Union[dict, List[dict]]] = None,
     ) -> None:
         """
         Builds `StandardLoggingGuardrailInformation` and adds it to the request metadata so it can be used for logging to DataDog, Langfuse, etc.
@@ -383,6 +384,7 @@ class CustomGuardrail(CustomLogger):
             end_time=end_time,
             duration=duration,
             masked_entity_count=masked_entity_count,
+            assessment_details=assessment_details,
         )
         if "metadata" in request_data:
             if request_data["metadata"] is None:

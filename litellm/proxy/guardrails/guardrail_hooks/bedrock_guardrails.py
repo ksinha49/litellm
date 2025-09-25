@@ -458,6 +458,7 @@ class BedrockGuardrail(CustomGuardrail, BaseAWSLLM):
                 start_time=start_time.timestamp(),
                 end_time=end_time.timestamp(),
                 duration=(end_time - start_time).total_seconds(),
+                assessment_details=None,
             )
             raise HTTPException(
                 status_code=500,
@@ -481,6 +482,15 @@ class BedrockGuardrail(CustomGuardrail, BaseAWSLLM):
             "success" if response.status_code == 200 and payload_is_valid else "failure"
         )
         guardrail_detected: Optional[bool] = None
+
+        # Extract assessment details for logging before any potential modifications
+        assessment_details: Optional[List[dict]] = None
+        if payload_is_valid and isinstance(response_json, dict):
+            assessments = response_json.get("assessments")
+            if assessments and isinstance(assessments, list):
+                # Apply PII redaction to assessment details for logging
+                assessment_details = _redact_pii_matches({"assessments": assessments}).get("assessments")
+
         if payload_is_valid and isinstance(guardrail_json_response, dict):
             guardrail_detected = self._response_indicates_detection(
                 guardrail_json_response
@@ -502,6 +512,7 @@ class BedrockGuardrail(CustomGuardrail, BaseAWSLLM):
             end_time=end_time.timestamp(),
             duration=(end_time - start_time).total_seconds(),
             guardrail_detected=guardrail_detected,
+            assessment_details=assessment_details,
         )
         #########################################################
         if response.status_code == 200:

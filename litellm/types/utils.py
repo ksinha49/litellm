@@ -1994,6 +1994,13 @@ class StandardLoggingGuardrailInformation(TypedDict, total=False):
     }
     """
 
+    assessment_details: Optional[Union[dict, List[dict]]]
+    """
+    Detailed assessment information from the guardrail provider.
+    For AWS Bedrock, this includes the full assessments array with
+    policy violations, confidence scores, detected entities etc.
+    """
+
 
 StandardLoggingPayloadStatus = Literal["success", "failure"]
 

@@ -238,3 +238,135 @@ def test_make_bedrock_api_request_logs_detection(patched_guardrail):
     assert isinstance(logged_response, dict)
     assert logged_response.get("detected") is True
     assert result.get("detected") is True
+
+
+def test_make_bedrock_api_request_logs_assessment_details(patched_guardrail):
+    """Test that assessment details are properly included in the logging information."""
+    guardrail = patched_guardrail
+    logging_mock = MagicMock()
+    guardrail.add_standard_logging_guardrail_information_to_request_data = logging_mock
+
+    response_payload = {
+        "action": "GUARDRAIL_INTERVENED",
+        "assessments": [
+            {
+                "topicPolicy": {
+                    "topics": [
+                        {
+                            "name": "Investment Advice",
+                            "type": "DENY",
+                            "action": "BLOCKED"
+                        }
+                    ]
+                },
+                "sensitiveInformationPolicy": {
+                    "piiEntities": [
+                        {
+                            "match": "test@example.com",
+                            "type": "EMAIL",
+                            "action": "ANONYMIZED"
+                        }
+                    ]
+                },
+                "contentPolicy": {
+                    "filters": [
+                        {
+                            "type": "HATE",
+                            "action": "BLOCKED",
+                            "confidence": "HIGH"
+                        }
+                    ]
+                }
+            }
+        ],
+        "outputs": [
+            {"text": "I can't provide investment advice."}
+        ]
+    }
+
+    guardrail.async_handler.post = AsyncMock(
+        return_value=MockResponse(200, response_payload)
+    )
+
+    result = asyncio.run(
+        guardrail.make_bedrock_api_request(
+            source="INPUT",
+            messages=[{"role": "user", "content": "Give me investment advice on crypto"}],
+            request_data={"metadata": {}},
+        )
+    )
+
+    # Verify logging was called with assessment_details
+    logging_mock.assert_called_once()
+    call_kwargs = logging_mock.call_args.kwargs
+
+    # Check that assessment_details is included and properly structured
+    assert "assessment_details" in call_kwargs
+    assessment_details = call_kwargs["assessment_details"]
+    assert isinstance(assessment_details, list)
+    assert len(assessment_details) == 1
+
+    # Verify the assessment structure is preserved
+    assessment = assessment_details[0]
+    assert "topicPolicy" in assessment
+    assert "sensitiveInformationPolicy" in assessment
+    assert "contentPolicy" in assessment
+
+    # Verify topic policy details
+    topic_policy = assessment["topicPolicy"]
+    assert len(topic_policy["topics"]) == 1
+    assert topic_policy["topics"][0]["name"] == "Investment Advice"
+    assert topic_policy["topics"][0]["action"] == "BLOCKED"
+
+    # Verify content policy details
+    content_policy = assessment["contentPolicy"]
+    assert len(content_policy["filters"]) == 1
+    assert content_policy["filters"][0]["type"] == "HATE"
+    assert content_policy["filters"][0]["action"] == "BLOCKED"
+    assert content_policy["filters"][0]["confidence"] == "HIGH"
+
+    # Verify PII redaction is applied in assessment details
+    pii_entities = assessment["sensitiveInformationPolicy"]["piiEntities"]
+    assert pii_entities[0]["match"] == "[REDACTED]"
+
+    # Verify other standard fields are still present
+    assert call_kwargs["guardrail_detected"] is True
+    assert call_kwargs["guardrail_status"] == "success"
+
+
+def test_make_bedrock_api_request_logs_no_assessment_details_when_none(patched_guardrail):
+    """Test that assessment_details is None when no assessments are present."""
+    guardrail = patched_guardrail
+    logging_mock = MagicMock()
+    guardrail.add_standard_logging_guardrail_information_to_request_data = logging_mock
+
+    response_payload = {
+        "action": "NONE",
+        "outputs": [
+            {"text": "This is a safe response."}
+        ]
+    }
+
+    guardrail.async_handler.post = AsyncMock(
+        return_value=MockResponse(200, response_payload)
+    )
+
+    result = asyncio.run(
+        guardrail.make_bedrock_api_request(
+            source="INPUT",
+            messages=[{"role": "user", "content": "Hello"}],
+            request_data={"metadata": {}},
+        )
+    )
+
+    # Verify logging was called with assessment_details as None
+    logging_mock.assert_called_once()
+    call_kwargs = logging_mock.call_args.kwargs
+
+    # Check that assessment_details is None when no assessments
+    assert "assessment_details" in call_kwargs
+    assert call_kwargs["assessment_details"] is None
+
+    # Verify other standard fields are still present
+    assert call_kwargs["guardrail_detected"] is False
+    assert call_kwargs["guardrail_status"] == "success"
