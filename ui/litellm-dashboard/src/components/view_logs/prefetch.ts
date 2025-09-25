@@ -4,8 +4,10 @@ import { LogEntry } from "./columns";
 
 export interface PrefetchedLog {
   id: string;
-  messages: any;
-  response: any;
+  messages?: LogEntry["messages"];
+  response?: LogEntry["response"];
+  metadata?: LogEntry["metadata"];
+  proxy_server_request?: LogEntry["proxy_server_request"];
 }
 
 export const prefetchLogDetails = async (
