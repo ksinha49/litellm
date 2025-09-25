@@ -36,7 +36,8 @@ interface GuardrailInformation {
   masked_entity_count?: MaskedEntityCount;
   detected?: boolean;
   // New fields from enhanced backend logging
-  assessment_details?: any[] | any; // eslint-disable-line @typescript-eslint/no-explicit-any
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  assessment_details?: any[] | any;
   guardrail_coverage?: {
     textCharacters?: { guarded: number; total: number };
     images?: { guarded: number; total: number };
@@ -50,7 +51,7 @@ interface GuardrailViewerProps {
   data: GuardrailInformation;
 }
 
-export const GuardrailViewer = React.memo(({ data }: GuardrailViewerProps) => {
+const GuardrailViewerComponent = React.memo(({ data }: GuardrailViewerProps) => {
   const [sectionExpanded, setSectionExpanded] = useState(true);
   const [entityListExpanded, setEntityListExpanded] = useState(true);
   const [expandedEntities, setExpandedEntities] = useState<Record<number, boolean>>({});
@@ -112,7 +113,8 @@ export const GuardrailViewer = React.memo(({ data }: GuardrailViewerProps) => {
     return "text-yellow-600";
   }, []);
 
-  const formatAssessmentDetails = useCallback((details: any): string => { // eslint-disable-line @typescript-eslint/no-explicit-any
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const formatAssessmentDetails = useCallback((details: any): string => {
     try {
       return JSON.stringify(details, null, 2);
     } catch (error) {
@@ -228,7 +230,7 @@ export const GuardrailViewer = React.memo(({ data }: GuardrailViewerProps) => {
               <div className="mt-4 pt-4 border-t">
                 <h4 className="font-medium mb-2">Guardrail Coverage</h4>
                 <div className="grid grid-cols-2 gap-4 text-sm">
-                  {data.guardrail_coverage.textCharacters && (
+                  {data.guardrail_coverage?.textCharacters && (
                     <div className="bg-gray-50 p-2 rounded">
                       <span className="font-medium">Text Characters:</span>
                       <div className="text-xs text-gray-600">
@@ -237,7 +239,7 @@ export const GuardrailViewer = React.memo(({ data }: GuardrailViewerProps) => {
                       </div>
                     </div>
                   )}
-                  {data.guardrail_coverage.images && (
+                  {data.guardrail_coverage?.images && (
                     <div className="bg-gray-50 p-2 rounded">
                       <span className="font-medium">Images:</span>
                       <div className="text-xs text-gray-600">
@@ -267,7 +269,7 @@ export const GuardrailViewer = React.memo(({ data }: GuardrailViewerProps) => {
             )}
 
             {/* Masked Entity Summary */}
-            {data.masked_entity_count && Object.keys(data.masked_entity_count).length > 0 && (
+            {(data.masked_entity_count && Object.keys(data.masked_entity_count).length > 0) && (
               <div className="mt-4 pt-4 border-t">
                 <h4 className="font-medium mb-2">Masked Entity Summary</h4>
                 <div className="flex flex-wrap gap-2">
@@ -282,7 +284,7 @@ export const GuardrailViewer = React.memo(({ data }: GuardrailViewerProps) => {
           </div>
 
           {/* Assessment Details Section */}
-          {data.assessment_details && Array.isArray(data.assessment_details) && data.assessment_details.length > 0 && (
+          {(data.assessment_details && Array.isArray(data.assessment_details) && data.assessment_details.length > 0) && (
             <div className="mt-4">
               <h4 className="font-medium mb-2">Assessment Details</h4>
               <div className="bg-gray-50 p-3 rounded-md">
@@ -294,7 +296,7 @@ export const GuardrailViewer = React.memo(({ data }: GuardrailViewerProps) => {
           )}
 
           {/* Guardrail Outputs Section */}
-          {data.guardrail_outputs && Array.isArray(data.guardrail_outputs) && data.guardrail_outputs.length > 0 && (
+          {(data.guardrail_outputs && Array.isArray(data.guardrail_outputs) && data.guardrail_outputs.length > 0) && (
             <div className="mt-4">
               <h4 className="font-medium mb-2">Guardrail Outputs</h4>
               <div className="space-y-2">
@@ -310,7 +312,7 @@ export const GuardrailViewer = React.memo(({ data }: GuardrailViewerProps) => {
           )}
 
           {/* Detected Entities Section */}
-          {guardrailEntities && guardrailEntities.length > 0 && (
+          {(guardrailEntities && guardrailEntities.length > 0) && (
             <div className="mt-4">
               <div
                 className="flex items-center mb-2 cursor-pointer"
@@ -410,7 +412,7 @@ export const GuardrailViewer = React.memo(({ data }: GuardrailViewerProps) => {
             </div>
           )}
 
-          {hasStructuredResponse && !guardrailEntities && (
+          {(hasStructuredResponse && !guardrailEntities) && (
             <div className="mt-4">
               <h4 className="font-medium mb-2">Guardrail Response</h4>
               <pre className="bg-gray-900 text-gray-100 text-xs p-3 rounded-md overflow-auto">
@@ -419,7 +421,7 @@ export const GuardrailViewer = React.memo(({ data }: GuardrailViewerProps) => {
             </div>
           )}
 
-          {typeof guardrailResponse === "string" && guardrailResponse.trim().length > 0 && (
+          {(typeof guardrailResponse === "string" && guardrailResponse.trim().length > 0) && (
             <div className="mt-4">
               <h4 className="font-medium mb-2">Guardrail Response</h4>
               <pre className="bg-gray-900 text-gray-100 text-xs p-3 rounded-md overflow-auto">
@@ -433,4 +435,6 @@ export const GuardrailViewer = React.memo(({ data }: GuardrailViewerProps) => {
   );
 });
 
-GuardrailViewer.displayName = 'GuardrailViewer';
+GuardrailViewerComponent.displayName = 'GuardrailViewer';
+
+export const GuardrailViewer = GuardrailViewerComponent;
