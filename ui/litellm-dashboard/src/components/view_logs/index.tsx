@@ -821,7 +821,11 @@ export function RequestViewer({ row, accessToken, formattedStartTime }: RequestV
 
   // Extract error information from metadata if available
   const metadata = logData.metadata || {}
-  const hasError = metadata.status === "failure"
+  const resolvedStatus =
+    (metadata?.status ?? logData.status ?? row.original?.status ?? null) as string | null
+  const normalizedStatus =
+    typeof resolvedStatus === "string" ? resolvedStatus.toLowerCase() : undefined
+  const hasError = normalizedStatus === "failure"
   const errorInfo = hasError ? metadata.error_information : null
 
   // Check if request/response data is missing
@@ -961,12 +965,14 @@ export function RequestViewer({ row, accessToken, formattedStartTime }: RequestV
               <span className="font-medium w-1/3">Status:</span>
               <span
                 className={`px-2 py-1 rounded-md text-xs font-medium inline-block text-center w-16 ${
-                  (metadata?.status || "Success").toLowerCase() !== "failure"
-                    ? "bg-green-100 text-green-800"
-                    : "bg-red-100 text-red-800"
+                  normalizedStatus === "failure"
+                    ? "bg-red-100 text-red-800"
+                    : "bg-green-100 text-green-800"
                 }`}
               >
-                {(metadata?.status || "Success").toLowerCase() !== "failure" ? "Success" : "Failure"}
+                {normalizedStatus
+                  ? `${normalizedStatus.charAt(0).toUpperCase()}${normalizedStatus.slice(1)}`
+                  : "Success"}
               </span>
             </div>
             <div className="flex">
