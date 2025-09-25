@@ -15,9 +15,17 @@ interface SessionViewProps {
   sessionId: string
   logs: LogEntry[]
   onBack: () => void
+  accessToken: string
+  formattedStartTime: string
 }
 
-export const SessionView: React.FC<SessionViewProps> = ({ sessionId, logs, onBack }) => {
+export const SessionView: React.FC<SessionViewProps> = ({
+  sessionId,
+  logs,
+  onBack,
+  accessToken,
+  formattedStartTime,
+}) => {
   // Track which log row is expanded
   const [expandedRequestId, setExpandedRequestId] = useState<string | null>(null)
   const [copiedStates, setCopiedStates] = useState<Record<string, boolean>>({});
@@ -178,7 +186,13 @@ export const SessionView: React.FC<SessionViewProps> = ({ sessionId, logs, onBac
         <DataTable
           columns={columns}
           data={logs}
-          renderSubComponent={RequestViewer}
+          renderSubComponent={({ row }) => (
+            <RequestViewer
+              row={row}
+              accessToken={accessToken}
+              formattedStartTime={formattedStartTime}
+            />
+          )}
           getRowCanExpand={() => true}
           loadingMessage="Loading logs..."
           noDataMessage="No logs found"

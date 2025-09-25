@@ -452,6 +452,8 @@ export default function SpendLogsTable({
           sessionId={selectedSessionId}
           logs={sessionLogs.data.data}
           onBack={() => setSelectedSessionId(null)}
+          accessToken={accessToken as string}
+          formattedStartTime={formattedStartTime}
         />
       </div>
     )
@@ -791,7 +793,7 @@ export function RequestViewer({ row, accessToken, formattedStartTime }: RequestV
   })
 
   const logData = useMemo<LogEntry>(() => {
-    const overrides = prefetchedDetails ?? {}
+    const overrides: Partial<PrefetchedLog> = prefetchedDetails ?? {}
 
     return {
       ...row.original,
