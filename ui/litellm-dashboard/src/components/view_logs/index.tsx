@@ -452,6 +452,8 @@ export default function SpendLogsTable({
           sessionId={selectedSessionId}
           logs={sessionLogs.data.data}
           onBack={() => setSelectedSessionId(null)}
+          accessToken={accessToken as string}
+          formattedStartTime={formattedStartTime}
         />
       </div>
     )
