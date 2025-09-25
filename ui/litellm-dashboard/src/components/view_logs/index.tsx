@@ -864,7 +864,7 @@ export function RequestViewer({ row, accessToken, formattedStartTime }: RequestV
   // Check both possible field names for backward compatibility
   const guardrailInfo = useMemo(() =>
     metadata?.standard_logging_guardrail_information || metadata?.guardrail_information,
-    [metadata?.standard_logging_guardrail_information, metadata?.guardrail_information]
+    [metadata]
   )
   const hasGuardrailData = useMemo(() => Boolean(guardrailInfo), [guardrailInfo])
 

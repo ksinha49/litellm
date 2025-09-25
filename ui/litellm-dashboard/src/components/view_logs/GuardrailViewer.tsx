@@ -36,19 +36,13 @@ interface GuardrailInformation {
   masked_entity_count?: MaskedEntityCount;
   detected?: boolean;
   // New fields from enhanced backend logging
-  assessment_details?: any[] | any;
+  assessment_details?: unknown[] | unknown;
   guardrail_coverage?: {
     textCharacters?: { guarded: number; total: number };
     images?: { guarded: number; total: number };
   };
   guardrail_outputs?: { text: string }[];
-  guardrail_usage?: {
-    topicPolicyUnits?: number;
-    contentPolicyUnits?: number;
-    sensitiveInformationPolicyUnits?: number;
-    sensitiveInformationPolicyFreeUnits?: number;
-    contextualGroundingPolicyUnits?: number;
-  };
+  guardrail_usage?: Record<string, number>;
   action_reason?: string;
 }
 
@@ -253,13 +247,13 @@ export const GuardrailViewer = React.memo(({ data }: GuardrailViewerProps) => {
               <div className="mt-4 pt-4 border-t">
                 <h4 className="font-medium mb-2">Usage Statistics</h4>
                 <div className="flex flex-wrap gap-2">
-                  {Object.entries(data.guardrail_usage).map(([key, value]) => (
-                    value !== undefined && value !== null && (
+                  {Object.entries(data.guardrail_usage)
+                    .filter(([, value]) => value !== undefined && value !== null && typeof value === 'number')
+                    .map(([key, value]) => (
                       <span key={key} className="px-2 py-1 bg-green-50 text-green-700 rounded-md text-xs font-medium">
                         {key.replace(/([A-Z])/g, ' $1').toLowerCase()}: {value}
                       </span>
-                    )
-                  ))}
+                    ))}
                 </div>
               </div>
             )}
@@ -430,3 +424,5 @@ export const GuardrailViewer = React.memo(({ data }: GuardrailViewerProps) => {
     </div>
   );
 });
+
+GuardrailViewer.displayName = 'GuardrailViewer';
