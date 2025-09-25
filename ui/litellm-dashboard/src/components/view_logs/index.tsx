@@ -522,7 +522,13 @@ export default function SpendLogsTable({
                 <DataTable
                   columns={columns}
                   data={sessionData}
-                  renderSubComponent={RequestViewer}
+                  renderSubComponent={({ row }) => (
+                    <RequestViewer
+                      row={row}
+                      accessToken={accessToken as string}
+                      formattedStartTime={formattedStartTime}
+                    />
+                  )}
                   getRowCanExpand={() => true}
                   // Optionally: add session-specific row expansion state
                 />
