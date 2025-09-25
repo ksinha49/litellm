@@ -470,11 +470,35 @@ def _custom_logger_class_exists_in_failure_callbacks(
 def get_request_guardrails(kwargs: Dict[str, Any]) -> List[str]:
     """
     Get the request guardrails from the kwargs
+    Enhanced to check multiple metadata locations for guardrails
     """
     metadata = kwargs.get("metadata") or {}
+
+    # Check multiple possible locations for guardrails
+    guardrails: List[str] = []
+
+    # 1. Direct metadata guardrails (from team/key settings)
+    metadata_guardrails = metadata.get("guardrails")
+    if isinstance(metadata_guardrails, list):
+        guardrails.extend(metadata_guardrails)
+    elif isinstance(metadata_guardrails, str):
+        guardrails.append(metadata_guardrails)
+
+    # 2. Legacy requester_metadata location
     requester_metadata = metadata.get("requester_metadata") or {}
-    applied_guardrails = requester_metadata.get("guardrails") or []
-    return applied_guardrails
+    requester_guardrails = requester_metadata.get("guardrails")
+    if isinstance(requester_guardrails, list):
+        guardrails.extend(requester_guardrails)
+    elif isinstance(requester_guardrails, str):
+        guardrails.append(requester_guardrails)
+
+    # 3. Remove duplicates while preserving order
+    unique_guardrails: List[str] = []
+    for guardrail in guardrails:
+        if guardrail not in unique_guardrails:
+            unique_guardrails.append(guardrail)
+
+    return unique_guardrails
 
 
 def get_applied_guardrails(kwargs: Dict[str, Any]) -> List[str]:
