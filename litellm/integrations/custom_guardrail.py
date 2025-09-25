@@ -1,7 +1,8 @@
 from datetime import datetime
-from typing import Any, Dict, List, Literal, Optional, Type, Union, get_args
+import logging
+from typing import Any, Dict, List, Literal, Optional, Type, Union, cast, get_args
 
-from litellm._logging import verbose_logger
+from litellm._logging import verbose_logger, verbose_proxy_logger
 from litellm.caching import DualCache
 from litellm.integrations.custom_logger import CustomLogger
 from litellm.types.guardrails import (
@@ -17,6 +18,7 @@ from litellm.types.utils import (
     LLMResponseTypes,
     StandardLoggingGuardrailInformation,
 )
+from litellm.litellm_core_utils.safe_json_dumps import safe_dumps
 
 dc = DualCache()
 
@@ -384,17 +386,69 @@ class CustomGuardrail(CustomLogger):
             duration=duration,
             masked_entity_count=masked_entity_count,
         )
+        guardrail_information: Optional[StandardLoggingGuardrailInformation] = None
         if "metadata" in request_data:
-            if request_data["metadata"] is None:
+            if not isinstance(request_data["metadata"], dict):
                 request_data["metadata"] = {}
             request_data["metadata"]["standard_logging_guardrail_information"] = slg
+            guardrail_information = cast(
+                StandardLoggingGuardrailInformation,
+                request_data["metadata"][
+                    "standard_logging_guardrail_information"
+                ],
+            )
         elif "litellm_metadata" in request_data:
+            if not isinstance(request_data["litellm_metadata"], dict):
+                request_data["litellm_metadata"] = {}
             request_data["litellm_metadata"][
                 "standard_logging_guardrail_information"
             ] = slg
+            guardrail_information = cast(
+                StandardLoggingGuardrailInformation,
+                request_data["litellm_metadata"][
+                    "standard_logging_guardrail_information"
+                ],
+            )
         else:
             verbose_logger.warning(
                 "unable to log guardrail information. No metadata found in request_data"
+            )
+            return
+
+        self._log_guardrail_response(guardrail_information)
+
+    def _log_guardrail_response(
+        self,
+        guardrail_information: Optional[StandardLoggingGuardrailInformation],
+    ) -> None:
+        """Log the guardrail response payload, if available."""
+
+        if guardrail_information is None:
+            return
+
+        guardrail_response_payload = guardrail_information.get("guardrail_response")
+        if guardrail_response_payload is None:
+            return
+
+        guardrail_name = (
+            self.guardrail_name
+            or guardrail_information.get("guardrail_name")
+            or "unknown"
+        )
+        guardrail_status = guardrail_information.get("guardrail_status", "unknown")
+
+        try:
+            if verbose_proxy_logger.isEnabledFor(logging.INFO):
+                verbose_proxy_logger.info(
+                    "Guardrail '%s' response (status=%s): %s",
+                    guardrail_name,
+                    guardrail_status,
+                    safe_dumps(guardrail_response_payload),
+                )
+        except Exception:
+            verbose_logger.exception(
+                "Failed to log guardrail response for guardrail=%s",
+                guardrail_name,
             )
 
     async def apply_guardrail(
