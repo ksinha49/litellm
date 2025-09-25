@@ -2001,6 +2001,29 @@ class StandardLoggingGuardrailInformation(TypedDict, total=False):
     policy violations, confidence scores, detected entities etc.
     """
 
+    guardrail_coverage: Optional[dict]
+    """
+    Guardrail coverage information from the provider.
+    For AWS Bedrock, this includes textCharacters and images coverage details.
+    """
+
+    guardrail_outputs: Optional[Union[dict, List[dict]]]
+    """
+    Output details from the guardrail provider.
+    For AWS Bedrock, this includes the text outputs from the guardrail.
+    """
+
+    guardrail_usage: Optional[dict]
+    """
+    Usage details from the guardrail provider.
+    For AWS Bedrock, this includes policy units processed.
+    """
+
+    action_reason: Optional[str]
+    """
+    The reason for the action taken when harmful content is detected.
+    """
+
 
 StandardLoggingPayloadStatus = Literal["success", "failure"]
 

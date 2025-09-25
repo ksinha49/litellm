@@ -248,6 +248,7 @@ def test_make_bedrock_api_request_logs_assessment_details(patched_guardrail):
 
     response_payload = {
         "action": "GUARDRAIL_INTERVENED",
+        "actionReason": "Content policy violation detected",
         "assessments": [
             {
                 "topicPolicy": {
@@ -255,7 +256,8 @@ def test_make_bedrock_api_request_logs_assessment_details(patched_guardrail):
                         {
                             "name": "Investment Advice",
                             "type": "DENY",
-                            "action": "BLOCKED"
+                            "action": "BLOCKED",
+                            "detected": True
                         }
                     ]
                 },
@@ -273,15 +275,34 @@ def test_make_bedrock_api_request_logs_assessment_details(patched_guardrail):
                         {
                             "type": "HATE",
                             "action": "BLOCKED",
-                            "confidence": "HIGH"
+                            "confidence": "HIGH",
+                            "detected": True,
+                            "filterStrength": "MEDIUM"
                         }
                     ]
                 }
             }
         ],
+        "guardrailCoverage": {
+            "textCharacters": {
+                "guarded": 50,
+                "total": 50
+            },
+            "images": {
+                "guarded": 0,
+                "total": 0
+            }
+        },
         "outputs": [
             {"text": "I can't provide investment advice."}
-        ]
+        ],
+        "usage": {
+            "topicPolicyUnits": 1,
+            "contentPolicyUnits": 1,
+            "sensitiveInformationPolicyUnits": 1,
+            "sensitiveInformationPolicyFreeUnits": 0,
+            "contextualGroundingPolicyUnits": 0
+        }
     }
 
     guardrail.async_handler.post = AsyncMock(
@@ -296,7 +317,7 @@ def test_make_bedrock_api_request_logs_assessment_details(patched_guardrail):
         )
     )
 
-    # Verify logging was called with assessment_details
+    # Verify logging was called with all new fields
     logging_mock.assert_called_once()
     call_kwargs = logging_mock.call_args.kwargs
 
@@ -328,6 +349,33 @@ def test_make_bedrock_api_request_logs_assessment_details(patched_guardrail):
     # Verify PII redaction is applied in assessment details
     pii_entities = assessment["sensitiveInformationPolicy"]["piiEntities"]
     assert pii_entities[0]["match"] == "[REDACTED]"
+
+    # Verify guardrail_coverage is included
+    assert "guardrail_coverage" in call_kwargs
+    coverage = call_kwargs["guardrail_coverage"]
+    assert isinstance(coverage, dict)
+    assert coverage["textCharacters"]["guarded"] == 50
+    assert coverage["textCharacters"]["total"] == 50
+    assert coverage["images"]["guarded"] == 0
+
+    # Verify guardrail_outputs is included
+    assert "guardrail_outputs" in call_kwargs
+    outputs = call_kwargs["guardrail_outputs"]
+    assert isinstance(outputs, list)
+    assert len(outputs) == 1
+    assert outputs[0]["text"] == "I can't provide investment advice."
+
+    # Verify guardrail_usage is included
+    assert "guardrail_usage" in call_kwargs
+    usage = call_kwargs["guardrail_usage"]
+    assert isinstance(usage, dict)
+    assert usage["topicPolicyUnits"] == 1
+    assert usage["contentPolicyUnits"] == 1
+    assert usage["sensitiveInformationPolicyUnits"] == 1
+
+    # Verify action_reason is included
+    assert "action_reason" in call_kwargs
+    assert call_kwargs["action_reason"] == "Content policy violation detected"
 
     # Verify other standard fields are still present
     assert call_kwargs["guardrail_detected"] is True
@@ -363,10 +411,111 @@ def test_make_bedrock_api_request_logs_no_assessment_details_when_none(patched_g
     logging_mock.assert_called_once()
     call_kwargs = logging_mock.call_args.kwargs
 
-    # Check that assessment_details is None when no assessments
+    # Check that all detailed fields are None when no assessments or other details
     assert "assessment_details" in call_kwargs
     assert call_kwargs["assessment_details"] is None
 
+    assert "guardrail_coverage" in call_kwargs
+    assert call_kwargs["guardrail_coverage"] is None
+
+    assert "guardrail_outputs" in call_kwargs
+    assert call_kwargs["guardrail_outputs"][0]["text"] == "This is a safe response."  # outputs should still be present
+
+    assert "guardrail_usage" in call_kwargs
+    assert call_kwargs["guardrail_usage"] is None
+
+    assert "action_reason" in call_kwargs
+    assert call_kwargs["action_reason"] is None
+
     # Verify other standard fields are still present
+    assert call_kwargs["guardrail_detected"] is False
+    assert call_kwargs["guardrail_status"] == "success"
+
+
+def test_make_bedrock_api_request_handles_minimal_response(patched_guardrail):
+    """Test that the code handles minimal Bedrock responses gracefully."""
+    guardrail = patched_guardrail
+    logging_mock = MagicMock()
+    guardrail.add_standard_logging_guardrail_information_to_request_data = logging_mock
+
+    # Minimal response from Bedrock (just action field)
+    response_payload = {
+        "action": "NONE"
+    }
+
+    guardrail.async_handler.post = AsyncMock(
+        return_value=MockResponse(200, response_payload)
+    )
+
+    result = asyncio.run(
+        guardrail.make_bedrock_api_request(
+            source="INPUT",
+            messages=[{"role": "user", "content": "Hello"}],
+            request_data={"metadata": {}},
+        )
+    )
+
+    # Verify logging was called and all detailed fields are None when not present
+    logging_mock.assert_called_once()
+    call_kwargs = logging_mock.call_args.kwargs
+
+    # All detailed fields should be None when not in response
+    assert call_kwargs["assessment_details"] is None
+    assert call_kwargs["guardrail_coverage"] is None
+    assert call_kwargs["guardrail_outputs"] is None
+    assert call_kwargs["guardrail_usage"] is None
+    assert call_kwargs["action_reason"] is None
+
+    # Standard fields should still work
+    assert call_kwargs["guardrail_detected"] is False
+    assert call_kwargs["guardrail_status"] == "success"
+
+    # The response should still be processed correctly
+    assert result.get("action") == "NONE"
+
+
+def test_make_bedrock_api_request_logs_partial_data(patched_guardrail):
+    """Test that the code handles partial Bedrock responses with only some fields present."""
+    guardrail = patched_guardrail
+    logging_mock = MagicMock()
+    guardrail.add_standard_logging_guardrail_information_to_request_data = logging_mock
+
+    # Partial response - only has usage and action, no assessments
+    response_payload = {
+        "action": "NONE",
+        "usage": {
+            "topicPolicyUnits": 2,
+            "contentPolicyUnits": 0
+        }
+    }
+
+    guardrail.async_handler.post = AsyncMock(
+        return_value=MockResponse(200, response_payload)
+    )
+
+    result = asyncio.run(
+        guardrail.make_bedrock_api_request(
+            source="INPUT",
+            messages=[{"role": "user", "content": "Hello world"}],
+            request_data={"metadata": {}},
+        )
+    )
+
+    # Verify logging was called
+    logging_mock.assert_called_once()
+    call_kwargs = logging_mock.call_args.kwargs
+
+    # Some fields should be None, others should have data
+    assert call_kwargs["assessment_details"] is None
+    assert call_kwargs["guardrail_coverage"] is None
+    assert call_kwargs["guardrail_outputs"] is None
+    assert call_kwargs["action_reason"] is None
+
+    # Usage should be present
+    assert call_kwargs["guardrail_usage"] is not None
+    assert call_kwargs["guardrail_usage"]["topicPolicyUnits"] == 2
+    assert call_kwargs["guardrail_usage"]["contentPolicyUnits"] == 0
+
+    # Standard fields should work
     assert call_kwargs["guardrail_detected"] is False
     assert call_kwargs["guardrail_status"] == "success"

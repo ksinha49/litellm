@@ -459,6 +459,10 @@ class BedrockGuardrail(CustomGuardrail, BaseAWSLLM):
                 end_time=end_time.timestamp(),
                 duration=(end_time - start_time).total_seconds(),
                 assessment_details=None,
+                guardrail_coverage=None,
+                guardrail_outputs=None,
+                guardrail_usage=None,
+                action_reason=None,
             )
             raise HTTPException(
                 status_code=500,
@@ -483,13 +487,62 @@ class BedrockGuardrail(CustomGuardrail, BaseAWSLLM):
         )
         guardrail_detected: Optional[bool] = None
 
-        # Extract assessment details for logging before any potential modifications
+        # Extract detailed information for logging before any potential modifications
         assessment_details: Optional[List[dict]] = None
+        guardrail_coverage: Optional[dict] = None
+        guardrail_outputs: Optional[List[dict]] = None
+        guardrail_usage: Optional[dict] = None
+        action_reason: Optional[str] = None
+
         if payload_is_valid and isinstance(response_json, dict):
+            verbose_proxy_logger.debug(
+                "Bedrock API response keys: %s", list(response_json.keys())
+            )
+
+            # Extract assessments
             assessments = response_json.get("assessments")
-            if assessments and isinstance(assessments, list):
+            if assessments and isinstance(assessments, list) and len(assessments) > 0:
+                verbose_proxy_logger.debug(
+                    "Found %d assessments in Bedrock response", len(assessments)
+                )
                 # Apply PII redaction to assessment details for logging
-                assessment_details = _redact_pii_matches({"assessments": assessments}).get("assessments")
+                redacted_response = _redact_pii_matches({"assessments": assessments})
+                assessment_details = redacted_response.get("assessments") if redacted_response else assessments
+            else:
+                verbose_proxy_logger.debug(
+                    "No assessments found in Bedrock response or assessments is empty"
+                )
+
+            # Extract guardrail coverage
+            coverage = response_json.get("guardrailCoverage")
+            if coverage and isinstance(coverage, dict):
+                guardrail_coverage = coverage
+                verbose_proxy_logger.debug(
+                    "Found guardrail coverage: %s", guardrail_coverage
+                )
+
+            # Extract outputs
+            outputs = response_json.get("outputs")
+            if outputs and isinstance(outputs, list):
+                guardrail_outputs = outputs
+                verbose_proxy_logger.debug(
+                    "Found %d outputs in Bedrock response", len(outputs)
+                )
+
+            # Extract usage
+            usage = response_json.get("usage")
+            if usage and isinstance(usage, dict):
+                guardrail_usage = usage
+                verbose_proxy_logger.debug(
+                    "Found usage data: %s", guardrail_usage
+                )
+
+            # Extract action reason
+            action_reason = response_json.get("actionReason")
+            if action_reason:
+                verbose_proxy_logger.debug(
+                    "Found action reason: %s", action_reason
+                )
 
         if payload_is_valid and isinstance(guardrail_json_response, dict):
             guardrail_detected = self._response_indicates_detection(
@@ -504,6 +557,14 @@ class BedrockGuardrail(CustomGuardrail, BaseAWSLLM):
         #########################################################
         # Add guardrail information to request trace
         #########################################################
+        verbose_proxy_logger.debug(
+            "Logging guardrail info - assessment_details: %s, coverage: %s, outputs: %s, usage: %s",
+            "present" if assessment_details else "null",
+            "present" if guardrail_coverage else "null",
+            "present" if guardrail_outputs else "null",
+            "present" if guardrail_usage else "null"
+        )
+
         self.add_standard_logging_guardrail_information_to_request_data(
             guardrail_json_response=guardrail_json_response,
             request_data=request_data or {},
@@ -513,6 +574,10 @@ class BedrockGuardrail(CustomGuardrail, BaseAWSLLM):
             duration=(end_time - start_time).total_seconds(),
             guardrail_detected=guardrail_detected,
             assessment_details=assessment_details,
+            guardrail_coverage=guardrail_coverage,
+            guardrail_outputs=guardrail_outputs,
+            guardrail_usage=guardrail_usage,
+            action_reason=action_reason,
         )
         #########################################################
         if response.status_code == 200:
