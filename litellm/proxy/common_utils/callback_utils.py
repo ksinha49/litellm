@@ -262,10 +262,10 @@ def initialize_callbacks_on_proxy(  # noqa: PLR0915
                         config_file_path=config_file_path,
                     )
                 )
-        if isinstance(litellm.callbacks, list):
-            litellm.callbacks.extend(imported_list)
-        else:
-            litellm.callbacks = imported_list  # type: ignore
+        for callback_obj in imported_list:
+            litellm.logging_callback_manager.add_litellm_callback(  # type: ignore[arg-type]
+                callback_obj
+            )
 
         if "prometheus" in value:
             try:
@@ -276,12 +276,13 @@ def initialize_callbacks_on_proxy(  # noqa: PLR0915
             if PrometheusLogger:
                 PrometheusLogger._mount_metrics_endpoint(premium_user)
     else:
-        litellm.callbacks = [
-            get_instance_fn(
-                value=value,
-                config_file_path=config_file_path,
-            )
-        ]
+        new_callback = get_instance_fn(
+            value=value,
+            config_file_path=config_file_path,
+        )
+        litellm.logging_callback_manager.add_litellm_callback(  # type: ignore[arg-type]
+            new_callback
+        )
     verbose_proxy_logger.debug(
         f"{blue_color_code} Initialized Callbacks - {litellm.callbacks} {reset_color_code}"
     )

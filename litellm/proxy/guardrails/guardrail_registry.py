@@ -4,7 +4,7 @@ import importlib
 import os
 import uuid
 from datetime import datetime, timezone
-from typing import Dict, List, Optional, Type, cast
+from typing import Any, Dict, List, Optional, Type, cast
 
 import litellm
 from litellm._logging import verbose_proxy_logger
@@ -16,6 +16,7 @@ from litellm.types.guardrails import (
     Guardrail,
     GuardrailEventHooks,
     LakeraCategoryThresholds,
+    BaseLitellmParams,
     LitellmParams,
     SupportedGuardrailIntegrations,
 )
@@ -382,29 +383,41 @@ class InMemoryGuardrailHandler:
         """
         guardrail_id = guardrail.get("guardrail_id") or str(uuid.uuid4())
         guardrail["guardrail_id"] = guardrail_id
+
+        raw_litellm_params: Any = guardrail.get("litellm_params", {})
+        verbose_proxy_logger.debug("litellm_params= %s", raw_litellm_params)
+        litellm_params = self._coerce_to_litellm_params(raw_litellm_params)
+
+        if isinstance(raw_litellm_params, dict) and raw_litellm_params.get(
+            "category_thresholds"
+        ):
+            lakera_category_thresholds = LakeraCategoryThresholds(
+                **raw_litellm_params["category_thresholds"]
+            )
+            litellm_params.category_thresholds = lakera_category_thresholds
+
         if guardrail_id in self.IN_MEMORY_GUARDRAILS:
             verbose_proxy_logger.debug(
                 "guardrail_id already exists in IN_MEMORY_GUARDRAILS"
             )
-            return self.IN_MEMORY_GUARDRAILS[guardrail_id]
+            existing_guardrail = self.IN_MEMORY_GUARDRAILS[guardrail_id]
+            existing_guardrail["guardrail_name"] = guardrail.get("guardrail_name", "")
+            existing_guardrail["litellm_params"] = litellm_params
+
+            custom_guardrail_callback = self.guardrail_id_to_custom_guardrail.get(
+                guardrail_id
+            )
+            if (
+                custom_guardrail_callback is not None
+                and isinstance(litellm_params, LitellmParams)
+            ):
+                custom_guardrail_callback.update_in_memory_litellm_params(
+                    litellm_params=litellm_params
+                )
+            self._ensure_callback_registered(custom_guardrail_callback)
+            return existing_guardrail
 
         custom_guardrail_callback: Optional[CustomGuardrail] = None
-        litellm_params_data = guardrail["litellm_params"]
-        verbose_proxy_logger.debug("litellm_params= %s", litellm_params_data)
-
-        if isinstance(litellm_params_data, dict):
-            litellm_params = LitellmParams(**litellm_params_data)
-        else:
-            litellm_params = litellm_params_data
-
-        if (
-            "category_thresholds" in litellm_params_data
-            and litellm_params_data["category_thresholds"]
-        ):
-            lakera_category_thresholds = LakeraCategoryThresholds(
-                **litellm_params_data["category_thresholds"]
-            )
-            litellm_params.category_thresholds = lakera_category_thresholds
 
         if litellm_params.api_key and litellm_params.api_key.startswith("os.environ/"):
             litellm_params.api_key = str(get_secret(litellm_params.api_key))
@@ -508,18 +521,20 @@ class InMemoryGuardrailHandler:
         - updates the guardrail in memory
         - updates the guardrail params in litellm.callback_manager
         """
+        litellm_params = self._coerce_to_litellm_params(
+            guardrail.get("litellm_params", {})
+        )
+        guardrail["litellm_params"] = litellm_params
         self.IN_MEMORY_GUARDRAILS[guardrail_id] = guardrail
 
         custom_guardrail_callback = self.guardrail_id_to_custom_guardrail.get(
             guardrail_id
         )
         if custom_guardrail_callback:
-            updated_litellm_params = cast(
-                LitellmParams, guardrail.get("litellm_params", {})
-            )
             custom_guardrail_callback.update_in_memory_litellm_params(
-                litellm_params=updated_litellm_params
+                litellm_params=litellm_params
             )
+        self._ensure_callback_registered(custom_guardrail_callback)
 
     def delete_in_memory_guardrail(self, guardrail_id: str) -> None:
         """
@@ -538,6 +553,30 @@ class InMemoryGuardrailHandler:
         Get a guardrail by its ID from memory
         """
         return self.IN_MEMORY_GUARDRAILS.get(guardrail_id)
+
+    def _coerce_to_litellm_params(
+        self, litellm_params_data: Any
+    ) -> LitellmParams:
+        if isinstance(litellm_params_data, LitellmParams):
+            return litellm_params_data
+        if isinstance(litellm_params_data, BaseLitellmParams):
+            return LitellmParams(**litellm_params_data.model_dump())
+        if isinstance(litellm_params_data, dict):
+            return LitellmParams(**litellm_params_data)
+        raise ValueError("litellm_params must be a dict or LitellmParams instance")
+
+    def _ensure_callback_registered(
+        self, custom_guardrail_callback: Optional[CustomGuardrail]
+    ) -> None:
+        if custom_guardrail_callback is None:
+            return
+        active_guardrails = litellm.logging_callback_manager.get_custom_loggers_for_type(
+            callback_type=CustomGuardrail
+        )
+        if custom_guardrail_callback not in active_guardrails:
+            litellm.logging_callback_manager.add_litellm_callback(
+                custom_guardrail_callback
+            )
 
 
 ########################################################

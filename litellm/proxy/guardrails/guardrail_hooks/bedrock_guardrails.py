@@ -35,6 +35,7 @@ from litellm.proxy._types import UserAPIKeyAuth
 from litellm.types.guardrails import (
     BedrockGuardrailConfigModel,
     GuardrailEventHooks,
+    LitellmParams,
     resolve_bedrock_region_name,
 )
 from litellm.types.llms.openai import AllMessageValues
@@ -189,7 +190,44 @@ class BedrockGuardrail(CustomGuardrail, BaseAWSLLM):
             self.guardrailIdentifier,
             self.guardrailVersion,
         )
-    
+
+
+    def update_in_memory_litellm_params(self, litellm_params: LitellmParams) -> None:
+        if litellm_params.guardrailIdentifier:
+            self.guardrailIdentifier = litellm_params.guardrailIdentifier
+        if litellm_params.guardrailVersion:
+            self.guardrailVersion = litellm_params.guardrailVersion
+        region_from_params = getattr(litellm_params, "aws_region_name", None)
+        if region_from_params is not None:
+            resolved_region_name = resolve_bedrock_region_name(region_from_params)
+            if resolved_region_name:
+                self.optional_params["aws_region_name"] = resolved_region_name
+        if litellm_params.disable_exception_on_block is not None:
+            self.disable_exception_on_block = bool(
+                litellm_params.disable_exception_on_block
+            )
+
+        optional_param_keys = [
+            "aws_access_key_id",
+            "aws_secret_access_key",
+            "aws_session_token",
+            "aws_session_name",
+            "aws_profile_name",
+            "aws_role_name",
+            "aws_web_identity_token",
+            "aws_sts_endpoint",
+            "aws_bedrock_runtime_endpoint",
+            "mask_request_content",
+            "mask_response_content",
+        ]
+
+        for key in optional_param_keys:
+            value = getattr(litellm_params, key, None)
+            if value is not None:
+                self.optional_params[key] = value
+            else:
+                self.optional_params.pop(key, None)
+
 
     def _create_bedrock_input_content_request(self, messages: Optional[List[AllMessageValues]]) -> BedrockRequest:
         """
