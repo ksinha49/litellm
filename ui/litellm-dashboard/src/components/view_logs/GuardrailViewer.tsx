@@ -36,7 +36,7 @@ interface GuardrailInformation {
   masked_entity_count?: MaskedEntityCount;
   detected?: boolean;
   // New fields from enhanced backend logging
-  assessment_details?: unknown[] | unknown;
+  assessment_details?: any[] | any; // eslint-disable-line @typescript-eslint/no-explicit-any
   guardrail_coverage?: {
     textCharacters?: { guarded: number; total: number };
     images?: { guarded: number; total: number };
@@ -110,6 +110,14 @@ export const GuardrailViewer = React.memo(({ data }: GuardrailViewerProps) => {
   const getScoreColor = useCallback((score: number): string => {
     if (score >= 0.8) return "text-green-600";
     return "text-yellow-600";
+  }, []);
+
+  const formatAssessmentDetails = useCallback((details: any): string => { // eslint-disable-line @typescript-eslint/no-explicit-any
+    try {
+      return JSON.stringify(details, null, 2);
+    } catch (error) {
+      return `Error displaying assessment details: ${error instanceof Error ? error.message : 'Unknown error'}`;
+    }
   }, []);
 
   const toggleSectionExpanded = useCallback(() => {
@@ -279,7 +287,7 @@ export const GuardrailViewer = React.memo(({ data }: GuardrailViewerProps) => {
               <h4 className="font-medium mb-2">Assessment Details</h4>
               <div className="bg-gray-50 p-3 rounded-md">
                 <pre className="text-xs overflow-auto max-h-64 text-gray-800">
-                  {JSON.stringify(data.assessment_details, null, 2)}
+                  {formatAssessmentDetails(data.assessment_details)}
                 </pre>
               </div>
             </div>
