@@ -2303,11 +2303,17 @@ async def list_available_teams(
     return available_teams_correct_type
 
 
-@router.get("/team/{team_id}/guardrails/debug", tags=["team management"])
+@router.get(
+    "/team/{team_id}/guardrails/debug",
+    tags=["team management"],
+    dependencies=[Depends(user_api_key_auth)],
+)
+@management_endpoint_wrapper
 async def debug_team_guardrails(
     team_id: str,
+    http_request: Request,
     user_api_key_dict: UserAPIKeyAuth = Depends(user_api_key_auth),
-):
+) -> Dict[str, Any]:
     """Debug endpoint to inspect guardrail configuration for a team."""
     from litellm.proxy.proxy_server import prisma_client
 
