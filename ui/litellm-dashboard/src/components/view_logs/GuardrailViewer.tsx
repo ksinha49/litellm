@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useMemo, useCallback } from "react";
 
 interface RecognitionMetadata {
   recognizer_name: string;
@@ -35,69 +35,102 @@ interface GuardrailInformation {
   guardrail_response?: GuardrailResponse;
   masked_entity_count?: MaskedEntityCount;
   detected?: boolean;
+  // New fields from enhanced backend logging
+  assessment_details?: any[] | any;
+  guardrail_coverage?: {
+    textCharacters?: { guarded: number; total: number };
+    images?: { guarded: number; total: number };
+  };
+  guardrail_outputs?: { text: string }[];
+  guardrail_usage?: {
+    topicPolicyUnits?: number;
+    contentPolicyUnits?: number;
+    sensitiveInformationPolicyUnits?: number;
+    sensitiveInformationPolicyFreeUnits?: number;
+    contextualGroundingPolicyUnits?: number;
+  };
+  action_reason?: string;
 }
 
 interface GuardrailViewerProps {
   data: GuardrailInformation;
 }
 
-export function GuardrailViewer({ data }: GuardrailViewerProps) {
+export const GuardrailViewer = React.memo(({ data }: GuardrailViewerProps) => {
   const [sectionExpanded, setSectionExpanded] = useState(true);
   const [entityListExpanded, setEntityListExpanded] = useState(true);
   const [expandedEntities, setExpandedEntities] = useState<Record<number, boolean>>({});
 
-  const guardrailResponse = data.guardrail_response;
-  const guardrailEntities = Array.isArray(guardrailResponse)
-    ? (guardrailResponse as GuardrailEntity[])
-    : null;
-  const hasStructuredResponse =
-    guardrailResponse !== null &&
-    typeof guardrailResponse === "object" &&
-    !Array.isArray(guardrailResponse);
-  const detectedStatus = typeof data.detected === "boolean"
-    ? data.detected
-    : guardrailEntities
-      ? guardrailEntities.length > 0
-      : undefined;
+  // Memoize computed values to prevent unnecessary re-renders
+  const guardrailResponse = useMemo(() => data.guardrail_response, [data.guardrail_response]);
+  const guardrailEntities = useMemo(() => {
+    return Array.isArray(guardrailResponse)
+      ? (guardrailResponse as GuardrailEntity[])
+      : null;
+  }, [guardrailResponse]);
+
+  const hasStructuredResponse = useMemo(() => {
+    return guardrailResponse !== null &&
+      typeof guardrailResponse === "object" &&
+      !Array.isArray(guardrailResponse);
+  }, [guardrailResponse]);
+
+  const detectedStatus = useMemo(() => {
+    return typeof data.detected === "boolean"
+      ? data.detected
+      : guardrailEntities
+        ? guardrailEntities.length > 0
+        : undefined;
+  }, [data.detected, guardrailEntities]);
 
   if (!data) {
     return null;
   }
 
   // Calculate total masked entities
-  const totalMaskedEntities = data.masked_entity_count
-    ? Object.values(data.masked_entity_count).reduce((sum, count) => sum + count, 0)
-    : 0;
+  const totalMaskedEntities = useMemo(() => {
+    return data.masked_entity_count
+      ? Object.values(data.masked_entity_count).reduce((sum, count) => sum + count, 0)
+      : 0;
+  }, [data.masked_entity_count]);
 
-  const formatTime = (timestamp: number): string => {
+  const formatTime = useCallback((timestamp: number): string => {
     const date = new Date(timestamp * 1000);
     return date.toLocaleString();
-  };
+  }, []);
 
-  const formatOptionalTime = (timestamp?: number): string => {
+  const formatOptionalTime = useCallback((timestamp?: number): string => {
     if (typeof timestamp !== "number") {
       return "-";
     }
     return formatTime(timestamp);
-  };
+  }, [formatTime]);
 
-  const toggleEntity = (index: number) => {
+  const toggleEntity = useCallback((index: number) => {
     setExpandedEntities(prev => ({
       ...prev,
       [index]: !prev[index]
     }));
-  };
+  }, []);
 
-  const getScoreColor = (score: number): string => {
+  const getScoreColor = useCallback((score: number): string => {
     if (score >= 0.8) return "text-green-600";
     return "text-yellow-600";
-  };
+  }, []);
+
+  const toggleSectionExpanded = useCallback(() => {
+    setSectionExpanded(!sectionExpanded);
+  }, [sectionExpanded]);
+
+  const toggleEntityListExpanded = useCallback(() => {
+    setEntityListExpanded(!entityListExpanded);
+  }, [entityListExpanded]);
 
   return (
     <div className="bg-white rounded-lg shadow mb-6">
-      <div 
+      <div
         className="flex justify-between items-center p-4 border-b cursor-pointer hover:bg-gray-50"
-        onClick={() => setSectionExpanded(!sectionExpanded)}
+        onClick={toggleSectionExpanded}
       >
         <div className="flex items-center">
           <svg 
@@ -178,6 +211,59 @@ export function GuardrailViewer({ data }: GuardrailViewerProps) {
               </div>
             </div>
 
+            {/* Action Reason */}
+            {data.action_reason && (
+              <div className="mt-4 pt-4 border-t">
+                <div className="flex">
+                  <span className="font-medium w-1/4">Action Reason:</span>
+                  <span className="text-orange-600 font-medium">{data.action_reason}</span>
+                </div>
+              </div>
+            )}
+
+            {/* Guardrail Coverage */}
+            {data.guardrail_coverage && (
+              <div className="mt-4 pt-4 border-t">
+                <h4 className="font-medium mb-2">Guardrail Coverage</h4>
+                <div className="grid grid-cols-2 gap-4 text-sm">
+                  {data.guardrail_coverage.textCharacters && (
+                    <div className="bg-gray-50 p-2 rounded">
+                      <span className="font-medium">Text Characters:</span>
+                      <div className="text-xs text-gray-600">
+                        Guarded: {data.guardrail_coverage.textCharacters.guarded} /
+                        Total: {data.guardrail_coverage.textCharacters.total}
+                      </div>
+                    </div>
+                  )}
+                  {data.guardrail_coverage.images && (
+                    <div className="bg-gray-50 p-2 rounded">
+                      <span className="font-medium">Images:</span>
+                      <div className="text-xs text-gray-600">
+                        Guarded: {data.guardrail_coverage.images.guarded} /
+                        Total: {data.guardrail_coverage.images.total}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Guardrail Usage */}
+            {data.guardrail_usage && (
+              <div className="mt-4 pt-4 border-t">
+                <h4 className="font-medium mb-2">Usage Statistics</h4>
+                <div className="flex flex-wrap gap-2">
+                  {Object.entries(data.guardrail_usage).map(([key, value]) => (
+                    value !== undefined && value !== null && (
+                      <span key={key} className="px-2 py-1 bg-green-50 text-green-700 rounded-md text-xs font-medium">
+                        {key.replace(/([A-Z])/g, ' $1').toLowerCase()}: {value}
+                      </span>
+                    )
+                  ))}
+                </div>
+              </div>
+            )}
+
             {/* Masked Entity Summary */}
             {data.masked_entity_count && Object.keys(data.masked_entity_count).length > 0 && (
               <div className="mt-4 pt-4 border-t">
@@ -193,12 +279,40 @@ export function GuardrailViewer({ data }: GuardrailViewerProps) {
             )}
           </div>
 
+          {/* Assessment Details Section */}
+          {data.assessment_details && Array.isArray(data.assessment_details) && data.assessment_details.length > 0 && (
+            <div className="mt-4">
+              <h4 className="font-medium mb-2">Assessment Details</h4>
+              <div className="bg-gray-50 p-3 rounded-md">
+                <pre className="text-xs overflow-auto max-h-64 text-gray-800">
+                  {JSON.stringify(data.assessment_details, null, 2)}
+                </pre>
+              </div>
+            </div>
+          )}
+
+          {/* Guardrail Outputs Section */}
+          {data.guardrail_outputs && Array.isArray(data.guardrail_outputs) && data.guardrail_outputs.length > 0 && (
+            <div className="mt-4">
+              <h4 className="font-medium mb-2">Guardrail Outputs</h4>
+              <div className="space-y-2">
+                {data.guardrail_outputs.map((output, index) => (
+                  <div key={index} className="bg-gray-50 p-3 rounded-md">
+                    <pre className="text-sm whitespace-pre-wrap text-gray-800">
+                      {output.text}
+                    </pre>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* Detected Entities Section */}
           {guardrailEntities && guardrailEntities.length > 0 && (
             <div className="mt-4">
               <div
                 className="flex items-center mb-2 cursor-pointer"
-                onClick={() => setEntityListExpanded(!entityListExpanded)}
+                onClick={toggleEntityListExpanded}
               >
                 <svg 
                   className={`w-5 h-5 mr-2 transition-transform ${entityListExpanded ? 'transform rotate-90' : ''}`}
@@ -315,4 +429,4 @@ export function GuardrailViewer({ data }: GuardrailViewerProps) {
       )}
     </div>
   );
-}
+});

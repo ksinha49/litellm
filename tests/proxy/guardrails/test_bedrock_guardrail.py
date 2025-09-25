@@ -432,6 +432,75 @@ def test_make_bedrock_api_request_logs_no_assessment_details_when_none(patched_g
     assert call_kwargs["guardrail_status"] == "success"
 
 
+def test_make_bedrock_api_request_no_decorator_interference(patched_guardrail):
+    """Test that removing the decorator allows proper logging of assessment details."""
+    guardrail = patched_guardrail
+    logging_mock = MagicMock()
+
+    # Directly mock the logging method to capture calls
+    original_logging_method = guardrail.add_standard_logging_guardrail_information_to_request_data
+    guardrail.add_standard_logging_guardrail_information_to_request_data = logging_mock
+
+    response_payload = {
+        "action": "GUARDRAIL_INTERVENED",
+        "actionReason": "Content policy violation detected",
+        "assessments": [
+            {
+                "contentPolicy": {
+                    "filters": [
+                        {
+                            "type": "HATE",
+                            "action": "BLOCKED",
+                            "confidence": "HIGH"
+                        }
+                    ]
+                }
+            }
+        ],
+        "guardrailCoverage": {
+            "textCharacters": {
+                "guarded": 25,
+                "total": 25
+            }
+        },
+        "usage": {
+            "contentPolicyUnits": 1
+        }
+    }
+
+    guardrail.async_handler.post = AsyncMock(
+        return_value=MockResponse(200, response_payload)
+    )
+
+    result = asyncio.run(
+        guardrail.make_bedrock_api_request(
+            source="INPUT",
+            messages=[{"role": "user", "content": "Test message"}],
+            request_data={"metadata": {}},
+        )
+    )
+
+    # Verify logging was called with assessment_details populated (not null)
+    logging_mock.assert_called_once()
+    call_kwargs = logging_mock.call_args.kwargs
+
+    # These should NOT be null when there are assessments
+    assert call_kwargs["assessment_details"] is not None
+    assert isinstance(call_kwargs["assessment_details"], list)
+    assert len(call_kwargs["assessment_details"]) == 1
+
+    assert call_kwargs["guardrail_coverage"] is not None
+    assert call_kwargs["guardrail_coverage"]["textCharacters"]["guarded"] == 25
+
+    assert call_kwargs["guardrail_usage"] is not None
+    assert call_kwargs["guardrail_usage"]["contentPolicyUnits"] == 1
+
+    assert call_kwargs["action_reason"] == "Content policy violation detected"
+
+    assert call_kwargs["guardrail_status"] == "success"
+    assert call_kwargs["guardrail_detected"] is True
+
+
 def test_make_bedrock_api_request_handles_minimal_response(patched_guardrail):
     """Test that the code handles minimal Bedrock responses gracefully."""
     guardrail = patched_guardrail

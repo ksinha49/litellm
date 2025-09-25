@@ -861,8 +861,12 @@ export function RequestViewer({ row, accessToken, formattedStartTime }: RequestV
     metadata.vector_store_request_metadata.length > 0
 
   // Extract guardrail information from metadata if available
-  const guardrailInfo = metadata?.guardrail_information
-  const hasGuardrailData = Boolean(guardrailInfo)
+  // Check both possible field names for backward compatibility
+  const guardrailInfo = useMemo(() =>
+    metadata?.standard_logging_guardrail_information || metadata?.guardrail_information,
+    [metadata?.standard_logging_guardrail_information, metadata?.guardrail_information]
+  )
+  const hasGuardrailData = useMemo(() => Boolean(guardrailInfo), [guardrailInfo])
 
   // Calculate total masked entities if guardrail data exists
   const getTotalMaskedEntities = (): number => {

@@ -850,7 +850,6 @@ class BedrockGuardrail(CustomGuardrail, BaseAWSLLM):
 
         return False
 
-    @log_guardrail_information
     async def async_pre_call_hook(
         self,
         user_api_key_dict: UserAPIKeyAuth,
@@ -883,14 +882,40 @@ class BedrockGuardrail(CustomGuardrail, BaseAWSLLM):
             verbose_proxy_logger.warning(
                 "Bedrock AI: not running guardrail. No messages in data"
             )
+            # Log empty guardrail information when no messages
+            self.add_standard_logging_guardrail_information_to_request_data(
+                guardrail_json_response={"error": "No messages in data"},
+                request_data=data,
+                guardrail_status="failure",
+                assessment_details=None,
+                guardrail_coverage=None,
+                guardrail_outputs=None,
+                guardrail_usage=None,
+                action_reason=None,
+            )
             return data
 
         #########################################################
         ########## 1. Make the Bedrock API request ##########
         #########################################################
-        bedrock_guardrail_response = await self.make_bedrock_api_request(
-            source="INPUT", messages=new_messages, request_data=data
-        )
+        try:
+            bedrock_guardrail_response = await self.make_bedrock_api_request(
+                source="INPUT", messages=new_messages, request_data=data
+            )
+        except Exception as e:
+            verbose_proxy_logger.error("Bedrock API request failed in pre_call: %s", str(e))
+            # Log error information when Bedrock API fails
+            self.add_standard_logging_guardrail_information_to_request_data(
+                guardrail_json_response={"error": str(e)},
+                request_data=data,
+                guardrail_status="failure",
+                assessment_details=None,
+                guardrail_coverage=None,
+                guardrail_outputs=None,
+                guardrail_usage=None,
+                action_reason=None,
+            )
+            raise e
         #########################################################
 
         #########################################################
@@ -938,14 +963,40 @@ class BedrockGuardrail(CustomGuardrail, BaseAWSLLM):
             verbose_proxy_logger.warning(
                 "Bedrock AI: not running guardrail. No messages in data"
             )
+            # Log empty guardrail information when no messages
+            self.add_standard_logging_guardrail_information_to_request_data(
+                guardrail_json_response={"error": "No messages in data"},
+                request_data=data,
+                guardrail_status="failure",
+                assessment_details=None,
+                guardrail_coverage=None,
+                guardrail_outputs=None,
+                guardrail_usage=None,
+                action_reason=None,
+            )
             return
 
         #########################################################
         ########## 1. Make the Bedrock API request ##########
         #########################################################
-        bedrock_guardrail_response = await self.make_bedrock_api_request(
-            source="INPUT", messages=new_messages, request_data=data
-        )
+        try:
+            bedrock_guardrail_response = await self.make_bedrock_api_request(
+                source="INPUT", messages=new_messages, request_data=data
+            )
+        except Exception as e:
+            verbose_proxy_logger.error("Bedrock API request failed in during_call: %s", str(e))
+            # Log error information when Bedrock API fails
+            self.add_standard_logging_guardrail_information_to_request_data(
+                guardrail_json_response={"error": str(e)},
+                request_data=data,
+                guardrail_status="failure",
+                assessment_details=None,
+                guardrail_coverage=None,
+                guardrail_outputs=None,
+                guardrail_usage=None,
+                action_reason=None,
+            )
+            raise e
         #########################################################
 
         #########################################################
@@ -991,16 +1042,42 @@ class BedrockGuardrail(CustomGuardrail, BaseAWSLLM):
             verbose_proxy_logger.warning(
                 "Bedrock AI: not running guardrail. No messages in data"
             )
+            # Log empty guardrail information when no messages
+            self.add_standard_logging_guardrail_information_to_request_data(
+                guardrail_json_response={"error": "No messages in data"},
+                request_data=data,
+                guardrail_status="failure",
+                assessment_details=None,
+                guardrail_coverage=None,
+                guardrail_outputs=None,
+                guardrail_usage=None,
+                action_reason=None,
+            )
             return
 
         #########################################################
         ########## 1. Make parallel Bedrock API requests ##########
         #########################################################
-        output_content_bedrock = await self.make_bedrock_api_request(
-            source="OUTPUT", 
-            response=response,
-            request_data=data
-        )  # Only response
+        try:
+            output_content_bedrock = await self.make_bedrock_api_request(
+                source="OUTPUT",
+                response=response,
+                request_data=data
+            )  # Only response
+        except Exception as e:
+            verbose_proxy_logger.error("Bedrock API request failed in post_call: %s", str(e))
+            # Log error information when Bedrock API fails
+            self.add_standard_logging_guardrail_information_to_request_data(
+                guardrail_json_response={"error": str(e)},
+                request_data=data,
+                guardrail_status="failure",
+                assessment_details=None,
+                guardrail_coverage=None,
+                guardrail_outputs=None,
+                guardrail_usage=None,
+                action_reason=None,
+            )
+            raise e
 
         #########################################################
         ########## 2. Apply masking to response with output guardrail response ##########
