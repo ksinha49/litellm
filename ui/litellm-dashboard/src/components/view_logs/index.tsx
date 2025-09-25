@@ -793,7 +793,7 @@ export function RequestViewer({ row, accessToken, formattedStartTime }: RequestV
   })
 
   const logData = useMemo<LogEntry>(() => {
-    const overrides = prefetchedDetails ?? {}
+    const overrides: Partial<PrefetchedLog> = prefetchedDetails ?? {}
 
     return {
       ...row.original,
