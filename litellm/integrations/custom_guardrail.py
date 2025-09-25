@@ -387,11 +387,17 @@ class CustomGuardrail(CustomLogger):
         if "metadata" in request_data:
             if request_data["metadata"] is None:
                 request_data["metadata"] = {}
-            request_data["metadata"]["standard_logging_guardrail_information"] = slg
+            request_data["metadata"][
+                "standard_logging_guardrail_information"
+            ] = slg
+            request_data["metadata"]["guardrail_information"] = slg
         elif "litellm_metadata" in request_data:
+            if request_data["litellm_metadata"] is None:
+                request_data["litellm_metadata"] = {}
             request_data["litellm_metadata"][
                 "standard_logging_guardrail_information"
             ] = slg
+            request_data["litellm_metadata"]["guardrail_information"] = slg
         else:
             verbose_logger.warning(
                 "unable to log guardrail information. No metadata found in request_data"

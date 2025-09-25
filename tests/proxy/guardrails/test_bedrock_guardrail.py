@@ -127,7 +127,10 @@ def test_bedrock_guardrail_metadata_disabled_does_not_raise(monkeypatch):
 
 def test_make_bedrock_api_request_raises_forbidden(patched_guardrail):
     guardrail = patched_guardrail
-    logging_mock = MagicMock()
+    original_logging_method = (
+        guardrail.add_standard_logging_guardrail_information_to_request_data
+    )
+    logging_mock = MagicMock(side_effect=original_logging_method)
     guardrail.add_standard_logging_guardrail_information_to_request_data = logging_mock
 
     response_payload = {"message": "Access denied"}
@@ -150,7 +153,10 @@ def test_make_bedrock_api_request_raises_forbidden(patched_guardrail):
 
 def test_make_bedrock_api_request_raises_server_error(patched_guardrail):
     guardrail = patched_guardrail
-    logging_mock = MagicMock()
+    original_logging_method = (
+        guardrail.add_standard_logging_guardrail_information_to_request_data
+    )
+    logging_mock = MagicMock(side_effect=original_logging_method)
     guardrail.add_standard_logging_guardrail_information_to_request_data = logging_mock
 
     response_payload = {"message": "Internal error"}
@@ -174,7 +180,10 @@ def test_make_bedrock_api_request_raises_server_error(patched_guardrail):
 
 def test_make_bedrock_api_request_raises_on_json_decode_failure(patched_guardrail):
     guardrail = patched_guardrail
-    logging_mock = MagicMock()
+    original_logging_method = (
+        guardrail.add_standard_logging_guardrail_information_to_request_data
+    )
+    logging_mock = MagicMock(side_effect=original_logging_method)
     guardrail.add_standard_logging_guardrail_information_to_request_data = logging_mock
 
     json_error = json.JSONDecodeError("Expecting value", "", 0)
@@ -204,7 +213,10 @@ def test_make_bedrock_api_request_raises_on_json_decode_failure(patched_guardrai
 
 def test_make_bedrock_api_request_logs_detection(patched_guardrail):
     guardrail = patched_guardrail
-    logging_mock = MagicMock()
+    original_logging_method = (
+        guardrail.add_standard_logging_guardrail_information_to_request_data
+    )
+    logging_mock = MagicMock(side_effect=original_logging_method)
     guardrail.add_standard_logging_guardrail_information_to_request_data = logging_mock
 
     response_payload = {
@@ -224,11 +236,12 @@ def test_make_bedrock_api_request_logs_detection(patched_guardrail):
         return_value=MockResponse(200, response_payload)
     )
 
+    request_payload = {"metadata": {}}
     result = asyncio.run(
         guardrail.make_bedrock_api_request(
             source="INPUT",
             messages=[{"role": "user", "content": "hello"}],
-            request_data={"metadata": {}},
+            request_data=request_payload,
         )
     )
 
@@ -238,3 +251,7 @@ def test_make_bedrock_api_request_logs_detection(patched_guardrail):
     assert isinstance(logged_response, dict)
     assert logged_response.get("detected") is True
     assert result.get("detected") is True
+    guardrail_information = request_payload["metadata"]["guardrail_information"]
+    assert guardrail_information["guardrail_response"]["assessments"][0][
+        "sensitiveInformationPolicy"
+    ]["piiEntities"][0]["match"] == "[REDACTED]"
