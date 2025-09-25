@@ -193,15 +193,15 @@ class BedrockGuardrail(CustomGuardrail, BaseAWSLLM):
 
 
     def update_in_memory_litellm_params(self, litellm_params: LitellmParams) -> None:
-        resolved_region_name = resolve_bedrock_region_name(
-            getattr(litellm_params, "aws_region_name", None)
-        )
         if litellm_params.guardrailIdentifier:
             self.guardrailIdentifier = litellm_params.guardrailIdentifier
         if litellm_params.guardrailVersion:
             self.guardrailVersion = litellm_params.guardrailVersion
-        if resolved_region_name:
-            self.optional_params["aws_region_name"] = resolved_region_name
+        region_from_params = getattr(litellm_params, "aws_region_name", None)
+        if region_from_params is not None:
+            resolved_region_name = resolve_bedrock_region_name(region_from_params)
+            if resolved_region_name:
+                self.optional_params["aws_region_name"] = resolved_region_name
         if litellm_params.disable_exception_on_block is not None:
             self.disable_exception_on_block = bool(
                 litellm_params.disable_exception_on_block
