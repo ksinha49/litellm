@@ -221,8 +221,19 @@ class BedrockGuardrail(CustomGuardrail, BaseAWSLLM):
             "mask_response_content",
         ]
 
+        mask_keys = ("mask_request_content", "mask_response_content")
+
         for key in optional_param_keys:
             value = getattr(litellm_params, key, None)
+            if key in mask_keys:
+                if value is not None:
+                    bool_value = bool(value)
+                    setattr(self, key, bool_value)
+                    self.optional_params[key] = bool_value
+                else:
+                    self.optional_params.pop(key, None)
+                continue
+
             if value is not None:
                 self.optional_params[key] = value
             else:
