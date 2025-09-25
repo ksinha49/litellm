@@ -10,6 +10,60 @@ blue_color_code = "\033[94m"
 reset_color_code = "\033[0m"
 
 
+def _remove_existing_callback_registration(callback_obj: Any) -> None:
+    """Ensure re-initialized callbacks replace previous registrations."""
+
+    callback_lists = [
+        getattr(litellm, "callbacks", None),
+        getattr(litellm, "success_callback", None),
+        getattr(litellm, "failure_callback", None),
+        getattr(litellm, "_async_success_callback", None),
+        getattr(litellm, "_async_failure_callback", None),
+    ]
+
+    candidate_names: set[str]
+
+    def _collect_names(obj: Any) -> set[str]:
+        names: set[str] = set()
+        if isinstance(obj, str):
+            names.add(obj)
+            return names
+        for attr in ("guardrail_name", "callback_name"):
+            value = getattr(obj, attr, None)
+            if isinstance(value, str):
+                names.add(value)
+        return names
+
+    if isinstance(callback_obj, str):
+        candidate_names = {callback_obj}
+
+        def _matches(existing: Any) -> bool:
+            return isinstance(existing, str) and existing == callback_obj
+
+    else:
+        candidate_names = _collect_names(callback_obj)
+        candidate_type = type(callback_obj)
+
+        def _matches(existing: Any) -> bool:
+            existing_names = _collect_names(existing)
+            if candidate_names and existing_names.intersection(candidate_names):
+                return True
+            return type(existing) is candidate_type
+
+    for callback_list in callback_lists:
+        if not isinstance(callback_list, list):
+            continue
+        removed = False
+        for idx in range(len(callback_list) - 1, -1, -1):
+            if _matches(callback_list[idx]):
+                del callback_list[idx]
+                removed = True
+        if removed:
+            verbose_proxy_logger.debug(
+                f"{blue_color_code}Replacing existing callback registrations for {candidate_names or type(callback_obj).__name__}{reset_color_code}"
+            )
+
+
 def initialize_callbacks_on_proxy(  # noqa: PLR0915
     value: Any,
     premium_user: bool,
@@ -263,6 +317,7 @@ def initialize_callbacks_on_proxy(  # noqa: PLR0915
                     )
                 )
         for callback_obj in imported_list:
+            _remove_existing_callback_registration(callback_obj)
             litellm.logging_callback_manager.add_litellm_callback(  # type: ignore[arg-type]
                 callback_obj
             )
@@ -280,6 +335,7 @@ def initialize_callbacks_on_proxy(  # noqa: PLR0915
             value=value,
             config_file_path=config_file_path,
         )
+        _remove_existing_callback_registration(new_callback)
         litellm.logging_callback_manager.add_litellm_callback(  # type: ignore[arg-type]
             new_callback
         )
