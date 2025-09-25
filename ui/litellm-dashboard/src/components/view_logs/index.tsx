@@ -1,13 +1,20 @@
 import moment from "moment"
 import { useQuery } from "@tanstack/react-query"
-import { useState, useRef, useEffect, useCallback } from "react"
+import { useState, useRef, useEffect, useCallback, useMemo } from "react"
 import { useQueryClient } from "@tanstack/react-query"
 
-import { uiSpendLogsCall, keyInfoV1Call, sessionSpendLogsCall, keyListCall, allEndUsersCall } from "../networking"
+import {
+  uiSpendLogsCall,
+  keyInfoV1Call,
+  sessionSpendLogsCall,
+  keyListCall,
+  allEndUsersCall,
+  uiSpendLogDetailsCall,
+} from "../networking"
 import { DataTable } from "./table"
 import { columns, LogEntry } from "./columns"
 import { Row } from "@tanstack/react-table"
-import { prefetchLogDetails } from "./prefetch"
+import { prefetchLogDetails, PrefetchedLog } from "./prefetch"
 import { RequestResponsePanel } from "./RequestResponsePanel"
 import { ErrorViewer } from "./ErrorViewer"
 import { internalUserRoles } from "../../utils/roles"
@@ -42,11 +49,6 @@ export interface PaginatedResponse {
   page: number
   page_size: number
   total_pages: number
-}
-
-interface PrefetchedLog {
-  messages: any[]
-  response: any
 }
 
 export default function SpendLogsTable({
@@ -102,6 +104,11 @@ export default function SpendLogsTable({
     value: 24,
     unit: "hours",
   })
+
+  const formattedStartTime = useMemo(
+    () => moment(startTime).utc().format("YYYY-MM-DD HH:mm:ss"),
+    [startTime],
+  )
 
   useEffect(() => {
     const fetchKeyInfo = async () => {
@@ -177,7 +184,6 @@ export default function SpendLogsTable({
         }
       }
 
-      const formattedStartTime = moment(startTime).utc().format("YYYY-MM-DD HH:mm:ss")
       const formattedEndTime = isCustomDate
         ? moment(endTime).utc().format("YYYY-MM-DD HH:mm:ss")
         : moment().utc().format("YYYY-MM-DD HH:mm:ss")
@@ -208,11 +214,21 @@ export default function SpendLogsTable({
           formattedStartTime,
         ])
 
-        if (prefetchedData?.messages && prefetchedData?.response) {
-          log.messages = prefetchedData.messages
-          log.response = prefetchedData.response
-          return log
+        if (prefetchedData) {
+          if (prefetchedData.messages !== undefined) {
+            log.messages = prefetchedData.messages
+          }
+          if (prefetchedData.response !== undefined) {
+            log.response = prefetchedData.response
+          }
+          if (prefetchedData.metadata !== undefined) {
+            log.metadata = prefetchedData.metadata
+          }
+          if (prefetchedData.proxy_server_request !== undefined) {
+            log.proxy_server_request = prefetchedData.proxy_server_request
+          }
         }
+
         return log
       })
 
@@ -506,7 +522,13 @@ export default function SpendLogsTable({
                 <DataTable
                   columns={columns}
                   data={sessionData}
-                  renderSubComponent={RequestViewer}
+                  renderSubComponent={({ row }) => (
+                    <RequestViewer
+                      row={row}
+                      accessToken={accessToken as string}
+                      formattedStartTime={formattedStartTime}
+                    />
+                  )}
                   getRowCanExpand={() => true}
                   // Optionally: add session-specific row expansion state
                 />
@@ -702,7 +724,13 @@ export default function SpendLogsTable({
                   <DataTable
                     columns={columns}
                     data={filteredData}
-                    renderSubComponent={RequestViewer}
+                    renderSubComponent={({ row }) => (
+                      <RequestViewer
+                        row={row}
+                        accessToken={accessToken as string}
+                        formattedStartTime={formattedStartTime}
+                      />
+                    )}
                     getRowCanExpand={() => true}
                   />
                 </div>
@@ -726,7 +754,13 @@ export default function SpendLogsTable({
   )
 }
 
-export function RequestViewer({ row }: { row: Row<LogEntry> }) {
+interface RequestViewerProps {
+  row: Row<LogEntry>
+  accessToken: string
+  formattedStartTime: string
+}
+
+export function RequestViewer({ row, accessToken, formattedStartTime }: RequestViewerProps) {
   // Helper function to clean metadata by removing specific fields
   const formatData = (input: any) => {
     if (typeof input === "string") {
@@ -739,28 +773,68 @@ export function RequestViewer({ row }: { row: Row<LogEntry> }) {
     return input
   }
 
+  const queryClient = useQueryClient()
+
+  const { data: prefetchedDetails } = useQuery<PrefetchedLog | null>({
+    queryKey: ["logDetails", row.original.request_id, formattedStartTime],
+    queryFn: async () =>
+      (await uiSpendLogDetailsCall(accessToken, row.original.request_id, formattedStartTime)) as PrefetchedLog,
+    enabled: Boolean(accessToken && row.original.request_id && formattedStartTime),
+    initialData: () =>
+      queryClient.getQueryData<PrefetchedLog>([
+        "logDetails",
+        row.original.request_id,
+        formattedStartTime,
+      ]) || null,
+    staleTime: 10 * 60 * 1000,
+    gcTime: 10 * 60 * 1000,
+  })
+
+  const logData = useMemo<LogEntry>(() => {
+    const overrides = prefetchedDetails ?? {}
+
+    return {
+      ...row.original,
+      ...overrides,
+      messages:
+        overrides.messages !== undefined ? overrides.messages : row.original.messages,
+      response:
+        overrides.response !== undefined ? overrides.response : row.original.response,
+      metadata:
+        overrides.metadata !== undefined ? overrides.metadata : row.original.metadata,
+      proxy_server_request:
+        overrides.proxy_server_request !== undefined
+          ? overrides.proxy_server_request
+          : row.original.proxy_server_request,
+    } as LogEntry
+  }, [prefetchedDetails, row.original])
+
   // New helper function to get raw request
   const getRawRequest = () => {
     // First check if proxy_server_request exists in metadata
-    if (row.original?.proxy_server_request) {
-      return formatData(row.original.proxy_server_request)
+    if (logData?.proxy_server_request) {
+      return formatData(logData.proxy_server_request)
     }
     // Fall back to messages if proxy_server_request is empty
-    return formatData(row.original.messages)
+    return formatData(logData.messages)
   }
 
   // Extract error information from metadata if available
-  const metadata = row.original.metadata || {}
-  const hasError = metadata.status === "failure"
+  const metadata = logData.metadata || {}
+  const resolvedStatus =
+    (metadata?.status ?? logData.status ?? row.original?.status ?? null) as string | null
+  const normalizedStatus =
+    typeof resolvedStatus === "string" ? resolvedStatus.toLowerCase() : undefined
+  const hasError = normalizedStatus === "failure"
   const errorInfo = hasError ? metadata.error_information : null
 
   // Check if request/response data is missing
   const hasMessages =
-    row.original.messages &&
-    (Array.isArray(row.original.messages)
-      ? row.original.messages.length > 0
-      : Object.keys(row.original.messages).length > 0)
-  const hasResponse = row.original.response && Object.keys(formatData(row.original.response)).length > 0
+    logData.messages &&
+    (Array.isArray(logData.messages)
+      ? logData.messages.length > 0
+      : Object.keys(logData.messages).length > 0)
+  const hasResponse = logData.response && Object.keys(formatData(logData.response)).length > 0
   const missingData = !hasMessages && !hasResponse
 
   // Format the response with error details if present
@@ -775,7 +849,7 @@ export function RequestViewer({ row }: { row: Row<LogEntry> }) {
         },
       }
     }
-    return formatData(row.original.response)
+    return formatData(logData.response)
   }
 
   // Extract vector store request metadata if available
@@ -785,14 +859,15 @@ export function RequestViewer({ row }: { row: Row<LogEntry> }) {
     metadata.vector_store_request_metadata.length > 0
 
   // Extract guardrail information from metadata if available
-  const hasGuardrailData = row.original.metadata && row.original.metadata.guardrail_information
+  const guardrailInfo = metadata?.guardrail_information
+  const hasGuardrailData = Boolean(guardrailInfo)
 
   // Calculate total masked entities if guardrail data exists
   const getTotalMaskedEntities = (): number => {
-    if (!hasGuardrailData || !row.original.metadata?.guardrail_information.masked_entity_count) {
+    if (!hasGuardrailData || !guardrailInfo?.masked_entity_count) {
       return 0
     }
-    return Object.values(row.original.metadata.guardrail_information.masked_entity_count).reduce(
+    return Object.values(guardrailInfo.masked_entity_count).reduce(
       (sum: number, count: any) => sum + (typeof count === "number" ? count : 0),
       0,
     )
@@ -811,41 +886,41 @@ export function RequestViewer({ row }: { row: Row<LogEntry> }) {
           <div className="space-y-2">
             <div className="flex">
               <span className="font-medium w-1/3">Request ID:</span>
-              <span className="font-mono text-sm">{row.original.request_id}</span>
+              <span className="font-mono text-sm">{logData.request_id}</span>
             </div>
             <div className="flex">
               <span className="font-medium w-1/3">Model:</span>
-              <span>{row.original.model}</span>
+              <span>{logData.model}</span>
             </div>
             <div className="flex">
               <span className="font-medium w-1/3">Model ID:</span>
-              <span>{row.original.model_id}</span>
+              <span>{logData.model_id}</span>
             </div>
             <div className="flex">
               <span className="font-medium w-1/3">Call Type:</span>
-              <span>{row.original.call_type}</span>
+              <span>{logData.call_type}</span>
             </div>
             <div className="flex">
               <span className="font-medium w-1/3">Provider:</span>
-              <span>{row.original.custom_llm_provider || "-"}</span>
+              <span>{logData.custom_llm_provider || "-"}</span>
             </div>
             <div className="flex">
               <span className="font-medium w-1/3">API Base:</span>
-              <Tooltip title={row.original.api_base || "-"}>
-                <span className="max-w-[15ch] truncate block">{row.original.api_base || "-"}</span>
+              <Tooltip title={logData.api_base || "-"}>
+                <span className="max-w-[15ch] truncate block">{logData.api_base || "-"}</span>
               </Tooltip>
             </div>
-            {row?.original?.requester_ip_address && (
+            {logData?.requester_ip_address && (
               <div className="flex">
                 <span className="font-medium w-1/3">IP Address:</span>
-                <span>{row?.original?.requester_ip_address}</span>
+                <span>{logData.requester_ip_address}</span>
               </div>
             )}
             {hasGuardrailData && (
               <div className="flex">
                 <span className="font-medium w-1/3">Guardrail:</span>
                 <div>
-                  <span className="font-mono">{row.original.metadata!.guardrail_information.guardrail_name}</span>
+                  <span className="font-mono">{guardrailInfo?.guardrail_name}</span>
                   {totalMaskedEntities > 0 && (
                     <span className="ml-2 px-2 py-0.5 bg-blue-50 text-blue-700 rounded-md text-xs font-medium">
                       {totalMaskedEntities} masked
@@ -859,54 +934,58 @@ export function RequestViewer({ row }: { row: Row<LogEntry> }) {
             <div className="flex">
               <span className="font-medium w-1/3">Tokens:</span>
               <span>
-                {row.original.total_tokens} ({row.original.prompt_tokens} prompt tokens +{" "}
-                {row.original.completion_tokens} completion tokens)
+                {logData.total_tokens} ({logData.prompt_tokens} prompt tokens +{" "}
+                {logData.completion_tokens} completion tokens)
               </span>
             </div>
             <div className="flex">
               <span className="font-medium w-1/3">Cache Read Tokens:</span>
               <span>
-                {formatNumberWithCommas(row.original.metadata?.additional_usage_values?.cache_read_input_tokens || 0)}
+                {formatNumberWithCommas(metadata?.additional_usage_values?.cache_read_input_tokens || 0)}
               </span>
             </div>
             <div className="flex">
               <span className="font-medium w-1/3">Cache Creation Tokens:</span>
               <span>
-                {formatNumberWithCommas(row.original.metadata?.additional_usage_values.cache_creation_input_tokens)}
+                {formatNumberWithCommas(
+                  metadata?.additional_usage_values?.cache_creation_input_tokens || 0,
+                )}
               </span>
             </div>
             <div className="flex">
               <span className="font-medium w-1/3">Cost:</span>
-              <span>${formatNumberWithCommas(row.original.spend || 0, 6)}</span>
+              <span>${formatNumberWithCommas(logData.spend || 0, 6)}</span>
             </div>
             <div className="flex">
               <span className="font-medium w-1/3">Cache Hit:</span>
-              <span>{row.original.cache_hit}</span>
+              <span>{logData.cache_hit}</span>
             </div>
 
             <div className="flex">
               <span className="font-medium w-1/3">Status:</span>
               <span
                 className={`px-2 py-1 rounded-md text-xs font-medium inline-block text-center w-16 ${
-                  (row.original.metadata?.status || "Success").toLowerCase() !== "failure"
-                    ? "bg-green-100 text-green-800"
-                    : "bg-red-100 text-red-800"
+                  normalizedStatus === "failure"
+                    ? "bg-red-100 text-red-800"
+                    : "bg-green-100 text-green-800"
                 }`}
               >
-                {(row.original.metadata?.status || "Success").toLowerCase() !== "failure" ? "Success" : "Failure"}
+                {normalizedStatus
+                  ? `${normalizedStatus.charAt(0).toUpperCase()}${normalizedStatus.slice(1)}`
+                  : "Success"}
               </span>
             </div>
             <div className="flex">
               <span className="font-medium w-1/3">Start Time:</span>
-              <span>{row.original.startTime}</span>
+              <span>{logData.startTime}</span>
             </div>
             <div className="flex">
               <span className="font-medium w-1/3">End Time:</span>
-              <span>{row.original.endTime}</span>
+              <span>{logData.endTime}</span>
             </div>
             <div className="flex">
               <span className="font-medium w-1/3">Duration:</span>
-              <span>{row.original.duration} s.</span>
+              <span>{logData.duration} s.</span>
             </div>
           </div>
         </div>
@@ -917,7 +996,7 @@ export function RequestViewer({ row }: { row: Row<LogEntry> }) {
 
       {/* Request/Response Panel */}
       <RequestResponsePanel
-        row={row}
+        row={{ original: logData }}
         hasMessages={hasMessages}
         hasResponse={hasResponse}
         hasError={hasError}
@@ -927,7 +1006,7 @@ export function RequestViewer({ row }: { row: Row<LogEntry> }) {
       />
 
       {/* Guardrail Data - Show only if present */}
-      {hasGuardrailData && <GuardrailViewer data={row.original.metadata!.guardrail_information} />}
+      {hasGuardrailData && guardrailInfo && <GuardrailViewer data={guardrailInfo} />}
 
       {/* Vector Store Request Data - Show only if present */}
       {hasVectorStoreData && <VectorStoreViewer data={metadata.vector_store_request_metadata} />}
@@ -936,14 +1015,14 @@ export function RequestViewer({ row }: { row: Row<LogEntry> }) {
       {hasError && errorInfo && <ErrorViewer errorInfo={errorInfo} />}
 
       {/* Tags Card - Only show if there are tags */}
-      {row.original.request_tags && Object.keys(row.original.request_tags).length > 0 && (
+      {logData.request_tags && Object.keys(logData.request_tags).length > 0 && (
         <div className="bg-white rounded-lg shadow">
           <div className="flex justify-between items-center p-4 border-b">
             <h3 className="text-lg font-medium">Request Tags</h3>
           </div>
           <div className="p-4">
             <div className="flex flex-wrap gap-2">
-              {Object.entries(row.original.request_tags).map(([key, value]) => (
+              {Object.entries(logData.request_tags).map(([key, value]) => (
                 <span key={key} className="px-2 py-1 bg-gray-100 rounded-full text-xs">
                   {key}: {String(value)}
                 </span>
@@ -954,13 +1033,13 @@ export function RequestViewer({ row }: { row: Row<LogEntry> }) {
       )}
 
       {/* Metadata Card - Only show if there's metadata */}
-      {row.original.metadata && Object.keys(row.original.metadata).length > 0 && (
+      {metadata && Object.keys(metadata).length > 0 && (
         <div className="bg-white rounded-lg shadow">
           <div className="flex justify-between items-center p-4 border-b">
             <h3 className="text-lg font-medium">Metadata</h3>
             <button
               onClick={() => {
-                navigator.clipboard.writeText(JSON.stringify(row.original.metadata, null, 2))
+                navigator.clipboard.writeText(JSON.stringify(metadata, null, 2))
               }}
               className="p-1 hover:bg-gray-200 rounded"
               title="Copy metadata"
@@ -983,7 +1062,7 @@ export function RequestViewer({ row }: { row: Row<LogEntry> }) {
           </div>
           <div className="p-4 overflow-auto max-h-64">
             <pre className="text-xs font-mono whitespace-pre-wrap break-all">
-              {JSON.stringify(row.original.metadata, null, 2)}
+              {JSON.stringify(metadata, null, 2)}
             </pre>
           </div>
         </div>
