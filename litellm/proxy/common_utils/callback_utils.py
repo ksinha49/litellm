@@ -5,7 +5,6 @@ from litellm import get_secret
 from litellm._logging import verbose_proxy_logger
 from litellm.proxy._types import CommonProxyErrors, LiteLLMPromptInjectionParams
 from litellm.proxy.types_utils.utils import get_instance_fn
-from litellm.integrations.custom_logger import CustomLogger
 
 blue_color_code = "\033[94m"
 reset_color_code = "\033[0m"
@@ -22,35 +21,34 @@ def _remove_existing_callback_registration(callback_obj: Any) -> None:
         getattr(litellm, "_async_failure_callback", None),
     ]
 
-    candidate_names: set[str] = set()
+    candidate_names: set[str]
 
     def _collect_names(obj: Any) -> set[str]:
         names: set[str] = set()
+        if isinstance(obj, str):
+            names.add(obj)
+            return names
         for attr in ("guardrail_name", "callback_name"):
             value = getattr(obj, attr, None)
             if isinstance(value, str):
                 names.add(value)
         return names
 
-    if isinstance(callback_obj, CustomLogger):
-        candidate_names = _collect_names(callback_obj)
-
-        def _matches(existing: Any) -> bool:
-            if not isinstance(existing, CustomLogger):
-                return False
-            existing_names = _collect_names(existing)
-            if candidate_names and existing_names.intersection(candidate_names):
-                return True
-            return type(existing) is type(callback_obj)
-
-    elif isinstance(callback_obj, str):
+    if isinstance(callback_obj, str):
         candidate_names = {callback_obj}
 
         def _matches(existing: Any) -> bool:
             return isinstance(existing, str) and existing == callback_obj
 
     else:
-        return
+        candidate_names = _collect_names(callback_obj)
+        candidate_type = type(callback_obj)
+
+        def _matches(existing: Any) -> bool:
+            existing_names = _collect_names(existing)
+            if candidate_names and existing_names.intersection(candidate_names):
+                return True
+            return type(existing) is candidate_type
 
     for callback_list in callback_lists:
         if not isinstance(callback_list, list):
