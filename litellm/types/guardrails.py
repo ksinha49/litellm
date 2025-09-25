@@ -325,6 +325,32 @@ class BedrockGuardrailConfigModel(BaseModel):
     aws_session_name: Optional[str] = Field(
         default=None, description="Name of the AWS session"
     )
+
+    # Rate limiting and performance settings
+    max_retries: Optional[int] = Field(
+        default=3,
+        ge=0,
+        le=10,
+        description="Maximum number of retries for rate limiting errors (429). Default: 3"
+    )
+    base_retry_delay: Optional[float] = Field(
+        default=1.0,
+        ge=0.1,
+        le=30.0,
+        description="Base delay in seconds for exponential backoff retry. Default: 1.0"
+    )
+    max_retry_delay: Optional[float] = Field(
+        default=60.0,
+        ge=1.0,
+        le=300.0,
+        description="Maximum delay in seconds between retries. Default: 60.0"
+    )
+    max_text_chunk_size: Optional[int] = Field(
+        default=4000,
+        ge=100,
+        le=50000,
+        description="Maximum characters per text chunk to avoid rate limits. Large content will be split into smaller chunks. Default: 4000"
+    )
     aws_profile_name: Optional[str] = Field(
         default=None, description="AWS profile name for credential retrieval"
     )

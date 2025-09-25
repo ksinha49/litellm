@@ -2054,6 +2054,17 @@ class ProxyConfig:
                     # this is set in the cache branch
                     # see usage here: https://docs.litellm.ai/docs/proxy/caching
                     pass
+                elif key == "s3_callback_params":
+                    # Set S3 callback parameters for S3 logger to use
+                    if value is not None and isinstance(value, dict):
+                        # Process any environment variable references
+                        for param_key, param_value in value.items():
+                            if isinstance(param_value, str) and param_value.startswith("os.environ/"):
+                                value[param_key] = get_secret(param_value)
+                        litellm.s3_callback_params = value
+                        verbose_proxy_logger.debug(
+                            f"{blue_color_code} setting litellm.s3_callback_params={value}{reset_color_code}"
+                        )
                 elif key == "default_team_settings":
                     for idx, team_setting in enumerate(
                         value
