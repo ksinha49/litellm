@@ -87,7 +87,9 @@ const GuardrailViewerComponent = React.memo(({ data }: GuardrailViewerProps) => 
   }, [data.masked_entity_count]);
 
   const assessmentDetails = data.assessment_details;
-  const showAssessmentDetails = Array.isArray(assessmentDetails) && assessmentDetails.length > 0;
+  const showAssessmentDetails = Array.isArray(assessmentDetails)
+    ? assessmentDetails.length > 0
+    : Boolean(assessmentDetails);
 
   const formatTime = useCallback((timestamp: number): string => {
     const date = new Date(timestamp * 1000);
