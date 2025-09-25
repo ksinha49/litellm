@@ -2304,6 +2304,102 @@ async def list_available_teams(
 
 
 @router.get(
+    "/team/{team_id}/guardrails/debug",
+    tags=["team management"],
+    dependencies=[Depends(user_api_key_auth)],
+)
+@management_endpoint_wrapper
+async def debug_team_guardrails(
+    team_id: str,
+    http_request: Request,
+    user_api_key_dict: UserAPIKeyAuth = Depends(user_api_key_auth),
+) -> Dict[str, Any]:
+    """Debug endpoint to inspect guardrail configuration for a team."""
+    from litellm.proxy.proxy_server import prisma_client
+
+    if prisma_client is None:
+        raise HTTPException(
+            status_code=500,
+            detail={"error": f"No db connected. prisma client={prisma_client}"},
+        )
+
+    try:
+        team = await prisma_client.db.litellm_teamtable.find_first(
+            where={"team_id": team_id}
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+    if team is None:
+        raise HTTPException(status_code=404, detail="Team not found")
+
+    team_dict: Dict[str, Any] = {}
+    team_metadata: Dict[str, Any] = {}
+    if hasattr(team, "model_dump"):
+        team_dict = team.model_dump()
+        metadata = team_dict.get("metadata") if isinstance(team_dict, dict) else None
+    elif isinstance(team, dict):
+        team_dict = team
+        metadata = team.get("metadata")
+    else:
+        team_dict = dict(getattr(team, "__dict__", {}))
+        metadata = team_dict.get("metadata")
+
+    try:
+        team_table = LiteLLM_TeamTable(**team_dict)
+    except Exception as exc:
+        raise HTTPException(
+            status_code=500,
+            detail={"error": f"Failed to parse team data for membership validation: {exc}"},
+        ) from exc
+
+    validate_membership(
+        user_api_key_dict=user_api_key_dict,
+        team_table=team_table,
+    )
+
+    if isinstance(metadata, dict):
+        team_metadata = metadata
+    elif isinstance(metadata, str):
+        try:
+            parsed_metadata = json.loads(metadata)
+            if isinstance(parsed_metadata, dict):
+                team_metadata = parsed_metadata
+        except json.JSONDecodeError:
+            team_metadata = {}
+    elif metadata is not None:
+        try:
+            team_metadata = cast(Dict[str, Any], metadata)
+        except TypeError:
+            team_metadata = {}
+
+    team_guardrails = team_metadata.get("guardrails", [])
+
+    from litellm.proxy.guardrails.guardrail_registry import IN_MEMORY_GUARDRAIL_HANDLER
+
+    available_guardrails = list(
+        IN_MEMORY_GUARDRAIL_HANDLER.IN_MEMORY_GUARDRAILS.keys()
+    )
+
+    from litellm.integrations.custom_guardrail import CustomGuardrail
+
+    registered_callbacks = [
+        callback.guardrail_name
+        for callback in litellm.callbacks
+        if isinstance(callback, CustomGuardrail)
+        and hasattr(callback, "guardrail_name")
+    ]
+
+    return {
+        "team_id": team_id,
+        "team_guardrails_config": team_guardrails,
+        "available_guardrails": available_guardrails,
+        "registered_callbacks": registered_callbacks,
+        "team_metadata": team_metadata,
+    }
+
+
+@router.get(
     "/v2/team/list",
     tags=["team management"],
     response_model=TeamListResponse,
