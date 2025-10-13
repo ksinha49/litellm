@@ -120,7 +120,7 @@ const GuardrailTestSimulator: React.FC<GuardrailTestSimulatorProps> = ({
         <div className="space-y-2 text-sm text-gray-600">
           <div>
             <strong>Manual Test:</strong> Test your guardrail with custom content. Use this to validate specific use
-            cases or edge cases you're concerned about.
+            cases or edge cases you&apos;re concerned about.
           </div>
           <div>
             <strong>Test Scenarios:</strong> Run predefined test scenarios based on best practices:
