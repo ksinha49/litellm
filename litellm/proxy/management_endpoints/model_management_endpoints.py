@@ -276,6 +276,8 @@ async def _add_model_to_db(
     new_encryption_key: Optional[str] = None,
     should_create_model_in_db: bool = True,
 ) -> Optional[LiteLLM_ProxyModelTable]:
+    import json
+
     # encrypt litellm params with salt-key hash prefix #
     _litellm_params_dict = model_params.litellm_params.model_dump(exclude_none=True)
     _orignal_litellm_model_name = model_params.litellm_params.model
@@ -283,10 +285,16 @@ async def _add_model_to_db(
     # Create encrypted dict without mutating the original Pydantic model
     _encrypted_litellm_params_dict = {}
     for k, v in _litellm_params_dict.items():
+        # Convert value to JSON-serializable format first
+        if not isinstance(v, (str, int, float, bool, type(None))):
+            v = json.loads(json.dumps(v, default=str))
         prefixed_encrypted_value = encrypt_value_helper(
             value=v, new_encryption_key=new_encryption_key
         )
         _encrypted_litellm_params_dict[k] = prefixed_encrypted_value
+
+    # Ensure the encrypted dict is JSON-serializable by doing a round-trip
+    _encrypted_litellm_params_dict = json.loads(json.dumps(_encrypted_litellm_params_dict, default=str))
 
     _data: dict = {
         "model_id": model_params.model_info.id,
@@ -880,6 +888,8 @@ async def update_model(
             if model_params.litellm_params is None:
                 raise Exception("litellm_params not provided")
 
+            import json
+
             _new_litellm_params_dict = model_params.litellm_params.dict(
                 exclude_none=True
             )
@@ -887,6 +897,9 @@ async def update_model(
             ### ENCRYPT PARAMS ###
             _encrypted_params_dict = {}
             for k, v in _new_litellm_params_dict.items():
+                # Convert value to JSON-serializable format first
+                if not isinstance(v, (str, int, float, bool, type(None))):
+                    v = json.loads(json.dumps(v, default=str))
                 prefixed_encrypted_value = encrypt_value_helper(value=v)
                 _encrypted_params_dict[k] = prefixed_encrypted_value
 
@@ -903,6 +916,9 @@ async def update_model(
                     merged_dictionary[key] = _existing_litellm_params_dict[key]
                 else:
                     pass
+
+            # Ensure the merged dict is JSON-serializable
+            merged_dictionary = json.loads(json.dumps(merged_dictionary, default=str))
 
             _data: dict = {
                 "litellm_params": merged_dictionary,  # type: ignore
