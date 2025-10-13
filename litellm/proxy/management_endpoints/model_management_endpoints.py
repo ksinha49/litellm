@@ -1179,3 +1179,254 @@ async def clear_cache():
         verbose_proxy_logger.exception(
             f"Failed to clear cache and reload models. Due to error - {str(e)}"
         )
+
+
+################################# DIAGNOSTIC ENDPOINTS #################################
+####################################################################################
+
+
+class DiagnosticModelInfo(BaseModel):
+    """Information about a model in the diagnostic report"""
+
+    model_id: str
+    model_name: str
+    created_by: str
+    created_at: str
+    status: Literal["valid", "invalid"]
+    error: Optional[str] = None
+    params_info: str
+    litellm_params: Optional[dict] = None
+
+    model_config = ConfigDict(extra="forbid")
+
+
+class ModelDiagnosticsResponse(BaseModel):
+    """Response model for diagnostics endpoint"""
+
+    total_models: int
+    valid_models: int
+    invalid_models: int
+    models: List[DiagnosticModelInfo]
+
+    model_config = ConfigDict(extra="forbid")
+
+
+class ModelFixRequest(BaseModel):
+    """Request to fix a specific model"""
+
+    model_id: str
+    litellm_params: dict
+
+    model_config = ConfigDict(extra="forbid")
+
+
+@router.get(
+    "/model/diagnostics",
+    tags=["model management"],
+    dependencies=[Depends(user_api_key_auth)],
+    response_model=ModelDiagnosticsResponse,
+)
+async def diagnose_models(
+    user_api_key_dict: UserAPIKeyAuth = Depends(user_api_key_auth),
+) -> ModelDiagnosticsResponse:
+    """
+    Diagnose all models in the database for litellm_params parsing issues.
+
+    Returns detailed information about each model including:
+    - Parsing status (valid/invalid)
+    - Error messages for invalid models
+    - Parameter structure information
+
+    Requires Admin or Admin Viewer role.
+    """
+    from litellm.proxy.proxy_server import ProxyConfig, premium_user, prisma_client
+
+    if prisma_client is None:
+        raise HTTPException(
+            status_code=500,
+            detail={"error": "Database not connected. Can't run diagnostics."},
+        )
+
+    # Check if user has admin permissions
+    if user_api_key_dict.user_role not in [
+        LitellmUserRoles.PROXY_ADMIN,
+        LitellmUserRoles.PROXY_ADMIN_VIEW_ONLY,
+    ]:
+        raise HTTPException(
+            status_code=403,
+            detail={
+                "error": "Only Admin or Admin Viewer users can run diagnostics."
+            },
+        )
+
+    try:
+        # Fetch all models from database
+        db_models = await prisma_client.db.litellm_proxymodeltable.find_many()
+
+        diagnostic_results: List[DiagnosticModelInfo] = []
+        valid_count = 0
+        invalid_count = 0
+
+        for model in db_models:
+            try:
+                # Try to parse litellm_params using the same logic as the proxy
+                _ = ProxyConfig.parse_litellm_params(model.litellm_params)
+
+                # If successful, mark as valid
+                diagnostic_results.append(
+                    DiagnosticModelInfo(
+                        model_id=model.model_id,
+                        model_name=model.model_name,
+                        created_by=model.created_by,
+                        created_at=model.created_at.isoformat(),
+                        status="valid",
+                        params_info=_get_params_info(model.litellm_params),
+                        litellm_params=None,  # Don't expose valid params
+                    )
+                )
+                valid_count += 1
+
+            except ValueError as e:
+                # If parsing failed, mark as invalid
+                diagnostic_results.append(
+                    DiagnosticModelInfo(
+                        model_id=model.model_id,
+                        model_name=model.model_name,
+                        created_by=model.created_by,
+                        created_at=model.created_at.isoformat(),
+                        status="invalid",
+                        error=str(e),
+                        params_info=_get_params_info(model.litellm_params),
+                        litellm_params=model.litellm_params,
+                    )
+                )
+                invalid_count += 1
+
+        return ModelDiagnosticsResponse(
+            total_models=len(db_models),
+            valid_models=valid_count,
+            invalid_models=invalid_count,
+            models=diagnostic_results,
+        )
+
+    except Exception as e:
+        verbose_proxy_logger.exception(f"Error in diagnose_models: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail={"error": f"Failed to run diagnostics: {str(e)}"},
+        )
+
+
+@router.post(
+    "/model/fix",
+    tags=["model management"],
+    dependencies=[Depends(user_api_key_auth)],
+)
+async def fix_model(
+    fix_request: ModelFixRequest,
+    user_api_key_dict: UserAPIKeyAuth = Depends(user_api_key_auth),
+):
+    """
+    Fix a model's litellm_params in the database.
+
+    This endpoint allows admins to update the litellm_params for a model
+    that has been identified as invalid by the diagnostics endpoint.
+
+    Requires Admin role (not Admin Viewer).
+    """
+    from litellm.proxy.proxy_server import ProxyConfig, prisma_client, llm_router
+
+    if prisma_client is None:
+        raise HTTPException(
+            status_code=500,
+            detail={"error": "Database not connected. Can't fix models."},
+        )
+
+    # Check if user has admin permissions (not viewer)
+    if user_api_key_dict.user_role != LitellmUserRoles.PROXY_ADMIN:
+        raise HTTPException(
+            status_code=403,
+            detail={"error": "Only Proxy Admin users can fix models."},
+        )
+
+    try:
+        # First, validate that the new params are valid
+        try:
+            validated_params = ProxyConfig.parse_litellm_params(
+                fix_request.litellm_params
+            )
+        except ValueError as e:
+            raise HTTPException(
+                status_code=400,
+                detail={
+                    "error": f"Invalid litellm_params provided: {str(e)}. Please fix and try again."
+                },
+            )
+
+        # Update the model in the database
+        updated_model = await prisma_client.db.litellm_proxymodeltable.update(
+            where={"model_id": fix_request.model_id},
+            data={
+                "litellm_params": validated_params.model_dump(
+                    mode="json", exclude_none=True
+                ),
+                "updated_by": user_api_key_dict.user_id or LITELLM_PROXY_ADMIN_NAME,
+                "updated_at": get_utc_datetime(),
+            },
+        )
+
+        if updated_model is None:
+            raise HTTPException(
+                status_code=404,
+                detail={"error": f"Model {fix_request.model_id} not found."},
+            )
+
+        # Reload the router to pick up the fixed model
+        if llm_router is not None:
+            from litellm.proxy.proxy_server import proxy_config, proxy_logging_obj
+
+            try:
+                await _clear_cache_and_reload_models(
+                    llm_router=llm_router,
+                    prisma_client=prisma_client,
+                    proxy_config=proxy_config,
+                    proxy_logging_obj=proxy_logging_obj,
+                )
+            except Exception as e:
+                verbose_proxy_logger.warning(
+                    f"Model updated in DB but failed to reload router: {str(e)}"
+                )
+
+        return {
+            "status": "success",
+            "message": f"Model {fix_request.model_id} fixed successfully.",
+            "model_id": fix_request.model_id,
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        verbose_proxy_logger.exception(f"Error in fix_model: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail={"error": f"Failed to fix model: {str(e)}"},
+        )
+
+
+def _get_params_info(params) -> str:
+    """Get readable information about the params structure"""
+    if params is None:
+        return "NULL"
+    elif isinstance(params, dict):
+        keys = list(params.keys())
+        has_model = "model" in params
+        return f"dict with {len(keys)} keys | has 'model' field: {has_model}"
+    elif isinstance(params, str):
+        if params.strip().startswith("{"):
+            return f"JSON string (length: {len(params)})"
+        elif params.strip().startswith("LiteLLM_Params("):
+            return "Pydantic string representation"
+        else:
+            return f"string (length: {len(params)})"
+    else:
+        return f"type: {type(params).__name__}"

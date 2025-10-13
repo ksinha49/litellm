@@ -462,6 +462,96 @@ export const modelDeleteCall = async (
   }
 };
 
+export interface DiagnosticModelInfo {
+  model_id: string;
+  model_name: string;
+  created_by: string;
+  created_at: string;
+  status: "valid" | "invalid";
+  error?: string;
+  params_info: string;
+  litellm_params?: Record<string, any>;
+}
+
+export interface ModelDiagnosticsResponse {
+  total_models: number;
+  valid_models: number;
+  invalid_models: number;
+  models: DiagnosticModelInfo[];
+}
+
+export const modelDiagnosticsCall = async (
+  accessToken: string
+): Promise<ModelDiagnosticsResponse> => {
+  /**
+   * Get diagnostics for all models in the database
+   */
+  try {
+    const url = proxyBaseUrl
+      ? `${proxyBaseUrl}/model/diagnostics`
+      : `/model/diagnostics`;
+
+    const response = await fetch(url, {
+      method: "GET",
+      headers: {
+        [globalLitellmHeaderName]: `Bearer ${accessToken}`,
+        "Content-Type": "application/json",
+      },
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      const errorMessage = deriveErrorMessage(errorData);
+      handleError(errorMessage);
+      throw new Error(errorMessage);
+    }
+
+    const data = await response.json();
+    return data;
+  } catch (error: any) {
+    console.error("Failed to get model diagnostics:", error);
+    throw error;
+  }
+};
+
+export const modelFixCall = async (
+  accessToken: string,
+  model_id: string,
+  litellm_params: Record<string, any>
+) => {
+  /**
+   * Fix a model's litellm_params
+   */
+  try {
+    const url = proxyBaseUrl ? `${proxyBaseUrl}/model/fix` : `/model/fix`;
+
+    const response = await fetch(url, {
+      method: "POST",
+      headers: {
+        [globalLitellmHeaderName]: `Bearer ${accessToken}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model_id: model_id,
+        litellm_params: litellm_params,
+      }),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      const errorMessage = deriveErrorMessage(errorData);
+      handleError(errorMessage);
+      throw new Error(errorMessage);
+    }
+
+    const data = await response.json();
+    return data;
+  } catch (error: any) {
+    console.error("Failed to fix model:", error);
+    throw error;
+  }
+};
+
 export const budgetDeleteCall = async (
   accessToken: string | null,
   budget_id: string
@@ -6709,6 +6799,301 @@ export const updateGuardrailCall = async (
     return data;
   } catch (error) {
     console.error("Failed to update guardrail:", error);
+    throw error;
+  }
+};
+
+/**
+ * Test a guardrail configuration with sample content
+ */
+export const testGuardrailCall = async (
+  accessToken: string,
+  testRequest: {
+    guardrail_id?: string;
+    guardrail_config?: any;
+    test_content: string;
+    content_source: "INPUT" | "OUTPUT";
+    test_scenario_name?: string;
+  }
+) => {
+  try {
+    const url = proxyBaseUrl
+      ? `${proxyBaseUrl}/guardrails/test`
+      : `/guardrails/test`;
+
+    const response = await fetch(url, {
+      method: "POST",
+      headers: {
+        [globalLitellmHeaderName]: `Bearer ${accessToken}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(testRequest),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.text();
+      handleError(errorData);
+      throw new Error("Failed to test guardrail");
+    }
+
+    const data = await response.json();
+    console.log("Test guardrail response:", data);
+    return data;
+  } catch (error) {
+    console.error("Failed to test guardrail:", error);
+    throw error;
+  }
+};
+
+/**
+ * Run a test suite against a guardrail
+ */
+export const testGuardrailSuiteCall = async (
+  accessToken: string,
+  suiteRequest: {
+    guardrail_id: string;
+    test_scenarios: Array<{
+      scenario_id: string;
+      name: string;
+      description: string;
+      test_content: string;
+      content_source: "INPUT" | "OUTPUT";
+      expected_detected: boolean;
+      expected_action?: string;
+      expected_entities?: string[];
+      category: string;
+    }>;
+    run_parallel?: boolean;
+  }
+) => {
+  try {
+    const url = proxyBaseUrl
+      ? `${proxyBaseUrl}/guardrails/test/suite`
+      : `/guardrails/test/suite`;
+
+    const response = await fetch(url, {
+      method: "POST",
+      headers: {
+        [globalLitellmHeaderName]: `Bearer ${accessToken}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(suiteRequest),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.text();
+      handleError(errorData);
+      throw new Error("Failed to run test suite");
+    }
+
+    const data = await response.json();
+    console.log("Test suite response:", data);
+    return data;
+  } catch (error) {
+    console.error("Failed to run test suite:", error);
+    throw error;
+  }
+};
+
+/**
+ * Get predefined test scenarios for a guardrail type
+ */
+export const getGuardrailTestScenariosCall = async (
+  accessToken: string,
+  guardrailType: string = "bedrock"
+) => {
+  try {
+    const url = proxyBaseUrl
+      ? `${proxyBaseUrl}/guardrails/test/scenarios?guardrail_type=${guardrailType}`
+      : `/guardrails/test/scenarios?guardrail_type=${guardrailType}`;
+
+    const response = await fetch(url, {
+      method: "GET",
+      headers: {
+        [globalLitellmHeaderName]: `Bearer ${accessToken}`,
+        "Content-Type": "application/json",
+      },
+    });
+
+    if (!response.ok) {
+      const errorData = await response.text();
+      handleError(errorData);
+      throw new Error("Failed to get test scenarios");
+    }
+
+    const data = await response.json();
+    console.log("Test scenarios response:", data);
+    return data;
+  } catch (error) {
+    console.error("Failed to get test scenarios:", error);
+    throw error;
+  }
+};
+
+/**
+ * Get test history with optional filters
+ */
+export const getTestHistoryCall = async (
+  accessToken: string,
+  filters?: {
+    guardrail_id?: string;
+    guardrail_type?: string;
+    created_by?: string;
+    start_date?: string;
+    end_date?: string;
+    limit?: number;
+    offset?: number;
+  }
+) => {
+  try {
+    const params = new URLSearchParams();
+    if (filters?.guardrail_id) params.append("guardrail_id", filters.guardrail_id);
+    if (filters?.guardrail_type) params.append("guardrail_type", filters.guardrail_type);
+    if (filters?.created_by) params.append("created_by", filters.created_by);
+    if (filters?.start_date) params.append("start_date", filters.start_date);
+    if (filters?.end_date) params.append("end_date", filters.end_date);
+    if (filters?.limit) params.append("limit", filters.limit.toString());
+    if (filters?.offset) params.append("offset", filters.offset.toString());
+
+    const queryString = params.toString();
+    const url = proxyBaseUrl
+      ? `${proxyBaseUrl}/guardrails/test/history${queryString ? `?${queryString}` : ""}`
+      : `/guardrails/test/history${queryString ? `?${queryString}` : ""}`;
+
+    const response = await fetch(url, {
+      method: "GET",
+      headers: {
+        [globalLitellmHeaderName]: `Bearer ${accessToken}`,
+        "Content-Type": "application/json",
+      },
+    });
+
+    if (!response.ok) {
+      const errorData = await response.text();
+      handleError(errorData);
+      throw new Error("Failed to get test history");
+    }
+
+    const data = await response.json();
+    console.log("Test history response:", data);
+    return data;
+  } catch (error) {
+    console.error("Failed to get test history:", error);
+    throw error;
+  }
+};
+
+/**
+ * Get test history for a specific guardrail
+ */
+export const getGuardrailTestHistoryCall = async (
+  accessToken: string,
+  guardrailId: string,
+  limit: number = 50,
+  offset: number = 0
+) => {
+  try {
+    const url = proxyBaseUrl
+      ? `${proxyBaseUrl}/guardrails/${guardrailId}/test/history?limit=${limit}&offset=${offset}`
+      : `/guardrails/${guardrailId}/test/history?limit=${limit}&offset=${offset}`;
+
+    const response = await fetch(url, {
+      method: "GET",
+      headers: {
+        [globalLitellmHeaderName]: `Bearer ${accessToken}`,
+        "Content-Type": "application/json",
+      },
+    });
+
+    if (!response.ok) {
+      const errorData = await response.text();
+      handleError(errorData);
+      throw new Error("Failed to get guardrail test history");
+    }
+
+    const data = await response.json();
+    console.log("Guardrail test history response:", data);
+    return data;
+  } catch (error) {
+    console.error("Failed to get guardrail test history:", error);
+    throw error;
+  }
+};
+
+/**
+ * Get a specific test history record by ID
+ */
+export const getTestHistoryByIdCall = async (
+  accessToken: string,
+  testHistoryId: string
+) => {
+  try {
+    const url = proxyBaseUrl
+      ? `${proxyBaseUrl}/guardrails/test/history/${testHistoryId}`
+      : `/guardrails/test/history/${testHistoryId}`;
+
+    const response = await fetch(url, {
+      method: "GET",
+      headers: {
+        [globalLitellmHeaderName]: `Bearer ${accessToken}`,
+        "Content-Type": "application/json",
+      },
+    });
+
+    if (!response.ok) {
+      const errorData = await response.text();
+      handleError(errorData);
+      throw new Error("Failed to get test history record");
+    }
+
+    const data = await response.json();
+    console.log("Test history record response:", data);
+    return data;
+  } catch (error) {
+    console.error("Failed to get test history record:", error);
+    throw error;
+  }
+};
+
+/**
+ * Get test statistics
+ */
+export const getTestStatisticsCall = async (
+  accessToken: string,
+  guardrailId?: string,
+  guardrailType?: string,
+  days: number = 30
+) => {
+  try {
+    const params = new URLSearchParams();
+    if (guardrailId) params.append("guardrail_id", guardrailId);
+    if (guardrailType) params.append("guardrail_type", guardrailType);
+    params.append("days", days.toString());
+
+    const queryString = params.toString();
+    const url = proxyBaseUrl
+      ? `${proxyBaseUrl}/guardrails/test/statistics?${queryString}`
+      : `/guardrails/test/statistics?${queryString}`;
+
+    const response = await fetch(url, {
+      method: "GET",
+      headers: {
+        [globalLitellmHeaderName]: `Bearer ${accessToken}`,
+        "Content-Type": "application/json",
+      },
+    });
+
+    if (!response.ok) {
+      const errorData = await response.text();
+      handleError(errorData);
+      throw new Error("Failed to get test statistics");
+    }
+
+    const data = await response.json();
+    console.log("Test statistics response:", data);
+    return data;
+  } catch (error) {
+    console.error("Failed to get test statistics:", error);
     throw error;
   }
 };

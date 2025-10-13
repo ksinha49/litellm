@@ -1855,6 +1855,10 @@ class LiteLLM_VerificationTokenView(LiteLLM_VerificationToken):
     team_member: Optional[Member] = None
     team_metadata: Optional[Dict] = None
 
+    # Organization Specific Params
+    organization_id: Optional[str] = None
+    organization_metadata: Optional[Dict] = None
+
     # Team Member Specific Params
     team_member_spend: Optional[float] = None
     team_member_tpm_limit: Optional[int] = None

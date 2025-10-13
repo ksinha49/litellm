@@ -30,6 +30,7 @@ import { copyToClipboard as utilCopyToClipboard } from "@/utils/dataUtils"
 import { CheckIcon, CopyIcon } from "lucide-react"
 import NotificationsManager from "../molecules/notifications_manager"
 import Image from "next/image"
+import GuardrailTestSimulator from "./GuardrailTestSimulator"
 
 export interface GuardrailInfoProps {
   guardrailId: string
@@ -358,6 +359,7 @@ const GuardrailInfoView: React.FC<GuardrailInfoProps> = ({ guardrailId, onClose,
         <TabList className="mb-4">
           <Tab key="overview">Overview</Tab>
           {isAdmin ? <Tab key="settings">Settings</Tab> : <></>}
+          <Tab key="test">Test</Tab>
         </TabList>
 
         <TabPanels>
@@ -589,6 +591,16 @@ const GuardrailInfoView: React.FC<GuardrailInfoProps> = ({ guardrailId, onClose,
               </Card>
             </TabPanel>
           )}
+
+          {/* Test Panel */}
+          <TabPanel>
+            <GuardrailTestSimulator
+              guardrailId={guardrailId}
+              guardrailName={guardrailData.guardrail_name || "Unnamed Guardrail"}
+              guardrailType={guardrailData.litellm_params?.guardrail || "unknown"}
+              accessToken={accessToken}
+            />
+          </TabPanel>
         </TabPanels>
       </TabGroup>
     </div>

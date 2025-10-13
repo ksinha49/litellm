@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { Select, Typography, Tooltip } from 'antd';
 import { InfoCircleOutlined } from '@ant-design/icons';
 import { Guardrail } from './types';
@@ -11,36 +11,49 @@ interface GuardrailSelectorProps {
   accessToken: string;
 }
 
-const GuardrailSelector: React.FC<GuardrailSelectorProps> = ({ 
-  onChange, 
-  value, 
-  className, 
-  accessToken 
+const GuardrailSelector: React.FC<GuardrailSelectorProps> = ({
+  onChange,
+  value,
+  className,
+  accessToken
 }) => {
   const [guardrails, setGuardrails] = useState<Guardrail[]>([]);
   const [loading, setLoading] = useState(false);
 
-  useEffect(() => {
-    const fetchGuardrails = async () => {
-      if (!accessToken) return;
-      
-      setLoading(true);
-      try {
-        const response = await getGuardrailsList(accessToken);
-        console.log("Guardrails response:", response);
-        if (response.guardrails) {
-          console.log("Guardrails data:", response.guardrails);
-          setGuardrails(response.guardrails);
-        }
-      } catch (error) {
-        console.error("Error fetching guardrails:", error);
-      } finally {
-        setLoading(false);
+  const fetchGuardrails = useCallback(async () => {
+    if (!accessToken) return;
+
+    setLoading(true);
+    try {
+      const response = await getGuardrailsList(accessToken);
+      console.log("Guardrails response:", response);
+      if (response.guardrails) {
+        console.log("Guardrails data:", response.guardrails);
+        setGuardrails(response.guardrails);
       }
+    } catch (error) {
+      console.error("Error fetching guardrails:", error);
+    } finally {
+      setLoading(false);
+    }
+  }, [accessToken]);
+
+  useEffect(() => {
+    fetchGuardrails();
+  }, [fetchGuardrails]);
+
+  // Add event listener for focus to refresh guardrails when user returns to the page
+  useEffect(() => {
+    const handleFocus = () => {
+      fetchGuardrails();
     };
 
-    fetchGuardrails();
-  }, [accessToken]);
+    window.addEventListener('focus', handleFocus);
+
+    return () => {
+      window.removeEventListener('focus', handleFocus);
+    };
+  }, [fetchGuardrails]);
 
   const handleGuardrailChange = (selectedValues: string[]) => {
     console.log("Selected guardrails:", selectedValues);
@@ -65,6 +78,13 @@ const GuardrailSelector: React.FC<GuardrailSelectorProps> = ({
         })}
         optionFilterProp="label"
         showSearch
+        allowClear
+        onDropdownVisibleChange={(open) => {
+          // Refresh guardrails list when dropdown is opened
+          if (open) {
+            fetchGuardrails();
+          }
+        }}
         style={{ width: '100%' }}
       />
     </div>

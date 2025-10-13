@@ -7,6 +7,7 @@ import { Button as Button2, Modal, Form, Input, Select, message, Radio } from "a
 import NumericalInput from "../shared/numerical_input"
 import { unfurlWildcardModelsInList, getModelDisplayName } from "../key_team_helpers/fetch_available_models_team_key"
 import SchemaFormFields from "../common_components/check_openapi_schema"
+import GuardrailSelector from "../guardrails/GuardrailSelector"
 import {
   keyCreateCall,
   slackBudgetAlertsHealthCheck,
@@ -837,14 +838,14 @@ const CreateKey: React.FC<CreateKeyProps> = ({
                   >
                     <TextInput placeholder="e.g., 30d" />
                   </Form.Item>
-                  <Form.Item 
+                  <Form.Item
                     label={
                       <span>
                         Guardrails{' '}
                         <Tooltip title="Apply safety guardrails to this key to filter content or enforce policies">
-                          <a 
-                            href="https://docs.litellm.ai/docs/proxy/guardrails/quick_start" 
-                            target="_blank" 
+                          <a
+                            href="https://docs.litellm.ai/docs/proxy/guardrails/quick_start"
+                            target="_blank"
                             rel="noopener noreferrer"
                             onClick={(e) => e.stopPropagation()} // Prevent accordion from collapsing when clicking link
                           >
@@ -853,25 +854,21 @@ const CreateKey: React.FC<CreateKeyProps> = ({
                         </Tooltip>
                       </span>
                     }
-                    name="guardrails" 
+                    name="guardrails"
                     className="mt-4"
-                    help={premiumUser ? "Select existing guardrails or enter new ones" : "Premium feature - Upgrade to set guardrails by key"}
+                    help={premiumUser ? "Apply safety guardrails to this key" : "Premium feature - Upgrade to set guardrails by key"}
                   >
-                    <Tooltip 
+                    <Tooltip
                       title={!premiumUser ? "Setting guardrails by key is a premium feature" : ""}
                       placement="top"
                     >
-                      <Select
-                        mode="tags"
-                        style={{ width: '100%' }}
-                        disabled={!premiumUser}
-                        placeholder={
-                          !premiumUser
-                            ? "Premium feature - Upgrade to set guardrails by key"
-                            : "Select or enter guardrails"
-                        }
-                        options={guardrailsList.map(name => ({ value: name, label: name }))}
-                      />
+                      <div style={{ pointerEvents: premiumUser ? 'auto' : 'none', opacity: premiumUser ? 1 : 0.5 }}>
+                        <GuardrailSelector
+                          onChange={(values) => form.setFieldValue("guardrails", values)}
+                          value={form.getFieldValue("guardrails")}
+                          accessToken={accessToken}
+                        />
+                      </div>
                     </Tooltip>
                   </Form.Item>
                   <Form.Item 

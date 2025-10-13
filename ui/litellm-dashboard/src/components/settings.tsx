@@ -55,6 +55,7 @@ import {
   mapInternalToDisplayNames,
 } from "./callback_info_helpers";
 import { parseErrorMessage } from "./shared/errorUtils";
+import ModelDiagnostics from "./model_diagnostics";
 interface SettingsPageProps {
   accessToken: string | null;
   userRole: string | null;
@@ -757,6 +758,7 @@ const Settings: React.FC<SettingsPageProps> = ({
             <Tab value="2">Alerting Types</Tab>
             <Tab value="3">Alerting Settings</Tab>
             <Tab value="4">Email Alerts</Tab>
+            <Tab value="5">Model Diagnostics</Tab>
           </TabList>
           <TabPanels>
             <TabPanel>
@@ -1136,6 +1138,12 @@ const Settings: React.FC<SettingsPageProps> = ({
                 accessToken={accessToken}
                 premiumUser={premiumUser}
                 alerts={alerts}
+              />
+            </TabPanel>
+            <TabPanel>
+              <ModelDiagnostics
+                accessToken={accessToken}
+                userRole={userRole}
               />
             </TabPanel>
           </TabPanels>

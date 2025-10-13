@@ -33,6 +33,7 @@ import {
   organizationMemberUpdateCall,
   organizationMemberDeleteCall,
   organizationUpdateCall,
+  getGuardrailsList,
 } from "../networking"
 import UserSearchModal from "../common_components/user_search_modal"
 import MemberModal from "../team/edit_membership"
@@ -42,6 +43,7 @@ import MCPServerSelector from "../mcp_server_management/MCPServerSelector"
 import { copyToClipboard as utilCopyToClipboard, formatNumberWithCommas } from "@/utils/dataUtils"
 import { CheckIcon, CopyIcon } from "lucide-react"
 import NotificationsManager from "../molecules/notifications_manager"
+import GuardrailSelector from "../guardrails/GuardrailSelector"
 
 interface OrganizationInfoProps {
   organizationId: string
@@ -70,6 +72,7 @@ const OrganizationInfoView: React.FC<OrganizationInfoProps> = ({
   const [isEditMemberModalVisible, setIsEditMemberModalVisible] = useState(false)
   const [selectedEditMember, setSelectedEditMember] = useState<Member | null>(null)
   const [copiedStates, setCopiedStates] = useState<Record<string, boolean>>({})
+  const [guardrailsList, setGuardrailsList] = useState<string[]>([])
   const canEditOrg = is_org_admin || is_proxy_admin
 
   const fetchOrgInfo = async () => {
@@ -89,6 +92,23 @@ const OrganizationInfoView: React.FC<OrganizationInfoProps> = ({
   useEffect(() => {
     fetchOrgInfo()
   }, [organizationId, accessToken])
+
+  useEffect(() => {
+    const fetchGuardrails = async () => {
+      try {
+        if (!accessToken) return
+        const response = await getGuardrailsList(accessToken)
+        const guardrailNames = response.guardrails.map(
+          (g: { guardrail_name: string }) => g.guardrail_name
+        )
+        setGuardrailsList(guardrailNames)
+      } catch (error) {
+        console.error("Failed to fetch guardrails:", error)
+      }
+    }
+
+    fetchGuardrails()
+  }, [accessToken])
 
   const handleMemberAdd = async (values: any) => {
     try {
@@ -153,6 +173,15 @@ const OrganizationInfoView: React.FC<OrganizationInfoProps> = ({
     try {
       if (!accessToken) return
 
+      // Parse existing metadata
+      let parsedMetadata = {}
+      try {
+        parsedMetadata = values.metadata ? JSON.parse(values.metadata) : {}
+      } catch (e) {
+        console.error("Failed to parse metadata:", e)
+        parsedMetadata = {}
+      }
+
       const updateData: any = {
         organization_id: organizationId,
         organization_alias: values.organization_alias,
@@ -163,7 +192,10 @@ const OrganizationInfoView: React.FC<OrganizationInfoProps> = ({
           max_budget: values.max_budget,
           budget_duration: values.budget_duration,
         },
-        metadata: values.metadata ? JSON.parse(values.metadata) : null,
+        metadata: {
+          ...parsedMetadata,
+          guardrails: values.guardrails || [],
+        },
       }
 
       // Handle object_permission updates
@@ -414,7 +446,14 @@ const OrganizationInfoView: React.FC<OrganizationInfoProps> = ({
                     rpm_limit: orgData.litellm_budget_table.rpm_limit,
                     max_budget: orgData.litellm_budget_table.max_budget,
                     budget_duration: orgData.litellm_budget_table.budget_duration,
-                    metadata: orgData.metadata ? JSON.stringify(orgData.metadata, null, 2) : "",
+                    metadata: orgData.metadata
+                      ? JSON.stringify(
+                          (({ guardrails, ...rest }) => rest)(orgData.metadata),
+                          null,
+                          2
+                        )
+                      : "",
+                    guardrails: orgData.metadata?.guardrails || [],
                     vector_stores: orgData.object_permission?.vector_stores || [],
                     mcp_servers_and_groups: {
                       servers: orgData.object_permission?.mcp_servers || [],
@@ -467,6 +506,32 @@ const OrganizationInfoView: React.FC<OrganizationInfoProps> = ({
 
                   <Form.Item label="Requests per minute Limit (RPM)" name="rpm_limit">
                     <NumericalInput step={1} style={{ width: "100%" }} />
+                  </Form.Item>
+
+                  <Form.Item
+                    label={
+                      <span>
+                        Guardrails{" "}
+                        <Tooltip title="Apply safety guardrails to all keys in this organization">
+                          <a
+                            href="https://docs.litellm.ai/docs/proxy/guardrails/quick_start"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <InfoCircleOutlined style={{ marginLeft: "4px" }} />
+                          </a>
+                        </Tooltip>
+                      </span>
+                    }
+                    name="guardrails"
+                    help="Apply safety guardrails to all keys in this organization"
+                  >
+                    <GuardrailSelector
+                      onChange={(values) => form.setFieldValue("guardrails", values)}
+                      value={form.getFieldValue("guardrails")}
+                      accessToken={accessToken || ""}
+                    />
                   </Form.Item>
 
                   <Form.Item label="Vector Stores" name="vector_stores">
@@ -537,6 +602,19 @@ const OrganizationInfoView: React.FC<OrganizationInfoProps> = ({
                     </div>
                     <div>Reset: {orgData.litellm_budget_table.budget_duration || "Never"}</div>
                   </div>
+
+                  {orgData.metadata?.guardrails && orgData.metadata.guardrails.length > 0 && (
+                    <div>
+                      <Text className="font-medium">Guardrails</Text>
+                      <div className="flex flex-wrap gap-2 mt-1">
+                        {orgData.metadata.guardrails.map((guardrail: string, index: number) => (
+                          <Badge key={index} color="blue">
+                            {guardrail}
+                          </Badge>
+                        ))}
+                      </div>
+                    </div>
+                  )}
 
                   <ObjectPermissionsView
                     objectPermission={orgData.object_permission}

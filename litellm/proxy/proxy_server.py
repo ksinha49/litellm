@@ -2587,10 +2587,10 @@ class ProxyConfig:
         for m in db_models:
             try:
                 _litellm_params = self.parse_litellm_params(m.litellm_params)
-            except ValueError:
+            except ValueError as e:
                 masked_params = _mask_litellm_params_for_logging(m.litellm_params)
                 verbose_proxy_logger.warning(
-                    f"Invalid litellm_params skipped: {masked_params}"
+                    f"Invalid litellm_params skipped for model_id={m.model_id}, model_name={m.model_name}: {str(e)} | params={masked_params}"
                 )
                 continue  # skip to next model
             _model_info = self.get_model_info_with_id(

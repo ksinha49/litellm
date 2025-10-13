@@ -900,6 +900,33 @@ async def _get_team_object_from_db(team_id: str, prisma_client: PrismaClient):
     )
 
 
+async def _get_organization_metadata(
+    organization_id: str, prisma_client: PrismaClient
+) -> Optional[Dict]:
+    """
+    Fetch organization metadata from database
+
+    Args:
+        organization_id: The organization ID to fetch
+        prisma_client: Database client
+
+    Returns:
+        Organization metadata dict or None if not found
+    """
+    try:
+        organization = await prisma_client.db.litellm_organizationtable.find_unique(
+            where={"organization_id": organization_id}
+        )
+        if organization and organization.metadata:
+            return organization.metadata
+        return None
+    except Exception as e:
+        verbose_proxy_logger.debug(
+            f"Error fetching organization metadata for {organization_id}: {str(e)}"
+        )
+        return None
+
+
 async def _get_team_object_from_user_api_key_cache(
     team_id: str,
     prisma_client: PrismaClient,

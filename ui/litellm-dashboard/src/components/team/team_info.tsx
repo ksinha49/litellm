@@ -55,6 +55,7 @@ import { fetchMCPAccessGroups } from "../networking";
 import { CheckIcon, CopyIcon } from "lucide-react";
 import { copyToClipboard as utilCopyToClipboard } from "../../utils/dataUtils"
 import NotificationsManager from "../molecules/notifications_manager";
+import GuardrailSelector from "../guardrails/GuardrailSelector";
 
 export interface TeamMembership {
   user_id: string;
@@ -719,7 +720,7 @@ const TeamInfoView: React.FC<TeamInfoProps> = ({
                     label={
                       <span>
                         Guardrails{" "}
-                        <Tooltip title="Setup your first guardrail">
+                        <Tooltip title="Apply safety guardrails to this team">
                           <a
                             href="https://docs.litellm.ai/docs/proxy/guardrails/quick_start"
                             target="_blank"
@@ -732,12 +733,12 @@ const TeamInfoView: React.FC<TeamInfoProps> = ({
                       </span>
                     }
                     name="guardrails"
-                    help="Select existing guardrails or enter new ones"
+                    help="Apply safety guardrails to all keys in this team"
                   >
-                    <Select
-                      mode="tags"
-                      placeholder="Select or enter guardrails"
-                      options={guardrailsList.map(name => ({ value: name, label: name }))}
+                    <GuardrailSelector
+                      onChange={(values) => form.setFieldValue("guardrails", values)}
+                      value={form.getFieldValue("guardrails")}
+                      accessToken={accessToken || ""}
                     />
                   </Form.Item>
 

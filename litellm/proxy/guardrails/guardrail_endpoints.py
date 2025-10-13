@@ -28,6 +28,22 @@ from litellm.types.guardrails import (
     PresidioPresidioConfigModelUserInterface,
     SupportedGuardrailIntegrations,
 )
+from litellm.proxy.guardrails.models import (
+    GuardrailTestRequest,
+    GuardrailTestResponse,
+    TestSuiteRequest,
+    TestSuiteResponse,
+    PredefinedTestScenariosResponse,
+    GuardrailTestHistoryRecord,
+    TestHistoryListResponse,
+    TestStatisticsResponse,
+)
+from litellm.proxy.guardrails.services import GuardrailTestService, GuardrailTestHistoryService
+from litellm.proxy.guardrails.test_scenarios import (
+    get_bedrock_test_scenarios,
+    get_presidio_test_scenarios,
+    get_lakera_test_scenarios,
+)
 
 #### GUARDRAILS ENDPOINTS ####
 
@@ -970,3 +986,572 @@ async def get_provider_specific_params():
             provider_params[guardrail_name] = fields
 
     return provider_params
+
+
+@router.post(
+    "/guardrails/test",
+    tags=["Guardrails"],
+    dependencies=[Depends(user_api_key_auth)],
+    response_model=GuardrailTestResponse,
+)
+async def test_guardrail(request: GuardrailTestRequest):
+    """
+    Test a guardrail configuration before deployment.
+
+    👉 [Guardrail testing docs](https://docs.litellm.ai/docs/proxy/guardrails/testing)
+
+    This endpoint allows you to test a guardrail with sample content to see how it will
+    respond before deploying it to production.
+
+    Example Request - Test by ID:
+    ```bash
+    curl -X POST "http://localhost:4000/guardrails/test" \\
+        -H "Authorization: Bearer <your_api_key>" \\
+        -H "Content-Type: application/json" \\
+        -d '{
+            "guardrail_id": "123e4567-e89b-12d3-a456-426614174000",
+            "test_content": "My SSN is 123-45-6789",
+            "content_source": "INPUT",
+            "test_scenario_name": "PII Detection Test"
+        }'
+    ```
+
+    Example Request - Test by Config:
+    ```bash
+    curl -X POST "http://localhost:4000/guardrails/test" \\
+        -H "Authorization: Bearer <your_api_key>" \\
+        -H "Content-Type: application/json" \\
+        -d '{
+            "guardrail_config": {
+                "guardrail": "bedrock",
+                "mode": "pre_call",
+                "guardrailIdentifier": "ff6ujrregl1q",
+                "guardrailVersion": "DRAFT",
+                "aws_region_name": "us-east-1"
+            },
+            "test_content": "This is offensive content with profanity",
+            "content_source": "INPUT"
+        }'
+    ```
+
+    Example Response:
+    ```json
+    {
+        "test_id": "test-abc123",
+        "guardrail_name": "my-bedrock-guard",
+        "test_scenario_name": "PII Detection Test",
+        "content_source": "INPUT",
+        "detected": true,
+        "action": "BLOCKED",
+        "assessment_details": [
+            {
+                "topicPolicy": {
+                    "topics": [{"name": "PII", "type": "SSN", "action": "BLOCKED"}]
+                }
+            }
+        ],
+        "guardrail_coverage": {"textCharacters": {"guarded": 100, "total": 100}},
+        "duration_ms": 245.5,
+        "timestamp": "2023-11-09T12:34:56.789Z",
+        "passed_validation": true,
+        "validation_errors": [],
+        "test_content_preview": "My SSN is 123-45-6789"
+    }
+    ```
+    """
+    from litellm.proxy.proxy_server import prisma_client
+
+    try:
+        test_service = GuardrailTestService(
+            guardrail_registry=GUARDRAIL_REGISTRY,
+            prisma_client=prisma_client,
+        )
+
+        result = await test_service.run_guardrail_test(request)
+        return result
+
+    except Exception as e:
+        verbose_proxy_logger.exception(f"Error running guardrail test: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post(
+    "/guardrails/test/suite",
+    tags=["Guardrails"],
+    dependencies=[Depends(user_api_key_auth)],
+    response_model=TestSuiteResponse,
+)
+async def test_guardrail_suite(request: TestSuiteRequest):
+    """
+    Run a suite of test scenarios against a guardrail.
+
+    👉 [Guardrail testing docs](https://docs.litellm.ai/docs/proxy/guardrails/testing)
+
+    This endpoint allows you to run multiple test scenarios against a guardrail
+    to validate its behavior across different types of content.
+
+    Example Request:
+    ```bash
+    curl -X POST "http://localhost:4000/guardrails/test/suite" \\
+        -H "Authorization: Bearer <your_api_key>" \\
+        -H "Content-Type: application/json" \\
+        -d '{
+            "guardrail_id": "123e4567-e89b-12d3-a456-426614174000",
+            "test_scenarios": [
+                {
+                    "scenario_id": "pii_ssn",
+                    "name": "SSN Detection",
+                    "description": "Test SSN detection",
+                    "test_content": "My SSN is 123-45-6789",
+                    "content_source": "INPUT",
+                    "expected_detected": true,
+                    "expected_action": "BLOCKED",
+                    "category": "pii"
+                },
+                {
+                    "scenario_id": "clean_content",
+                    "name": "Clean Content",
+                    "description": "Test clean content passes",
+                    "test_content": "Hello, how are you?",
+                    "content_source": "INPUT",
+                    "expected_detected": false,
+                    "category": "general"
+                }
+            ],
+            "run_parallel": false
+        }'
+    ```
+
+    Example Response:
+    ```json
+    {
+        "suite_id": "suite-xyz789",
+        "guardrail_name": "my-bedrock-guard",
+        "total_tests": 2,
+        "passed_tests": 2,
+        "failed_tests": 0,
+        "pass_rate": 100.0,
+        "test_results": [...],
+        "total_duration_ms": 512.3,
+        "timestamp": "2023-11-09T12:34:56.789Z"
+    }
+    ```
+    """
+    from litellm.proxy.proxy_server import prisma_client
+
+    try:
+        test_service = GuardrailTestService(
+            guardrail_registry=GUARDRAIL_REGISTRY,
+            prisma_client=prisma_client,
+        )
+
+        result = await test_service.run_test_suite(request)
+        return result
+
+    except Exception as e:
+        verbose_proxy_logger.exception(f"Error running guardrail test suite: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get(
+    "/guardrails/test/scenarios",
+    tags=["Guardrails"],
+    dependencies=[Depends(user_api_key_auth)],
+    response_model=PredefinedTestScenariosResponse,
+)
+async def get_test_scenarios(guardrail_type: str = "bedrock"):
+    """
+    Get predefined test scenarios for a specific guardrail type.
+
+    👉 [Guardrail testing docs](https://docs.litellm.ai/docs/proxy/guardrails/testing)
+
+    This endpoint returns a collection of recommended test scenarios for testing
+    guardrails. Supported guardrail types: bedrock, presidio, lakera.
+
+    Example Request:
+    ```bash
+    curl -X GET "http://localhost:4000/guardrails/test/scenarios?guardrail_type=bedrock" \\
+        -H "Authorization: Bearer <your_api_key>"
+    ```
+
+    Example Response:
+    ```json
+    {
+        "guardrail_type": "bedrock",
+        "scenario_categories": {
+            "pii": [
+                {
+                    "scenario_id": "pii_ssn_detection",
+                    "name": "SSN Detection",
+                    "description": "Test detection of US Social Security Numbers",
+                    "test_content": "My SSN is 123-45-6789",
+                    "content_source": "INPUT",
+                    "expected_detected": true,
+                    "expected_action": "ANONYMIZED",
+                    "expected_entities": ["SSN"],
+                    "category": "pii"
+                }
+            ],
+            "toxic_content": [...],
+            "prompt_injection": [...],
+            "sensitive_topics": [...]
+        },
+        "total_scenarios": 28
+    }
+    ```
+    """
+    try:
+        guardrail_type_lower = guardrail_type.lower()
+
+        # Map guardrail types to their scenario functions
+        scenario_functions = {
+            "bedrock": get_bedrock_test_scenarios,
+            "presidio": get_presidio_test_scenarios,
+            "lakera": get_lakera_test_scenarios,
+            "lakera_v2": get_lakera_test_scenarios,  # Alias for lakera
+        }
+
+        if guardrail_type_lower not in scenario_functions:
+            supported_types = ", ".join(scenario_functions.keys())
+            raise HTTPException(
+                status_code=400,
+                detail=f"Unsupported guardrail type: {guardrail_type}. Supported types: {supported_types}",
+            )
+
+        # Get test scenarios for the specified type
+        get_scenarios_func = scenario_functions[guardrail_type_lower]
+        scenario_categories = get_scenarios_func()
+
+        # Count total scenarios
+        total_scenarios = sum(len(scenarios) for scenarios in scenario_categories.values())
+
+        return PredefinedTestScenariosResponse(
+            guardrail_type=guardrail_type_lower,
+            scenario_categories=scenario_categories,
+            total_scenarios=total_scenarios,
+        )
+
+    except HTTPException as e:
+        raise e
+    except Exception as e:
+        verbose_proxy_logger.exception(f"Error getting test scenarios: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get(
+    "/guardrails/test/history",
+    tags=["Guardrails"],
+    dependencies=[Depends(user_api_key_auth)],
+    response_model=TestHistoryListResponse,
+)
+async def get_test_history(
+    guardrail_id: Optional[str] = None,
+    guardrail_type: Optional[str] = None,
+    created_by: Optional[str] = None,
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
+    limit: int = 50,
+    offset: int = 0,
+):
+    """
+    Retrieve test history with optional filters.
+
+    👉 [Guardrail testing docs](https://docs.litellm.ai/docs/proxy/guardrails/testing)
+
+    This endpoint returns historical guardrail test results with filtering and pagination support.
+
+    Example Request:
+    ```bash
+    curl -X GET "http://localhost:4000/guardrails/test/history?guardrail_id=123&limit=20" \\
+        -H "Authorization: Bearer <your_api_key>"
+    ```
+
+    Example Response:
+    ```json
+    {
+        "total_count": 45,
+        "records": [
+            {
+                "test_history_id": "hist-abc123",
+                "test_id": "test-xyz789",
+                "guardrail_id": "123e4567-e89b-12d3-a456-426614174000",
+                "guardrail_name": "my-bedrock-guard",
+                "guardrail_type": "bedrock",
+                "test_scenario_name": "PII Detection Test",
+                "content_source": "INPUT",
+                "test_content_hash": "a1b2c3...",
+                "test_content_preview": "My SSN is 123-45-6789",
+                "detected": true,
+                "action": "BLOCKED",
+                "duration_ms": 245.5,
+                "passed_validation": true,
+                "created_at": "2023-11-09T12:34:56.789Z"
+            }
+        ],
+        "limit": 20,
+        "offset": 0
+    }
+    ```
+    """
+    from litellm.proxy.proxy_server import prisma_client
+    from datetime import datetime
+
+    if prisma_client is None:
+        raise HTTPException(status_code=500, detail="Prisma client not initialized")
+
+    try:
+        history_service = GuardrailTestHistoryService(prisma_client=prisma_client)
+
+        # Parse date strings to datetime if provided
+        start_date_dt = None
+        end_date_dt = None
+        if start_date:
+            try:
+                start_date_dt = datetime.fromisoformat(start_date.replace("Z", "+00:00"))
+            except ValueError:
+                raise HTTPException(status_code=400, detail="Invalid start_date format. Use ISO 8601 format.")
+
+        if end_date:
+            try:
+                end_date_dt = datetime.fromisoformat(end_date.replace("Z", "+00:00"))
+            except ValueError:
+                raise HTTPException(status_code=400, detail="Invalid end_date format. Use ISO 8601 format.")
+
+        # Get test history
+        records = await history_service.get_test_history(
+            guardrail_id=guardrail_id,
+            guardrail_type=guardrail_type,
+            created_by=created_by,
+            start_date=start_date_dt,
+            end_date=end_date_dt,
+            limit=limit,
+            offset=offset,
+        )
+
+        # Convert to response models
+        history_records = [GuardrailTestHistoryRecord(**record) for record in records]
+
+        return TestHistoryListResponse(
+            total_count=len(history_records),
+            records=history_records,
+            limit=limit,
+            offset=offset,
+        )
+
+    except HTTPException as e:
+        raise e
+    except Exception as e:
+        verbose_proxy_logger.exception(f"Error retrieving test history: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get(
+    "/guardrails/{guardrail_id}/test/history",
+    tags=["Guardrails"],
+    dependencies=[Depends(user_api_key_auth)],
+    response_model=TestHistoryListResponse,
+)
+async def get_guardrail_test_history(
+    guardrail_id: str,
+    limit: int = 50,
+    offset: int = 0,
+):
+    """
+    Get test history for a specific guardrail.
+
+    👉 [Guardrail testing docs](https://docs.litellm.ai/docs/proxy/guardrails/testing)
+
+    This endpoint returns test history for a specific guardrail by ID.
+
+    Example Request:
+    ```bash
+    curl -X GET "http://localhost:4000/guardrails/123e4567-e89b-12d3-a456-426614174000/test/history?limit=20" \\
+        -H "Authorization: Bearer <your_api_key>"
+    ```
+
+    Example Response:
+    ```json
+    {
+        "total_count": 12,
+        "records": [...],
+        "limit": 20,
+        "offset": 0
+    }
+    ```
+    """
+    from litellm.proxy.proxy_server import prisma_client
+
+    if prisma_client is None:
+        raise HTTPException(status_code=500, detail="Prisma client not initialized")
+
+    try:
+        history_service = GuardrailTestHistoryService(prisma_client=prisma_client)
+
+        records = await history_service.get_test_history(
+            guardrail_id=guardrail_id,
+            limit=limit,
+            offset=offset,
+        )
+
+        # Convert to response models
+        history_records = [GuardrailTestHistoryRecord(**record) for record in records]
+
+        return TestHistoryListResponse(
+            total_count=len(history_records),
+            records=history_records,
+            limit=limit,
+            offset=offset,
+        )
+
+    except Exception as e:
+        verbose_proxy_logger.exception(f"Error retrieving guardrail test history: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get(
+    "/guardrails/test/history/{test_history_id}",
+    tags=["Guardrails"],
+    dependencies=[Depends(user_api_key_auth)],
+    response_model=GuardrailTestHistoryRecord,
+)
+async def get_test_history_by_id(test_history_id: str):
+    """
+    Get a specific test history record by ID.
+
+    👉 [Guardrail testing docs](https://docs.litellm.ai/docs/proxy/guardrails/testing)
+
+    This endpoint returns detailed information about a specific test history record.
+
+    Example Request:
+    ```bash
+    curl -X GET "http://localhost:4000/guardrails/test/history/hist-abc123" \\
+        -H "Authorization: Bearer <your_api_key>"
+    ```
+
+    Example Response:
+    ```json
+    {
+        "test_history_id": "hist-abc123",
+        "test_id": "test-xyz789",
+        "guardrail_id": "123e4567-e89b-12d3-a456-426614174000",
+        "guardrail_name": "my-bedrock-guard",
+        "guardrail_type": "bedrock",
+        "test_scenario_name": "PII Detection Test",
+        "content_source": "INPUT",
+        "test_content_hash": "a1b2c3...",
+        "test_content_preview": "My SSN is 123-45-6789",
+        "detected": true,
+        "action": "BLOCKED",
+        "action_reason": "PII detected in content",
+        "assessment_details": {...},
+        "duration_ms": 245.5,
+        "passed_validation": true,
+        "validation_errors": [],
+        "created_at": "2023-11-09T12:34:56.789Z",
+        "created_by": "user-123"
+    }
+    ```
+    """
+    from litellm.proxy.proxy_server import prisma_client
+
+    if prisma_client is None:
+        raise HTTPException(status_code=500, detail="Prisma client not initialized")
+
+    try:
+        history_service = GuardrailTestHistoryService(prisma_client=prisma_client)
+
+        record = await history_service.get_test_history_by_id(
+            test_history_id=test_history_id
+        )
+
+        if record is None:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Test history record with ID {test_history_id} not found"
+            )
+
+        return GuardrailTestHistoryRecord(**record)
+
+    except HTTPException as e:
+        raise e
+    except Exception as e:
+        verbose_proxy_logger.exception(f"Error retrieving test history record: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get(
+    "/guardrails/test/statistics",
+    tags=["Guardrails"],
+    dependencies=[Depends(user_api_key_auth)],
+    response_model=TestStatisticsResponse,
+)
+async def get_test_statistics(
+    guardrail_id: Optional[str] = None,
+    guardrail_type: Optional[str] = None,
+    days: int = 30,
+):
+    """
+    Get statistics about guardrail test history.
+
+    👉 [Guardrail testing docs](https://docs.litellm.ai/docs/proxy/guardrails/testing)
+
+    This endpoint returns aggregated statistics about test results including pass rates,
+    detection rates, average duration, and action breakdown.
+
+    Example Request:
+    ```bash
+    curl -X GET "http://localhost:4000/guardrails/test/statistics?guardrail_id=123&days=30" \\
+        -H "Authorization: Bearer <your_api_key>"
+    ```
+
+    Example Response:
+    ```json
+    {
+        "total_tests": 150,
+        "passed_tests": 145,
+        "failed_tests": 5,
+        "detection_rate": 35.5,
+        "average_duration_ms": 267.8,
+        "actions": {
+            "BLOCKED": 45,
+            "ANONYMIZED": 8,
+            "NONE": 97
+        },
+        "date_range": {
+            "start": "2023-10-10T00:00:00Z",
+            "end": "2023-11-09T00:00:00Z"
+        }
+    }
+    ```
+    """
+    from litellm.proxy.proxy_server import prisma_client
+
+    if prisma_client is None:
+        raise HTTPException(status_code=500, detail="Prisma client not initialized")
+
+    try:
+        history_service = GuardrailTestHistoryService(prisma_client=prisma_client)
+
+        stats = await history_service.get_test_statistics(
+            guardrail_id=guardrail_id,
+            guardrail_type=guardrail_type,
+            days=days,
+        )
+
+        if not stats:
+            # Return empty statistics if no data
+            return TestStatisticsResponse(
+                total_tests=0,
+                passed_tests=0,
+                failed_tests=0,
+                detection_rate=0.0,
+                average_duration_ms=0.0,
+                actions={},
+                date_range={"start": "", "end": ""},
+            )
+
+        return TestStatisticsResponse(**stats)
+
+    except Exception as e:
+        verbose_proxy_logger.exception(f"Error retrieving test statistics: {e}")
+        raise HTTPException(status_code=500, detail=str(e))

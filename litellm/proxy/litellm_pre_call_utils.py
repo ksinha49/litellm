@@ -995,22 +995,27 @@ def _enforced_params_check(
 def _add_guardrails_from_key_or_team_metadata(
     key_metadata: Optional[dict],
     team_metadata: Optional[dict],
+    organization_metadata: Optional[dict],
     data: dict,
     metadata_variable_name: str,
 ) -> None:
     """
-    Helper add guardrails from key or team metadata to request data
+    Helper add guardrails from key, team, or organization metadata to request data
+
+    Precedence order: Key > Team > Organization (most specific wins)
 
     Args:
         key_metadata: The key metadata dictionary to check for guardrails
         team_metadata: The team metadata dictionary to check for guardrails
+        organization_metadata: The organization metadata dictionary to check for guardrails
         data: The request data to update
         metadata_variable_name: The name of the metadata field in data
 
     """
     from litellm.proxy.auth.premium import _premium_user_check
 
-    for _management_object_metadata in [key_metadata, team_metadata]:
+    # Check in order: key, then team, then organization (most specific wins)
+    for _management_object_metadata in [key_metadata, team_metadata, organization_metadata]:
         if _management_object_metadata and "guardrails" in _management_object_metadata:
             if len(_management_object_metadata["guardrails"]) > 0:
                 _premium_user_check()
@@ -1029,7 +1034,9 @@ def move_guardrails_to_metadata(
     Helper to add guardrails from request to metadata
 
     - If guardrails set on API Key metadata then sets guardrails on request metadata
-    - If guardrails not set on API key, then checks request metadata
+    - If guardrails not set on API key, checks team metadata
+    - If guardrails not set on team, checks organization metadata
+    - Precedence: Key > Team > Organization (most specific wins)
     """
     from litellm._logging import verbose_proxy_logger
 
@@ -1037,22 +1044,24 @@ def move_guardrails_to_metadata(
     if _metadata_variable_name not in data:
         data[_metadata_variable_name] = {}
 
-    # Check key-level and team-level guardrails
+    # Check key-level, team-level, and organization-level guardrails
     initial_guardrails = list(data[_metadata_variable_name].get("guardrails", []))
 
     _add_guardrails_from_key_or_team_metadata(
         key_metadata=user_api_key_dict.metadata,
         team_metadata=user_api_key_dict.team_metadata,
+        organization_metadata=user_api_key_dict.organization_metadata,
         data=data,
         metadata_variable_name=_metadata_variable_name,
     )
 
-    # Log team guardrail assignment for debugging
+    # Log guardrail assignment for debugging
     final_guardrails = list(data[_metadata_variable_name].get("guardrails", []))
     if final_guardrails != initial_guardrails:
         team_id = getattr(user_api_key_dict, "team_id", None)
+        organization_id = getattr(user_api_key_dict, "organization_id", None)
         verbose_proxy_logger.info(
-            f"Team guardrails applied - team: {team_id}, "
+            f"Guardrails applied - org: {organization_id}, team: {team_id}, "
             f"guardrails: {final_guardrails}"
         )
 

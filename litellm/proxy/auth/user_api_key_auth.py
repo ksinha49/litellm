@@ -1025,6 +1025,17 @@ async def _user_api_key_auth_builder(  # noqa: PLR0915
                     models=valid_token.team_models,
                     metadata=valid_token.team_metadata,
                 )
+
+                # Fetch organization metadata if team has organization_id
+                if valid_token.organization_id is not None and prisma_client is not None:
+                    from litellm.proxy.auth.auth_checks import _get_organization_metadata
+
+                    organization_metadata = await _get_organization_metadata(
+                        organization_id=valid_token.organization_id,
+                        prisma_client=prisma_client,
+                    )
+                    if organization_metadata:
+                        valid_token.organization_metadata = organization_metadata
             else:
                 _team_obj = None
 

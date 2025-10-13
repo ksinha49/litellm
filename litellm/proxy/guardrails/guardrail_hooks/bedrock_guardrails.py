@@ -38,6 +38,11 @@ from litellm.types.guardrails import (
     LitellmParams,
     resolve_bedrock_region_name,
 )
+from litellm.proxy.guardrails.utils.retry_handler import (
+    GuardrailRetryConfig,
+    DEFAULT_BEDROCK_RETRY_CONFIG,
+    async_retry_with_backoff,
+)
 from litellm.types.llms.openai import AllMessageValues
 from litellm.types.proxy.guardrails.guardrail_hooks.bedrock_guardrails import (
     BedrockContentItem,
@@ -108,6 +113,9 @@ class BedrockGuardrail(CustomGuardrail, BaseAWSLLM):
         guardrailIdentifier: Optional[str] = None,
         guardrailVersion: Optional[str] = None,
         disable_exception_on_block: Optional[bool] = False,
+        max_retries: Optional[int] = None,
+        retry_backoff_base: Optional[float] = None,
+        retry_backoff_max: Optional[float] = None,
         **kwargs,
     ):
         def _is_missing(value: Optional[str]) -> bool:
@@ -157,8 +165,10 @@ class BedrockGuardrail(CustomGuardrail, BaseAWSLLM):
 
         BedrockGuardrailConfigModel(**config_kwargs)
 
+        # Initialize HTTP client with optimized timeout for guardrails (30s total, 5s connect)
         self.async_handler = get_async_httpx_client(
-            llm_provider=httpxSpecialProvider.GuardrailCallback
+            llm_provider=httpxSpecialProvider.GuardrailCallback,
+            params={"timeout": httpx.Timeout(timeout=30.0, connect=5.0)},
         )
         self.guardrailIdentifier = guardrailIdentifier
         self.guardrailVersion = guardrailVersion
@@ -170,7 +180,18 @@ class BedrockGuardrail(CustomGuardrail, BaseAWSLLM):
         """
         If True, will not raise an exception when the guardrail is blocked.
         """
-        
+
+        # Initialize retry configuration with production-ready defaults
+        self.retry_config = GuardrailRetryConfig(
+            max_retries=max_retries if max_retries is not None else 5,
+            retry_backoff_base=retry_backoff_base if retry_backoff_base is not None else 0.1,
+            retry_backoff_max=retry_backoff_max if retry_backoff_max is not None else 10.0,
+        )
+        verbose_proxy_logger.info(
+            f"Bedrock Guardrail retry config: max_retries={self.retry_config.max_retries}, "
+            f"backoff_base={self.retry_config.retry_backoff_base}s, "
+            f"backoff_max={self.retry_config.retry_backoff_max}s"
+        )
 
         # Set supported event hooks to include MCP hooks
         if 'supported_event_hooks' not in kwargs:
@@ -181,7 +202,7 @@ class BedrockGuardrail(CustomGuardrail, BaseAWSLLM):
                 GuardrailEventHooks.pre_mcp_call,
                 GuardrailEventHooks.during_mcp_call,
             ]
-        
+
         super().__init__(**kwargs)
         BaseAWSLLM.__init__(self)
 
@@ -396,8 +417,27 @@ class BedrockGuardrail(CustomGuardrail, BaseAWSLLM):
 
         return prepped_request
 
+    @async_retry_with_backoff()
+    async def _make_bedrock_api_request_with_retry(
+        self,
+        prepared_request: Any,
+        request_data: Optional[dict],
+        bedrock_request_data: dict,
+    ) -> httpx.Response:
+        """
+        Internal method to make the actual HTTP request with retry logic.
+
+        This is separated to allow the retry decorator to work properly.
+        """
+        response = await self.async_handler.post(
+            url=prepared_request.url,
+            data=prepared_request.body,  # type: ignore
+            headers=prepared_request.headers,  # type: ignore
+        )
+        return response
+
     async def make_bedrock_api_request(
-        self, 
+        self,
         source: Literal["INPUT", "OUTPUT"],
         messages: Optional[List[AllMessageValues]] = None,
         response: Optional[Union[Any, litellm.ModelResponse]] = None,
@@ -438,10 +478,11 @@ class BedrockGuardrail(CustomGuardrail, BaseAWSLLM):
             prepared_request.headers,
         )
 
-        response = await self.async_handler.post(
-            url=prepared_request.url,
-            data=prepared_request.body,  # type: ignore
-            headers=prepared_request.headers,  # type: ignore
+        # Make the request with automatic retry logic for 429 and 5xx errors
+        response = await self._make_bedrock_api_request_with_retry(
+            prepared_request=prepared_request,
+            request_data=request_data,
+            bedrock_request_data=bedrock_request_data,
         )
 
         try:
