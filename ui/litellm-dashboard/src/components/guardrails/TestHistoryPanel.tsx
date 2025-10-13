@@ -29,7 +29,7 @@ import {
   Select,
   SelectItem,
 } from "@tremor/react";
-import { NotificationsManager } from "../molecules/notifications_manager";
+import NotificationsManager from "../molecules/notifications_manager";
 import {
   getGuardrailTestHistoryCall,
   getTestStatisticsCall,
