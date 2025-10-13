@@ -65,12 +65,6 @@ const ModelDiagnostics: React.FC<ModelDiagnosticsProps> = ({
 
   const isAdmin = userRole === "Admin" || userRole === "Proxy Admin";
 
-  useEffect(() => {
-    if (accessToken) {
-      loadDiagnostics();
-    }
-  }, [accessToken, loadDiagnostics]);
-
   const loadDiagnostics = useCallback(async () => {
     if (!accessToken) {
       message.error("No access token available");
@@ -96,6 +90,12 @@ const ModelDiagnostics: React.FC<ModelDiagnosticsProps> = ({
       setLoading(false);
     }
   }, [accessToken]);
+
+  useEffect(() => {
+    if (accessToken) {
+      loadDiagnostics();
+    }
+  }, [accessToken, loadDiagnostics]);
 
   const handleFixClick = (model: DiagnosticModelInfo) => {
     setSelectedModel(model);
