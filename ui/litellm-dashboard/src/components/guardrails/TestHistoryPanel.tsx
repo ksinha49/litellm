@@ -39,7 +39,7 @@ interface TestHistoryPanelProps {
   guardrailId: string;
   guardrailName: string;
   guardrailType: string;
-  accessToken: string;
+  accessToken: string | null;
 }
 
 interface TestHistoryRecord {
@@ -97,6 +97,10 @@ const TestHistoryPanel: React.FC<TestHistoryPanelProps> = ({
 
   // Load test history and statistics
   const loadHistory = async () => {
+    if (!accessToken) {
+      return;
+    }
+
     setLoading(true);
     try {
       // Load test history
