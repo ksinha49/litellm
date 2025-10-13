@@ -279,17 +279,19 @@ async def _add_model_to_db(
     # encrypt litellm params with salt-key hash prefix #
     _litellm_params_dict = model_params.litellm_params.model_dump(exclude_none=True)
     _orignal_litellm_model_name = model_params.litellm_params.model
+
+    # Create encrypted dict without mutating the original Pydantic model
+    _encrypted_litellm_params_dict = {}
     for k, v in _litellm_params_dict.items():
         prefixed_encrypted_value = encrypt_value_helper(
             value=v, new_encryption_key=new_encryption_key
         )
-        model_params.litellm_params[k] = prefixed_encrypted_value
+        _encrypted_litellm_params_dict[k] = prefixed_encrypted_value
+
     _data: dict = {
         "model_id": model_params.model_info.id,
         "model_name": model_params.model_name,
-        "litellm_params": model_params.litellm_params.model_dump(
-            mode="json", exclude_none=True
-        ),  # type: ignore
+        "litellm_params": _encrypted_litellm_params_dict,  # Use the encrypted dict directly
         "model_info": model_params.model_info.model_dump(
             mode="json", exclude_none=True
         ),  # type: ignore
@@ -883,15 +885,15 @@ async def update_model(
             )
 
             ### ENCRYPT PARAMS ###
+            _encrypted_params_dict = {}
             for k, v in _new_litellm_params_dict.items():
                 prefixed_encrypted_value = encrypt_value_helper(value=v)
-                model_params.litellm_params[k] = prefixed_encrypted_value
+                _encrypted_params_dict[k] = prefixed_encrypted_value
 
             ### MERGE WITH EXISTING DATA ###
             merged_dictionary = {}
-            _mp = model_params.litellm_params.dict()
 
-            for key, value in _mp.items():
+            for key, value in _encrypted_params_dict.items():
                 if value is not None:
                     merged_dictionary[key] = value
                 elif (
