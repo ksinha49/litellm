@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import {
   Card,
   Title,
@@ -95,54 +95,54 @@ export default function ModelInfoView({
     modelData?.litellm_params?.litellm_credential_name
   );
 
-  useEffect(() => {
-    const getExistingCredential = async () => {
-      console.log("accessToken, ", accessToken);
-      if (!accessToken) return;
-      if (usingExistingCredential) return;
-      let existingCredentialResponse = await credentialGetCall(
-        accessToken,
-        null,
-        modelId
+  const getExistingCredential = useCallback(async () => {
+    console.log("accessToken, ", accessToken);
+    if (!accessToken) return;
+    if (usingExistingCredential) return;
+    let existingCredentialResponse = await credentialGetCall(
+      accessToken,
+      null,
+      modelId
+    );
+    console.log("existingCredentialResponse, ", existingCredentialResponse);
+    setExistingCredential({
+      credential_name: existingCredentialResponse["credential_name"],
+      credential_values: existingCredentialResponse["credential_values"],
+      credential_info: existingCredentialResponse["credential_info"],
+    });
+  }, [accessToken, modelId, usingExistingCredential]);
+
+  const getModelInfo = useCallback(async () => {
+    if (!accessToken) return;
+    let modelInfoResponse = await modelInfoV1Call(accessToken, modelId);
+    console.log("modelInfoResponse, ", modelInfoResponse);
+    let specificModelData = modelInfoResponse.data[0];
+    setLocalModelData(specificModelData);
+
+    // Check if cache control is enabled
+    if (specificModelData?.litellm_params?.cache_control_injection_points) {
+      setShowCacheControl(true);
+    }
+  }, [accessToken, modelId]);
+
+  const fetchGuardrails = useCallback(async () => {
+    if (!accessToken) return;
+    try {
+      const response = await getGuardrailsList(accessToken);
+      const guardrailNames = response.guardrails.map(
+        (g: { guardrail_name: string }) => g.guardrail_name
       );
-      console.log("existingCredentialResponse, ", existingCredentialResponse);
-      setExistingCredential({
-        credential_name: existingCredentialResponse["credential_name"],
-        credential_values: existingCredentialResponse["credential_values"],
-        credential_info: existingCredentialResponse["credential_info"],
-      });
-    };
+      setGuardrailsList(guardrailNames);
+    } catch (error) {
+      console.error("Failed to fetch guardrails:", error);
+    }
+  }, [accessToken]);
 
-    const getModelInfo = async () => {
-      if (!accessToken) return;
-      let modelInfoResponse = await modelInfoV1Call(accessToken, modelId);
-      console.log("modelInfoResponse, ", modelInfoResponse);
-      let specificModelData = modelInfoResponse.data[0];
-      setLocalModelData(specificModelData);
-
-      // Check if cache control is enabled
-      if (specificModelData?.litellm_params?.cache_control_injection_points) {
-        setShowCacheControl(true);
-      }
-    };
-
-    const fetchGuardrails = async () => {
-      if (!accessToken) return;
-      try {
-        const response = await getGuardrailsList(accessToken);
-        const guardrailNames = response.guardrails.map(
-          (g: { guardrail_name: string }) => g.guardrail_name
-        );
-        setGuardrailsList(guardrailNames);
-      } catch (error) {
-        console.error("Failed to fetch guardrails:", error);
-      }
-    };
-
+  useEffect(() => {
     getExistingCredential();
     getModelInfo();
     fetchGuardrails();
-  }, [accessToken, modelId]);
+  }, [getExistingCredential, getModelInfo, fetchGuardrails]);
 
   const handleReuseCredential = async (values: any) => {
     console.log("values, ", values);

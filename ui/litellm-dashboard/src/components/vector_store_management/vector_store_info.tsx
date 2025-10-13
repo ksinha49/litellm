@@ -50,13 +50,13 @@ const VectorStoreInfoView: React.FC<VectorStoreInfoViewProps> = ({
   const [credentials, setCredentials] = useState<CredentialItem[]>([]);
   const [activeTab, setActiveTab] = useState<string>(editVectorStore ? "details" : "details");
 
-  const fetchVectorStoreDetails = async () => {
+  const fetchVectorStoreDetails = React.useCallback(async () => {
     if (!accessToken) return;
     try {
       const response = await vectorStoreInfoCall(accessToken, vectorStoreId);
       if (response && response.vector_store) {
         setVectorStoreDetails(response.vector_store);
-        
+
         // If metadata exists and is an object, stringify it for display/editing
         if (response.vector_store.vector_store_metadata) {
           const metadata = typeof response.vector_store.vector_store_metadata === 'string'
@@ -64,7 +64,7 @@ const VectorStoreInfoView: React.FC<VectorStoreInfoViewProps> = ({
             : response.vector_store.vector_store_metadata;
           setMetadataString(JSON.stringify(metadata, null, 2));
         }
-        
+
         if (editVectorStore) {
           form.setFieldsValue({
             vector_store_id: response.vector_store.vector_store_id,
@@ -78,9 +78,9 @@ const VectorStoreInfoView: React.FC<VectorStoreInfoViewProps> = ({
       console.error("Error fetching vector store details:", error);
       NotificationsManager.fromBackend("Error fetching vector store details: " + error);
     }
-  };
+  }, [accessToken, vectorStoreId, editVectorStore, form]);
 
-  const fetchCredentials = async () => {
+  const fetchCredentials = React.useCallback(async () => {
     if (!accessToken) return;
     try {
       const response = await credentialListCall(accessToken);
@@ -89,12 +89,12 @@ const VectorStoreInfoView: React.FC<VectorStoreInfoViewProps> = ({
     } catch (error) {
       console.error("Error fetching credentials:", error);
     }
-  };
+  }, [accessToken]);
 
   useEffect(() => {
     fetchVectorStoreDetails();
     fetchCredentials();
-  }, [vectorStoreId, accessToken]);
+  }, [vectorStoreId, accessToken, fetchVectorStoreDetails, fetchCredentials]);
 
   const handleSave = async (values: any) => {
     if (!accessToken) return;

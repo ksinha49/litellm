@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { Button, message, Spin, Alert, Collapse, Badge } from "antd";
 import { CheckCircleOutlined, ExclamationCircleOutlined, ReloadOutlined, ToolOutlined, InfoCircleOutlined } from "@ant-design/icons";
 import { Card, Title, Text } from "@tremor/react";
@@ -25,14 +25,14 @@ const MCPConnectionStatus: React.FC<MCPConnectionStatusProps> = ({
   // Check if we have the minimum required fields to fetch tools
   const canFetchTools = formValues.url && formValues.transport && formValues.auth_type && accessToken;
 
-  const fetchTools = async () => {
+  const fetchTools = useCallback(async () => {
     if (!accessToken || !formValues.url) {
       return;
     }
 
     setIsLoadingTools(true);
     setToolsError(null);
-    
+
     try {
       // Prepare the MCP server config from form values
       const mcpServerConfig = {
@@ -46,7 +46,7 @@ const MCPConnectionStatus: React.FC<MCPConnectionStatusProps> = ({
       };
 
       const toolsResponse = await testMCPToolsListRequest(accessToken, mcpServerConfig);
-      
+
       if (toolsResponse.tools && !toolsResponse.error) {
         setTools(toolsResponse.tools);
         setToolsError(null);
@@ -70,7 +70,7 @@ const MCPConnectionStatus: React.FC<MCPConnectionStatusProps> = ({
     } finally {
       setIsLoadingTools(false);
     }
-  };
+  }, [accessToken, formValues.url, formValues.server_id, formValues.server_name, formValues.transport, formValues.spec_version, formValues.auth_type, formValues.mcp_info, hasShownSuccessMessage, onToolsLoaded]);
 
   // Auto-fetch tools when form values change and required fields are available
   useEffect(() => {
@@ -83,7 +83,7 @@ const MCPConnectionStatus: React.FC<MCPConnectionStatusProps> = ({
       setHasShownSuccessMessage(false);
       onToolsLoaded?.([]);
     }
-  }, [formValues.url, formValues.transport, formValues.auth_type, formValues.spec_version, accessToken]);
+  }, [formValues.url, formValues.transport, formValues.auth_type, formValues.spec_version, accessToken, canFetchTools, fetchTools, onToolsLoaded]);
 
   // Don't show anything if required fields aren't filled
   if (!canFetchTools && !formValues.url) {

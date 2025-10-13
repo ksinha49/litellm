@@ -136,6 +136,7 @@ const EntityUsage: React.FC<EntityUsageProps> = ({
 
   useEffect(() => {
     fetchSpendData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [accessToken, dateValue, entityId, selectedTags]);
 
   const getTopModels = () => {

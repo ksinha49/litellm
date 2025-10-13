@@ -61,7 +61,7 @@ const TagManagement: React.FC<TagProps> = ({
   const [form] = Form.useForm();
   const [availableModels, setAvailableModels] = useState<ModelInfo[]>([]);
 
-  const fetchTags = async () => {
+  const fetchTags = React.useCallback(async () => {
     if (!accessToken) return;
     try {
       const response = await tagListCall(accessToken);
@@ -77,7 +77,7 @@ const TagManagement: React.FC<TagProps> = ({
       console.error("Error fetching tags:", error);
       NotificationsManager.fromBackend("Error fetching tags: " + error);
     }
-  };
+  }, [accessToken]);
 
   const handleRefreshClick = () => {
     fetchTags();
@@ -141,7 +141,7 @@ const TagManagement: React.FC<TagProps> = ({
 
   useEffect(() => {
     fetchTags();
-  }, [accessToken]);
+  }, [accessToken, fetchTags]);
 
   return (
     <div className="w-full mx-4 h-[75vh]">

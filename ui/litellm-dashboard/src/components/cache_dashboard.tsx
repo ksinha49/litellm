@@ -152,7 +152,7 @@ const CacheDashboard: React.FC<CachePageProps> = ({
 
     const currentDate = new Date();
     setLastRefreshed(currentDate.toLocaleString());
-  }, [accessToken]);
+  }, [accessToken, dateValue]);
 
     const uniqueApiKeys = Array.from(new Set(data.map((item) => item?.api_key ?? "")));
     const uniqueModels = Array.from(new Set(data.map((item) => item?.model ?? "")));

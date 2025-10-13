@@ -30,7 +30,7 @@ const MemberPermissions: React.FC<MemberPermissionsProps> = ({ teamId, accessTok
   const [saving, setSaving] = useState(false)
   const [hasChanges, setHasChanges] = useState(false)
 
-  const fetchPermissions = async () => {
+  const fetchPermissions = React.useCallback(async () => {
     try {
       setLoading(true)
       if (!accessToken) return
@@ -46,11 +46,11 @@ const MemberPermissions: React.FC<MemberPermissionsProps> = ({ teamId, accessTok
     } finally {
       setLoading(false)
     }
-  }
+  }, [accessToken, teamId])
 
   useEffect(() => {
     fetchPermissions()
-  }, [teamId, accessToken])
+  }, [teamId, accessToken, fetchPermissions])
 
   const handlePermissionChange = (permission: string, checked: boolean) => {
     const newSelectedPermissions = checked

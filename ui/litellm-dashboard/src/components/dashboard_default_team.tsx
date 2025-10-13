@@ -39,16 +39,16 @@ const DashboardTeam: React.FC<DashboardTeamProps> = ({
     max_budget: userInfo?.max_budget || null,
   }
 
-  const getProxySettings = async () => {
+  const getProxySettings = React.useCallback(async () => {
     if (proxySettings === null && accessToken) {
       const proxy_settings: ProxySettings = await getProxyUISettings(accessToken);
       setProxySettings(proxy_settings);
     }
-  };
+  }, [proxySettings, accessToken, setProxySettings]);
 
   useEffect(() => {
     getProxySettings();
-  }, [proxySettings]);
+  }, [getProxySettings]);
 
   const [value, setValue] = useState(defaultTeam);
 

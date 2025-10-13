@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react"
+import React, { useState, useEffect, useCallback } from "react"
 import {
   Card,
   Title,
@@ -73,7 +73,8 @@ const GuardrailInfoView: React.FC<GuardrailInfoProps> = ({ guardrailId, onClose,
     supported_modes: string[]
   } | null>(null)
   const [copiedStates, setCopiedStates] = useState<Record<string, boolean>>({})
-  const fetchGuardrailInfo = async () => {
+
+  const fetchGuardrailInfo = useCallback(async () => {
     try {
       setLoading(true)
       if (!accessToken) return
@@ -112,9 +113,9 @@ const GuardrailInfoView: React.FC<GuardrailInfoProps> = ({ guardrailId, onClose,
     } finally {
       setLoading(false)
     }
-  }
+  }, [accessToken, guardrailId])
 
-  const fetchGuardrailProviderSpecificParams = async () => {
+  const fetchGuardrailProviderSpecificParams = useCallback(async () => {
     try {
       if (!accessToken) return
       const response = await getGuardrailProviderSpecificParams(accessToken)
@@ -122,9 +123,9 @@ const GuardrailInfoView: React.FC<GuardrailInfoProps> = ({ guardrailId, onClose,
     } catch (error) {
       console.error("Error fetching guardrail provider specific params:", error)
     }
-  }
+  }, [accessToken])
 
-  const fetchGuardrailUISettings = async () => {
+  const fetchGuardrailUISettings = useCallback(async () => {
     try {
       if (!accessToken) return
       const uiSettings = await getGuardrailUISettings(accessToken)
@@ -132,16 +133,16 @@ const GuardrailInfoView: React.FC<GuardrailInfoProps> = ({ guardrailId, onClose,
     } catch (error) {
       console.error("Error fetching guardrail UI settings:", error)
     }
-  }
+  }, [accessToken])
 
   useEffect(() => {
     fetchGuardrailProviderSpecificParams()
-  }, [accessToken])
+  }, [fetchGuardrailProviderSpecificParams])
 
   useEffect(() => {
     fetchGuardrailInfo()
     fetchGuardrailUISettings()
-  }, [guardrailId, accessToken])
+  }, [fetchGuardrailInfo, fetchGuardrailUISettings])
 
   // Reset form when guardrail data or provider params change
   useEffect(() => {

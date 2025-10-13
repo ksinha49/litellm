@@ -174,7 +174,7 @@ const Teams: React.FC<TeamProps> = ({
       fetchTeams(accessToken, userID, userRole, currentOrg, setTeams);
     }
     handleRefreshClick();
-  }, [lastRefreshed]);
+  }, [lastRefreshed, accessToken, userID, userRole, currentOrg, setTeams]);
 
   const [form] = Form.useForm();
   const [memberForm] = Form.useForm();
@@ -215,7 +215,7 @@ const Teams: React.FC<TeamProps> = ({
     console.log(`models: ${models}`);
     setModelsToPick(models);
     form.setFieldValue("models", []);
-  }, [currentOrgForCreateTeam, userModels]);
+  }, [currentOrgForCreateTeam, userModels, form]);
 
   // Add this useEffect to fetch guardrails
   useEffect(() => {
@@ -238,7 +238,7 @@ const Teams: React.FC<TeamProps> = ({
     fetchGuardrails();
   }, [accessToken]);
 
-  const fetchMcpAccessGroups = async () => {
+  const fetchMcpAccessGroups = React.useCallback(async () => {
     try {
       if (accessToken == null) {
         return;
@@ -248,11 +248,11 @@ const Teams: React.FC<TeamProps> = ({
     } catch (error) {
       console.error("Failed to fetch MCP access groups:", error);
     }
-  };
+  }, [accessToken]);
 
   useEffect(() => {
     fetchMcpAccessGroups();
-  }, [accessToken]);
+  }, [fetchMcpAccessGroups]);
 
   useEffect(() => {
     const fetchTeamInfo = () => {

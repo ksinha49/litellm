@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { Card, Title, Text, Badge } from "@tremor/react";
 import { Button, Select, Tabs, Table, Tag, Progress, Collapse, Alert, Spin } from "antd";
 import {
@@ -51,11 +51,7 @@ const ScenarioTestPanel: React.FC<ScenarioTestPanelProps> = ({ guardrailId, guar
   const [runningTest, setRunningTest] = useState(false);
   const [testResults, setTestResults] = useState<TestSuiteResult | null>(null);
 
-  useEffect(() => {
-    fetchScenarios();
-  }, [accessToken, guardrailType]);
-
-  const fetchScenarios = async () => {
+  const fetchScenarios = useCallback(async () => {
     if (!accessToken) return;
 
     setLoadingScenarios(true);
@@ -68,7 +64,11 @@ const ScenarioTestPanel: React.FC<ScenarioTestPanelProps> = ({ guardrailId, guar
     } finally {
       setLoadingScenarios(false);
     }
-  };
+  }, [accessToken, guardrailType]);
+
+  useEffect(() => {
+    fetchScenarios();
+  }, [fetchScenarios]);
 
   const getFilteredScenarios = (): TestScenario[] => {
     if (selectedCategory === "all") {

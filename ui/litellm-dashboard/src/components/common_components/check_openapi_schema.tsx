@@ -112,22 +112,22 @@ const SchemaFormFields: React.FC<SchemaFormFieldsProps> = ({
       try {
         const schema = await getOpenAPISchema();
         const componentSchema = schema.components.schemas[schemaComponent];
-        
+
         if (!componentSchema) {
           throw new Error(`Schema component "${schemaComponent}" not found`);
         }
 
         setSchemaProperties(componentSchema);
-        
+
         const defaultFormValues: { [key: string]: any } = {};
         Object.keys(componentSchema.properties)
           .filter(key => !excludedFields.includes(key) && defaultValues[key] !== undefined)
           .forEach(key => {
             defaultFormValues[key] = defaultValues[key];
           });
-        
+
         form.setFieldsValue(defaultFormValues);
-        
+
       } catch (error) {
         console.error('Schema fetch error:', error);
         setError(error instanceof Error ? error.message : 'Failed to fetch schema');
@@ -135,7 +135,7 @@ const SchemaFormFields: React.FC<SchemaFormFieldsProps> = ({
     };
 
     fetchOpenAPISchema();
-  }, [schemaComponent, form, excludedFields]);
+  }, [schemaComponent, form, excludedFields, defaultValues]);
 
   const getPropertyType = (property: SchemaProperty): string => {
     if (property.type) {

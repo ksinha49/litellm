@@ -49,10 +49,10 @@ export function useFilterLogic({
       if (!accessToken) {
         return;
       }
-  
+
       const currentTimestamp = Date.now();
       lastSearchTimestamp.current = currentTimestamp;
-  
+
       try {
         // Make the API call using userListCall with all filter parameters
         const data = await keyListCall(
@@ -67,7 +67,7 @@ export function useFilterLogic({
           filters["Sort By"] || null,
           filters["Sort Order"] || null
         );
-        
+
         // Only update state if this is the most recent search
         if (currentTimestamp === lastSearchTimestamp.current) {
           if (data) {
@@ -80,7 +80,7 @@ export function useFilterLogic({
         console.error("Error searching users:", error);
       }
     }, 300),
-    [accessToken]
+    [accessToken, setFilteredKeys]
   );
   // Apply filters to keys whenever keys or filters change
   useEffect(() => {

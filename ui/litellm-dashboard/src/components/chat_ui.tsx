@@ -203,6 +203,7 @@ const ChatUI: React.FC<ChatUIProps> = ({
     if (isMCPToolsModalVisible) {
       loadMCPTools();
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isMCPToolsModalVisible, accessToken, apiKey, apiKeySource]);
 
   useEffect(() => {
@@ -278,9 +279,9 @@ const ChatUI: React.FC<ChatUIProps> = ({
         const uniqueModels = await fetchAvailableModels(
           userApiKey,
         );
-  
+
         console.log("Fetched models:", uniqueModels);
-  
+
         if (uniqueModels.length > 0) {
           setModelInfo(uniqueModels);
           if (!selectedModel) {
@@ -291,10 +292,11 @@ const ChatUI: React.FC<ChatUIProps> = ({
         console.error("Error fetching model info:", error);
       }
     };
-  
+
     loadModels();
     loadMCPTools();
-  }, [accessToken, userID, userRole, apiKeySource, apiKey, token]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [accessToken, userID, userRole, apiKeySource, apiKey, token, selectedModel]);
   
 
   useEffect(() => {

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react"
+import React, { useState, useEffect, useCallback } from "react"
 import {
   Card,
   Title,
@@ -36,7 +36,7 @@ const PromptInfoView: React.FC<PromptInfoProps> = ({ promptId, onClose, accessTo
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
 
-  const fetchPromptInfo = async () => {
+  const fetchPromptInfo = useCallback(async () => {
     try {
       setLoading(true)
       if (!accessToken) return
@@ -50,11 +50,11 @@ const PromptInfoView: React.FC<PromptInfoProps> = ({ promptId, onClose, accessTo
     } finally {
       setLoading(false)
     }
-  }
+  }, [accessToken, promptId])
 
   useEffect(() => {
     fetchPromptInfo()
-  }, [promptId, accessToken])
+  }, [fetchPromptInfo])
 
   if (loading) {
     return <div className="p-4">Loading...</div>

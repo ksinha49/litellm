@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { keyListCall, Member, Organization } from '../networking';
 import { Setter } from '@/types';
 
@@ -131,7 +131,7 @@ const useKeyList = ({
     const [isLoading, setIsLoading] = useState<boolean>(true);
     const [error, setError] = useState<Error | null>(null);
 
-    const fetchKeys = async (params: Record<string, unknown> = {}): Promise<void> => {
+    const fetchKeys = useCallback(async (params: Record<string, unknown> = {}): Promise<void> => {
         try {
             console.log("calling fetchKeys");
             if (!accessToken) {
@@ -161,7 +161,7 @@ const useKeyList = ({
         } finally {
             setIsLoading(false);
         }
-    };
+    }, [accessToken]);
 
     useEffect(() => {
         fetchKeys();
@@ -175,7 +175,7 @@ const useKeyList = ({
           'selectedKeyAlias',
           selectedKeyAlias
         );
-    }, [selectedTeam, currentOrg, accessToken, selectedKeyAlias, createClicked]);
+    }, [selectedTeam, currentOrg, accessToken, selectedKeyAlias, createClicked, fetchKeys]);
 
     const setKeys = (newKeysOrUpdater: KeyResponse[] | ((prevKeys: KeyResponse[]) => KeyResponse[])) => {
         setKeyData(prevData => {

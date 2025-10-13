@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react"
+import React, { useState, useEffect, useCallback } from "react"
 import {
   Card,
   Title,
@@ -27,14 +27,7 @@ const UIThemeSettings: React.FC<UIThemeSettingsProps> = ({
   const [logoUrlInput, setLogoUrlInput] = useState<string>("");
   const [loading, setLoading] = useState(false);
 
-  // Load current settings when component mounts
-  useEffect(() => {
-    if (accessToken) {
-      fetchLogoSettings();
-    }
-  }, [accessToken]);
-
-  const fetchLogoSettings = async () => {
+  const fetchLogoSettings = useCallback(async () => {
     try {
       const proxyBaseUrl = getProxyBaseUrl();
       const url = proxyBaseUrl ? `${proxyBaseUrl}/get/ui_theme_settings` : "/get/ui_theme_settings";
@@ -55,7 +48,14 @@ const UIThemeSettings: React.FC<UIThemeSettingsProps> = ({
     } catch (error) {
       console.error("Error fetching theme settings:", error);
     }
-  };
+  }, [accessToken, setLogoUrl]);
+
+  // Load current settings when component mounts
+  useEffect(() => {
+    if (accessToken) {
+      fetchLogoSettings();
+    }
+  }, [accessToken, fetchLogoSettings]);
 
   const handleSave = async () => {
     setLoading(true);

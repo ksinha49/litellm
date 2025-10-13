@@ -77,29 +77,29 @@ export function UserDataTable({
   };
 
   // Selection handlers
-  const handleSelectUser = (user: UserInfo, isSelected: boolean) => {
+  const handleSelectUser = React.useCallback((user: UserInfo, isSelected: boolean) => {
     if (!onSelectionChange) return;
-    
+
     if (isSelected) {
       onSelectionChange([...selectedUsers, user]);
     } else {
       onSelectionChange(selectedUsers.filter(u => u.user_id !== user.user_id));
     }
-  };
+  }, [onSelectionChange, selectedUsers]);
 
-  const handleSelectAll = (isSelected: boolean) => {
+  const handleSelectAll = React.useCallback((isSelected: boolean) => {
     if (!onSelectionChange) return;
-    
+
     if (isSelected) {
       onSelectionChange(data);
     } else {
       onSelectionChange([]);
     }
-  };
+  }, [onSelectionChange, data]);
 
-  const isUserSelected = (user: UserInfo) => {
+  const isUserSelected = React.useCallback((user: UserInfo) => {
     return selectedUsers.some(u => u.user_id === user.user_id);
-  };
+  }, [selectedUsers]);
 
   const isAllSelected = data.length > 0 && selectedUsers.length === data.length;
   const isIndeterminate = selectedUsers.length > 0 && selectedUsers.length < data.length;
@@ -124,7 +124,7 @@ export function UserDataTable({
       );
     }
     return originalColumns;
-  }, [possibleUIRoles, handleEdit, handleDelete, handleResetPassword, handleUserClick, originalColumns, enableSelection, selectedUsers, isAllSelected, isIndeterminate]);
+  }, [possibleUIRoles, handleEdit, handleDelete, handleResetPassword, handleUserClick, originalColumns, enableSelection, selectedUsers, isAllSelected, isIndeterminate, handleSelectUser, handleSelectAll, isUserSelected]);
 
   const table = useReactTable({
     data,

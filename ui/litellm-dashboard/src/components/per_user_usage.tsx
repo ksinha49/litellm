@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import {
   Card,
   Title,
@@ -62,7 +62,7 @@ const PerUserUsage: React.FC<PerUserUsageProps> = ({
   const [loading, setLoading] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
 
-  const fetchPerUserData = async () => {
+  const fetchPerUserData = useCallback(async () => {
     if (!accessToken) return;
 
     setLoading(true);
@@ -79,11 +79,11 @@ const PerUserUsage: React.FC<PerUserUsageProps> = ({
     } finally {
       setLoading(false);
     }
-  };
+  }, [accessToken, selectedTags, currentPage]);
 
   useEffect(() => {
     fetchPerUserData();
-  }, [accessToken, selectedTags, currentPage]);
+  }, [fetchPerUserData]);
 
   const handleNextPage = () => {
     if (currentPage < perUserData.total_pages) {

@@ -822,7 +822,7 @@ export function RequestViewer({ row, accessToken, formattedStartTime }: RequestV
   }
 
   // Extract error information from metadata if available
-  const metadata = logData.metadata || {}
+  const metadata = useMemo(() => logData.metadata || {}, [logData.metadata])
   const resolvedStatus =
     (metadata?.status ?? logData.status ?? row.original?.status ?? null) as string | null
   const normalizedStatus =

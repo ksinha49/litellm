@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import {
   Card,
   Title,
@@ -103,7 +103,7 @@ const UserAgentActivity: React.FC<UserAgentActivityProps> = ({
   // Use today's date as the end date for all API calls
   const today = new Date();
 
-  const fetchAvailableTags = async () => {
+  const fetchAvailableTags = useCallback(async () => {
     if (!accessToken) return;
 
     setTagsLoading(true);
@@ -115,9 +115,9 @@ const UserAgentActivity: React.FC<UserAgentActivityProps> = ({
     } finally {
       setTagsLoading(false);
     }
-  };
+  }, [accessToken]);
 
-  const fetchDauData = async () => {
+  const fetchDauData = useCallback(async () => {
     if (!accessToken) return;
 
     setDauLoading(true);
@@ -134,9 +134,9 @@ const UserAgentActivity: React.FC<UserAgentActivityProps> = ({
     } finally {
       setDauLoading(false);
     }
-  };
+  }, [accessToken, userAgentFilter, selectedTags]);
 
-  const fetchWauData = async () => {
+  const fetchWauData = useCallback(async () => {
     if (!accessToken) return;
 
     setWauLoading(true);
@@ -153,9 +153,9 @@ const UserAgentActivity: React.FC<UserAgentActivityProps> = ({
     } finally {
       setWauLoading(false);
     }
-  };
+  }, [accessToken, userAgentFilter, selectedTags]);
 
-  const fetchMauData = async () => {
+  const fetchMauData = useCallback(async () => {
     if (!accessToken) return;
 
     setMauLoading(true);
@@ -172,16 +172,16 @@ const UserAgentActivity: React.FC<UserAgentActivityProps> = ({
     } finally {
       setMauLoading(false);
     }
-  };
+  }, [accessToken, userAgentFilter, selectedTags]);
 
-  const fetchSummaryData = async () => {
+  const fetchSummaryData = useCallback(async () => {
     if (!accessToken || !dateValue.from || !dateValue.to) return;
 
     setSummaryLoading(true);
     try {
       const summary = await userAgentSummaryCall(
-        accessToken, 
-        dateValue.from, 
+        accessToken,
+        dateValue.from,
         dateValue.to,
         selectedTags.length > 0 ? selectedTags : undefined
       );
@@ -192,7 +192,7 @@ const UserAgentActivity: React.FC<UserAgentActivityProps> = ({
       setSummaryLoading(false);
       setIsDateChanging(false);
     }
-  };
+  }, [accessToken, dateValue, selectedTags]);
 
   // Super responsive date change handler
   const handleDateChange = (newValue: DateRangePickerValue) => {
@@ -207,7 +207,7 @@ const UserAgentActivity: React.FC<UserAgentActivityProps> = ({
   // Effect to fetch available tags on mount
   useEffect(() => {
     fetchAvailableTags();
-  }, [accessToken]);
+  }, [fetchAvailableTags]);
 
   // Effect for DAU/WAU/MAU data (independent of date picker)
   useEffect(() => {
@@ -220,7 +220,7 @@ const UserAgentActivity: React.FC<UserAgentActivityProps> = ({
     }, 50);
 
     return () => clearTimeout(timeoutId);
-  }, [accessToken, userAgentFilter, selectedTags]);
+  }, [accessToken, userAgentFilter, selectedTags, fetchDauData, fetchWauData, fetchMauData]);
 
   // Effect for summary data (depends on date picker)
   useEffect(() => {
@@ -231,7 +231,7 @@ const UserAgentActivity: React.FC<UserAgentActivityProps> = ({
     }, 50);
 
     return () => clearTimeout(timeoutId);
-  }, [accessToken, dateValue, selectedTags]);
+  }, [dateValue, fetchSummaryData]);
 
   // Helper function to extract user agent from tag
   const extractUserAgent = (tag: string): string => {

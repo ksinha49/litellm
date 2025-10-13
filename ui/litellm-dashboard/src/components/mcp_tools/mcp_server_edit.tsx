@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { Form, Select, Button as AntdButton, message, Input, Space, Tooltip } from "antd";
 import { Button, TextInput, TabGroup, TabList, Tab, TabPanels, TabPanel } from "@tremor/react";
 import { MCPServer, MCPServerCostInfo } from "./types";
@@ -38,20 +38,15 @@ const MCPServerEdit: React.FC<MCPServerEditProps> = ({ mcpServer, accessToken, o
       const groupNames = mcpServer.mcp_access_groups.map((g: any) => typeof g === 'string' ? g : g.name || String(g));
       form.setFieldValue('mcp_access_groups', groupNames);
     }
-  }, [mcpServer]);
+  }, [mcpServer, form]);
 
-  // Fetch tools when component mounts
-  useEffect(() => {
-    fetchTools();
-  }, [mcpServer, accessToken]);
-
-  const fetchTools = async () => {
+  const fetchTools = useCallback(async () => {
     if (!accessToken || !mcpServer.url) {
       return;
     }
 
     setIsLoadingTools(true);
-    
+
     try {
       // Prepare the MCP server config from existing server data
       const mcpServerConfig = {
@@ -65,7 +60,7 @@ const MCPServerEdit: React.FC<MCPServerEditProps> = ({ mcpServer, accessToken, o
       };
 
       const toolsResponse = await testMCPToolsListRequest(accessToken, mcpServerConfig);
-      
+
       if (toolsResponse.tools && !toolsResponse.error) {
         setTools(toolsResponse.tools);
       } else {
@@ -78,7 +73,12 @@ const MCPServerEdit: React.FC<MCPServerEditProps> = ({ mcpServer, accessToken, o
     } finally {
       setIsLoadingTools(false);
     }
-  };
+  }, [accessToken, mcpServer.url, mcpServer.server_id, mcpServer.server_name, mcpServer.transport, mcpServer.spec_version, mcpServer.auth_type, mcpServer.mcp_info]);
+
+  // Fetch tools when component mounts
+  useEffect(() => {
+    fetchTools();
+  }, [fetchTools]);
 
   // Generate options with existing groups and potential new group
   const getAccessGroupOptions = () => {

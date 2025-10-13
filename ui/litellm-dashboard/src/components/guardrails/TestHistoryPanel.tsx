@@ -8,7 +8,7 @@
  * - Export test history data
  */
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import {
   Card,
   Table,
@@ -96,7 +96,7 @@ const TestHistoryPanel: React.FC<TestHistoryPanelProps> = ({
   const [actionFilter, setActionFilter] = useState<string>("all");
 
   // Load test history and statistics
-  const loadHistory = async () => {
+  const loadHistory = useCallback(async () => {
     if (!accessToken) {
       return;
     }
@@ -126,11 +126,11 @@ const TestHistoryPanel: React.FC<TestHistoryPanelProps> = ({
     } finally {
       setLoading(false);
     }
-  };
+  }, [accessToken, guardrailId]);
 
   useEffect(() => {
     loadHistory();
-  }, [guardrailId, accessToken]);
+  }, [loadHistory]);
 
   // Filter history by action
   const filteredHistory = React.useMemo(() => {

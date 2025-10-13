@@ -212,7 +212,7 @@ const ModelDashboard: React.FC<ModelDashboardProps> = ({
     console.log(`providerModels: ${_providerModels}`)
   }
 
-  const updateModelMetrics = async (
+  const updateModelMetrics = React.useCallback(async (
     modelGroup: string | null,
     startTime: Date | undefined,
     endTime: Date | undefined,
@@ -313,7 +313,7 @@ const ModelDashboard: React.FC<ModelDashboardProps> = ({
     } catch (error) {
       console.error("Failed to fetch model metrics", error)
     }
-  }
+  }, [accessToken, userID, userRole, selectedAPIKey?.token, selectedCustomer])
 
   const fetchCredentials = async (accessToken: string) => {
     try {
@@ -327,7 +327,7 @@ const ModelDashboard: React.FC<ModelDashboardProps> = ({
 
   useEffect(() => {
     updateModelMetrics(selectedModelGroup, dateValue.from, dateValue.to)
-  }, [selectedAPIKey, selectedCustomer, selectedTeam])
+  }, [updateModelMetrics, selectedModelGroup, dateValue.from, dateValue.to])
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -608,6 +608,7 @@ const ModelDashboard: React.FC<ModelDashboardProps> = ({
     }
 
     handleRefreshClick()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [accessToken, token, userRole, userID, modelMap, lastRefreshed, selectedTeam])
 
   if (!modelData) {

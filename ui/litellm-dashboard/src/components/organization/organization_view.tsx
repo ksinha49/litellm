@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react"
+import React, { useState, useEffect, useCallback } from "react"
 import {
   Card,
   Title,
@@ -75,7 +75,7 @@ const OrganizationInfoView: React.FC<OrganizationInfoProps> = ({
   const [guardrailsList, setGuardrailsList] = useState<string[]>([])
   const canEditOrg = is_org_admin || is_proxy_admin
 
-  const fetchOrgInfo = async () => {
+  const fetchOrgInfo = useCallback(async () => {
     try {
       setLoading(true)
       if (!accessToken) return
@@ -87,11 +87,11 @@ const OrganizationInfoView: React.FC<OrganizationInfoProps> = ({
     } finally {
       setLoading(false)
     }
-  }
+  }, [accessToken, organizationId])
 
   useEffect(() => {
     fetchOrgInfo()
-  }, [organizationId, accessToken])
+  }, [organizationId, accessToken, fetchOrgInfo])
 
   useEffect(() => {
     const fetchGuardrails = async () => {

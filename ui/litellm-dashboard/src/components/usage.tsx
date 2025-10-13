@@ -1,6 +1,6 @@
 import { BarChart, BarList, Card, Title, Table, TableHead, TableHeaderCell, TableRow, TableCell, TableBody, Metric, Subtitle } from "@tremor/react";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 
 import ViewUserSpend from "./view_user_spend";
 import { ProxySettings } from "./user_dashboard";
@@ -193,7 +193,7 @@ const UsagePage: React.FC<UsagePageProps> = ({
   }
 
 
-  const fetchProxySettings = async () => {
+  const fetchProxySettings = useCallback(async () => {
     if (accessToken) {
       try {
         const proxy_settings: ProxySettings = await getProxyUISettings(accessToken);
@@ -203,11 +203,7 @@ const UsagePage: React.FC<UsagePageProps> = ({
         console.error("Error fetching proxy settings:", error);
       }
     }
-  };
-
-  useEffect(() => {
-    updateTagSpendData(dateValue.from, dateValue.to);
-  }, [dateValue, selectedTags]);
+  }, [accessToken]);
   
 
   const updateEndUserData = async (startTime:  Date | undefined, endTime:  Date | undefined, uiSelectedKey: string | null) => {
@@ -228,12 +224,12 @@ const UsagePage: React.FC<UsagePageProps> = ({
   
   }
 
-  const updateTagSpendData = async (startTime:  Date | undefined, endTime:  Date | undefined) => {
+  const updateTagSpendData = useCallback(async (startTime:  Date | undefined, endTime:  Date | undefined) => {
     if (!startTime || !endTime || !accessToken) {
       return;
     }
 
-    
+
     // we refetch because the state variable can be None when the user refreshes the page
     const proxy_settings: ProxySettings | undefined = await fetchProxySettings();
 
@@ -242,15 +238,19 @@ const UsagePage: React.FC<UsagePageProps> = ({
     }
 
     let top_tags = await tagsSpendLogsCall(
-      accessToken, 
-      startTime.toISOString(), 
+      accessToken,
+      startTime.toISOString(),
       endTime.toISOString(),
       selectedTags.length === 0 ? undefined : selectedTags
     );
     setTopTagsData(top_tags.spend_per_tag);
     console.log("Tag spend data updated successfully");
 
-  }
+  }, [accessToken, selectedTags, fetchProxySettings]);
+
+  useEffect(() => {
+    updateTagSpendData(dateValue.from, dateValue.to);
+  }, [dateValue, selectedTags, updateTagSpendData]);
 
   function formatDate(date: Date) {
     const year = date.getFullYear();
@@ -348,38 +348,38 @@ const UsagePage: React.FC<UsagePageProps> = ({
   };
 
   // Update the fetchOverallSpend function
-  const fetchOverallSpend = async () => {
+  const fetchOverallSpend = useCallback(async () => {
     if (!accessToken) {
       return;
     }
     try {
       const data = await adminSpendLogsCall(accessToken);
-      
+
       // Get the first and last day of the current month
       const now = new Date();
       const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
       const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-      
+
       // Fill in missing dates
       const filledData = fillMissingDates(data, firstDay, lastDay, []);
-      
+
       // Calculate total spend for the month and round to 2 decimal places
       const monthlyTotal = Number(filledData.reduce((sum, day) => sum + (day.spend || 0), 0).toFixed(2));
       setTotalMonthlySpend(monthlyTotal);
-      
+
       setKeySpendData(filledData);
     } catch (error) {
       console.error("Error fetching overall spend:", error);
     }
-  };
+  }, [accessToken]);
 
-  const fetchProviderSpend = () => fetchAndSetData(
+  const fetchProviderSpend = useCallback(() => fetchAndSetData(
     () => accessToken && token ? adminspendByProvider(accessToken, token, startTime, endTime) : Promise.reject("No access token or token"),
     setSpendByProvider,
     "Error fetching provider spend"
-  );
+  ), [accessToken, token, startTime, endTime]);
 
-  const fetchTopKeys = async () => {
+  const fetchTopKeys = useCallback(async () => {
     if (!accessToken) return;
     await fetchAndSetData(
       async () => {
@@ -394,9 +394,9 @@ const UsagePage: React.FC<UsagePageProps> = ({
       setTopKeys,
       "Error fetching top keys"
     );
-  };
+  }, [accessToken]);
 
-  const fetchTopModels = async () => {
+  const fetchTopModels = useCallback(async () => {
     if (!accessToken) return;
     await fetchAndSetData(
       async () => {
@@ -409,20 +409,20 @@ const UsagePage: React.FC<UsagePageProps> = ({
       setTopModels,
       "Error fetching top models"
     );
-  };
+  }, [accessToken]);
 
   // Update the fetchTeamSpend function
-  const fetchTeamSpend = async () => {
+  const fetchTeamSpend = useCallback(async () => {
     if (!accessToken) return;
     await fetchAndSetData(
       async () => {
         const teamSpend = await teamSpendLogsCall(accessToken);
-        
+
         // Get the first and last day of the current month
         const now = new Date();
         const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
         const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-        
+
         // Fill in missing dates with zero values for all teams
         const filledData = fillMissingDates(
           teamSpend.daily_spend,
@@ -430,7 +430,7 @@ const UsagePage: React.FC<UsagePageProps> = ({
           lastDay,
           teamSpend.teams
         );
-        
+
         setTeamSpendData(filledData);
         setUniqueTeamIds(teamSpend.teams);
         return teamSpend.total_spend_per_team.map((tspt: any) => ({
@@ -441,9 +441,9 @@ const UsagePage: React.FC<UsagePageProps> = ({
       setTotalSpendPerTeam,
       "Error fetching team spend"
     );
-  };
+  }, [accessToken]);
 
-  const fetchTagNames = () => {
+  const fetchTagNames = useCallback(() => {
     if (!accessToken) return;
     fetchAndSetData(
       async () => {
@@ -453,37 +453,37 @@ const UsagePage: React.FC<UsagePageProps> = ({
       setAllTagNames,
       "Error fetching tag names"
     );
-  };
+  }, [accessToken]);
 
-  const fetchTopTags = () => {
+  const fetchTopTags = useCallback(() => {
     if (!accessToken) return;
     fetchAndSetData(
       () => tagsSpendLogsCall(accessToken, dateValue.from?.toISOString(), dateValue.to?.toISOString(), undefined),
       (data) => setTopTagsData(data.spend_per_tag),
       "Error fetching top tags"
     );
-  };
+  }, [accessToken, dateValue.from, dateValue.to]);
 
-  const fetchTopEndUsers = () => {
+  const fetchTopEndUsers = useCallback(() => {
     if (!accessToken) return;
     fetchAndSetData(
       () => adminTopEndUsersCall(accessToken, null, undefined, undefined),
       setTopUsers,
       "Error fetching top end users"
     );
-  };
+  }, [accessToken]);
 
   // Update the fetchGlobalActivity function
-  const fetchGlobalActivity = async () => {
+  const fetchGlobalActivity = useCallback(async () => {
     if (!accessToken) return;
     try {
       const data = await adminGlobalActivity(accessToken, startTime, endTime);
-      
+
       // Get the date range from the current month
       const now = new Date();
       const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
       const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-      
+
       // Fill in missing dates for daily_data
       const filledDailyData = fillMissingDates(
         data.daily_data || [],
@@ -491,7 +491,7 @@ const UsagePage: React.FC<UsagePageProps> = ({
         lastDay,
         ['api_requests', 'total_tokens']
       );
-      
+
       setGlobalActivity({
         ...data,
         daily_data: filledDailyData
@@ -499,19 +499,19 @@ const UsagePage: React.FC<UsagePageProps> = ({
     } catch (error) {
       console.error("Error fetching global activity:", error);
     }
-  };
+  }, [accessToken, startTime, endTime]);
 
   // Update the fetchGlobalActivityPerModel function
-  const fetchGlobalActivityPerModel = async () => {
+  const fetchGlobalActivityPerModel = useCallback(async () => {
     if (!accessToken) return;
     try {
       const data = await adminGlobalActivityPerModel(accessToken, startTime, endTime);
-      
+
       // Get the date range from the current month
       const now = new Date();
       const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
       const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-      
+
       // Fill in missing dates for each model's daily data
       const filledModelData = data.map((modelData: any) => ({
         ...modelData,
@@ -522,12 +522,12 @@ const UsagePage: React.FC<UsagePageProps> = ({
           ['api_requests', 'total_tokens']
         )
       }));
-      
+
       setGlobalActivityPerModel(filledModelData);
     } catch (error) {
       console.error("Error fetching global activity per model:", error);
     }
-  };
+  }, [accessToken, startTime, endTime]);
 
   useEffect(() => {
     const initlizeUsageData = async () => {
@@ -539,7 +539,7 @@ const UsagePage: React.FC<UsagePageProps> = ({
             return;  // Don't run expensive UI queries - return out of initlizeUsageData at this point
           }
         }
-        
+
 
         console.log("fetching data - valiue of proxySettings", proxySettings);
 
@@ -561,7 +561,7 @@ const UsagePage: React.FC<UsagePageProps> = ({
   };
 
   initlizeUsageData();
-  }, [accessToken, token, userRole, userID, startTime, endTime]);
+  }, [accessToken, token, userRole, userID, startTime, endTime, fetchProxySettings, fetchOverallSpend, fetchProviderSpend, fetchTopKeys, fetchTopModels, fetchGlobalActivity, fetchGlobalActivityPerModel, fetchTeamSpend, fetchTagNames, fetchTopTags, fetchTopEndUsers, proxySettings]);
 
 
   if (proxySettings?.DISABLE_EXPENSIVE_DB_QUERIES) {

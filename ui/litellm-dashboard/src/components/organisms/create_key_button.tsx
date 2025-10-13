@@ -197,7 +197,7 @@ const CreateKey: React.FC<CreateKeyProps> = ({
     }
   }, [accessToken, userID, userRole]);
 
-  const fetchMcpAccessGroups = async () => {
+  const fetchMcpAccessGroups = useCallback(async () => {
     try {
       if (accessToken == null) {
         return;
@@ -207,11 +207,11 @@ const CreateKey: React.FC<CreateKeyProps> = ({
     } catch (error) {
       console.error("Failed to fetch MCP access groups:", error);
     }
-  };
+  }, [accessToken]);
 
   useEffect(() => {
     fetchMcpAccessGroups();
-  }, [accessToken]);
+  }, [accessToken, fetchMcpAccessGroups]);
 
 
   useEffect(() => {
@@ -402,7 +402,7 @@ const CreateKey: React.FC<CreateKeyProps> = ({
       });
     }
     form.setFieldValue('models', []);
-  }, [selectedCreateKeyTeam, accessToken, userID, userRole]);
+  }, [selectedCreateKeyTeam, accessToken, userID, userRole, form]);
 
   // Add a callback function to handle user creation
   const handleUserCreated = (userId: string) => {
@@ -411,7 +411,7 @@ const CreateKey: React.FC<CreateKeyProps> = ({
     setIsCreateUserModalVisible(false);
   };
 
-  const fetchUsers = async (searchText: string): Promise<void> => {
+  const fetchUsers = useCallback(async (searchText: string): Promise<void> => {
     if (!searchText) {
       setUserOptions([]);
       return;
@@ -425,14 +425,14 @@ const CreateKey: React.FC<CreateKeyProps> = ({
         return;
       }
       const response = await userFilterUICall(accessToken, params);
-      
+
       const data: User[] = response;
       const options: UserOption[] = data.map(user => ({
         label: `${user.user_email} (${user.user_id})`,
         value: user.user_id,
         user
       }));
-      
+
       setUserOptions(options);
     } catch (error) {
       console.error('Error fetching users:', error);
@@ -440,11 +440,11 @@ const CreateKey: React.FC<CreateKeyProps> = ({
     } finally {
       setUserSearchLoading(false);
     }
-  };
+  }, [accessToken]);
 
   const debouncedSearch = useCallback(
     debounce((text: string) => fetchUsers(text), 300),
-    [accessToken]
+    [fetchUsers]
   );
 
   const handleUserSearch = (value: string): void => {

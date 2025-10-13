@@ -157,7 +157,7 @@ const TeamInfoView: React.FC<TeamInfoProps> = ({
 
   const canEditTeam = is_team_admin || is_proxy_admin;
 
-  const fetchTeamInfo = async () => {
+  const fetchTeamInfo = React.useCallback(async () => {
     try {
       setLoading(true);
       if (!accessToken) return;
@@ -169,11 +169,11 @@ const TeamInfoView: React.FC<TeamInfoProps> = ({
     } finally {
       setLoading(false);
     }
-  };
+  }, [accessToken, teamId]);
 
   useEffect(() => {
     fetchTeamInfo();
-  }, [teamId, accessToken]);
+  }, [teamId, accessToken, fetchTeamInfo]);
 
   const fetchMcpAccessGroups = async () => {
     if (!accessToken) return;

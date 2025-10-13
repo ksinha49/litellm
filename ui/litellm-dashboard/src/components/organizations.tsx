@@ -79,7 +79,7 @@ const OrganizationsTable: React.FC<OrganizationsTableProps> = ({
     if (accessToken) {
       fetchOrganizations(accessToken, setOrganizations)
     }
-  }, [accessToken])
+  }, [accessToken, setOrganizations])
 
   const handleDelete = (orgId: string | null) => {
     if (!orgId) return

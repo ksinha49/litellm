@@ -1297,7 +1297,7 @@ async def diagnose_models(
                         status="invalid",
                         error=str(e),
                         params_info=_get_params_info(model.litellm_params),
-                        litellm_params=model.litellm_params,
+                        litellm_params=None,
                     )
                 )
                 invalid_count += 1

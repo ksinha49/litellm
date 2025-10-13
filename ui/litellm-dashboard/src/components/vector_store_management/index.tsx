@@ -41,7 +41,7 @@ const VectorStoreManagement: React.FC<VectorStoreProps> = ({
   const [selectedVectorStoreId, setSelectedVectorStoreId] = useState<string | null>(null);
   const [editVectorStore, setEditVectorStore] = useState(false);
 
-  const fetchVectorStores = async () => {
+  const fetchVectorStores = React.useCallback(async () => {
     if (!accessToken) return;
     try {
       const response = await vectorStoreListCall(accessToken);
@@ -51,9 +51,9 @@ const VectorStoreManagement: React.FC<VectorStoreProps> = ({
       console.error("Error fetching vector stores:", error);
       NotificationsManager.fromBackend("Error fetching vector stores: " + error);
     }
-  };
+  }, [accessToken]);
 
-  const fetchCredentials = async () => {
+  const fetchCredentials = React.useCallback(async () => {
     if (!accessToken) return;
     try {
       const response = await credentialListCall(accessToken);
@@ -63,7 +63,7 @@ const VectorStoreManagement: React.FC<VectorStoreProps> = ({
       console.error("Error fetching credentials:", error);
       NotificationsManager.fromBackend("Error fetching credentials: " + error);
     }
-  };
+  }, [accessToken]);
 
   const handleRefreshClick = () => {
     fetchVectorStores();
@@ -115,7 +115,7 @@ const VectorStoreManagement: React.FC<VectorStoreProps> = ({
   useEffect(() => {
     fetchVectorStores();
     fetchCredentials();
-  }, [accessToken]);
+  }, [accessToken, fetchVectorStores, fetchCredentials]);
 
   return selectedVectorStoreId ? (
     <div className="w-full h-full">

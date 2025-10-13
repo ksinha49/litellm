@@ -91,7 +91,7 @@ const NewUsagePage: React.FC<NewUsagePageProps> = ({ accessToken, userRole, user
   const [modelViewType, setModelViewType] = useState<"groups" | "individual">("groups")
   const [isCloudZeroModalOpen, setIsCloudZeroModalOpen] = useState(false)
 
-  const getAllTags = async () => {
+  const getAllTags = useCallback(async () => {
     if (!accessToken) {
       return
     }
@@ -102,11 +102,11 @@ const NewUsagePage: React.FC<NewUsagePageProps> = ({ accessToken, userRole, user
         value: tag.name,
       })),
     )
-  }
+  }, [accessToken])
 
   useEffect(() => {
     getAllTags()
-  }, [accessToken])
+  }, [accessToken, getAllTags])
 
   // Derived states from userSpendData
   const totalSpend = userSpendData.metadata?.total_spend || 0
@@ -367,7 +367,7 @@ const NewUsagePage: React.FC<NewUsagePageProps> = ({ accessToken, userRole, user
     }, 50) // Very short debounce
 
     return () => clearTimeout(timeoutId)
-  }, [fetchUserSpendData])
+  }, [dateValue.from, dateValue.to, fetchUserSpendData])
 
   const modelMetrics = processActivityData(userSpendData, "models")
   const keyMetrics = processActivityData(userSpendData, "api_keys")

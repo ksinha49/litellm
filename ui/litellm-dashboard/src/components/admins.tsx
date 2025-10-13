@@ -125,18 +125,18 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
   nonSssoUrl += "/fallback/login";
 
   // Extract the SSO configuration check logic into a separate function for reuse
-  const checkSSOConfiguration = async () => {
+  const checkSSOConfiguration = React.useCallback(async () => {
     if (accessToken && premiumUser) {
       try {
         const ssoData = await getSSOSettings(accessToken);
         console.log("SSO data:", ssoData);
-        
+
         // Check if any SSO provider is configured
         if (ssoData && ssoData.values) {
           const hasGoogleSSO = ssoData.values.google_client_id && ssoData.values.google_client_secret;
           const hasMicrosoftSSO = ssoData.values.microsoft_client_id && ssoData.values.microsoft_client_secret;
           const hasGenericSSO = ssoData.values.generic_client_id && ssoData.values.generic_client_secret;
-          
+
           setSsoConfigured(hasGoogleSSO || hasMicrosoftSSO || hasGenericSSO);
         } else {
           setSsoConfigured(false);
@@ -146,7 +146,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
         setSsoConfigured(false);
       }
     }
-  };
+  }, [accessToken, premiumUser]);
 
   const handleShowAllowedIPs = async () => {
     try {
@@ -311,7 +311,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
   // Add new useEffect to check SSO configuration
   useEffect(() => {
     checkSSOConfiguration();
-  }, [accessToken, premiumUser]);
+  }, [checkSSOConfiguration]);
 
   const handleMemberUpdateOk = () => {
     setIsUpdateModalModalVisible(false);

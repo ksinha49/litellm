@@ -66,7 +66,7 @@ export const columns: ColumnDef<LogEntry>[] = [
         const toggleHandler = React.useCallback(() => {
           setLocalExpanded((prev) => !prev);
           row.getToggleExpandedHandler()();
-        }, [row]);
+        }, []);
 
         return row.getCanExpand() ? (
           <button
@@ -436,7 +436,7 @@ export const auditLogColumns: ColumnDef<AuditLogEntry>[] = [
         const toggleHandler = React.useCallback(() => {
           setLocalExpanded((prev) => !prev);
           row.getToggleExpandedHandler()();
-        }, [row]);
+        }, []);
 
         return row.getCanExpand() ? (
           <button

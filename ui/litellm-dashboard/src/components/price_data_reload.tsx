@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { Button, Popconfirm, message, Modal, InputNumber, Space, Typography, Tag, Card } from "antd";
 import { ReloadOutlined, ClockCircleOutlined, StopOutlined } from "@ant-design/icons";
 import { reloadModelCostMap, scheduleModelCostMapReload, cancelModelCostMapReload, getModelCostMapReloadStatus } from "./networking";
@@ -41,21 +41,9 @@ const PriceDataReload: React.FC<PriceDataReloadProps> = ({
   const [reloadStatus, setReloadStatus] = useState<ReloadStatus | null>(null);
   const [loadingStatus, setLoadingStatus] = useState(false);
 
-  // Fetch status on component mount and periodically
-  useEffect(() => {
-    fetchReloadStatus();
-    
-    // Refresh status every 30 seconds to keep it up to date
-    const interval = setInterval(() => {
-      fetchReloadStatus();
-    }, 30000);
-    
-    return () => clearInterval(interval);
-  }, [accessToken]);
-
-  const fetchReloadStatus = async () => {
+  const fetchReloadStatus = useCallback(async () => {
     if (!accessToken) return;
-    
+
     setLoadingStatus(true);
     try {
       console.log("Fetching reload status...");
@@ -74,7 +62,19 @@ const PriceDataReload: React.FC<PriceDataReloadProps> = ({
     } finally {
       setLoadingStatus(false);
     }
-  };
+  }, [accessToken]);
+
+  // Fetch status on component mount and periodically
+  useEffect(() => {
+    fetchReloadStatus();
+
+    // Refresh status every 30 seconds to keep it up to date
+    const interval = setInterval(() => {
+      fetchReloadStatus();
+    }, 30000);
+
+    return () => clearInterval(interval);
+  }, [fetchReloadStatus]);
 
   const handleHardRefresh = async () => {
     if (!accessToken) {

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import {
   Card,
   Table,
@@ -69,9 +69,9 @@ const ModelDiagnostics: React.FC<ModelDiagnosticsProps> = ({
     if (accessToken) {
       loadDiagnostics();
     }
-  }, [accessToken]);
+  }, [accessToken, loadDiagnostics]);
 
-  const loadDiagnostics = async () => {
+  const loadDiagnostics = useCallback(async () => {
     if (!accessToken) {
       message.error("No access token available");
       return;
@@ -95,7 +95,7 @@ const ModelDiagnostics: React.FC<ModelDiagnosticsProps> = ({
     } finally {
       setLoading(false);
     }
-  };
+  }, [accessToken]);
 
   const handleFixClick = (model: DiagnosticModelInfo) => {
     setSelectedModel(model);

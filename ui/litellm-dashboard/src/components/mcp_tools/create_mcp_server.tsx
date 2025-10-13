@@ -175,7 +175,7 @@ const CreateMCPServer: React.FC<CreateMCPServerProps> = ({
       form.setFieldsValue({ alias: normalized })
       setFormValues((prev) => ({ ...prev, alias: normalized }))
     }
-  }, [formValues.server_name])
+  }, [formValues.server_name, aliasManuallyEdited, form])
 
   // rendering
   if (!isAdminRole(userRole)) {

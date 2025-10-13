@@ -55,7 +55,7 @@ const TeamSSOSettings: React.FC<TeamSSOSettingsProps> = ({ accessToken, userID, 
     };
 
     fetchTeamSSOSettings();
-  }, [accessToken]);
+  }, [accessToken, userID, userRole]);
 
   const handleSaveSettings = async () => {
     if (!accessToken) return;

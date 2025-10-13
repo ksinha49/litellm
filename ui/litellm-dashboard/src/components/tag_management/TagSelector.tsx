@@ -27,7 +27,7 @@ const TagSelector: React.FC<TagSelectorProps> = ({ onChange, value, className, a
     };
 
     fetchTags();
-  }, []);
+  }, [accessToken]);
 
   return (
     <Select

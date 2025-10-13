@@ -30,21 +30,21 @@ const ModelConnectionTest: React.FC<ModelConnectionTestProps> = ({
   const [isSuccess, setIsSuccess] = React.useState<boolean>(false);
   const [showDetails, setShowDetails] = React.useState<boolean>(false);
 
-  const testModelConnection = async () => {
+  const testModelConnection = React.useCallback(async () => {
     setIsLoading(true);
     setShowDetails(false);
     setError(null);
     setRawRequest(null);
     setRawResponse(null);
     setIsSuccess(false);
-    
+
     // Add a small delay to ensure form values are fully populated
     await new Promise(resolve => setTimeout(resolve, 100));
-    
+
     try {
       console.log("Testing connection with form values:", formValues);
       const result = await prepareModelAddRequest(formValues, accessToken, null);
-      
+
       if (!result) {
         console.log("No result from prepareModelAddRequest");
         setError("Failed to prepare model data. Please check your form inputs.");
@@ -77,7 +77,7 @@ const ModelConnectionTest: React.FC<ModelConnectionTestProps> = ({
       setIsLoading(false);
       if (onTestComplete) onTestComplete();
     }
-  };
+  }, [formValues, accessToken, onTestComplete]);
 
   React.useEffect(() => {
     // Run the test once when component mounts
@@ -85,9 +85,9 @@ const ModelConnectionTest: React.FC<ModelConnectionTestProps> = ({
     const timer = setTimeout(() => {
       testModelConnection();
     }, 200);
-    
+
     return () => clearTimeout(timer);
-  }, []); // Empty dependency array means this runs once on mount
+  }, [testModelConnection]);
 
   const getCleanErrorMessage = (errorMsg: string) => {
     if (!errorMsg) return "Unknown error";

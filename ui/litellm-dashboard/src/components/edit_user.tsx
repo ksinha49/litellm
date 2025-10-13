@@ -38,7 +38,7 @@ const EditUserModal: React.FC<EditUserModalProps> = ({ visible, possibleUIRoles,
 
   useEffect(() => {
     form.resetFields();
-  }, [user]);
+  }, [user, form]);
 
   const handleCancel = async () => {
     form.resetFields();

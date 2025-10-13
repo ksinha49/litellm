@@ -62,7 +62,7 @@ const FilterComponent: React.FC<FilterComponentProps> = ({
         setSearchLoadingMap((prev) => ({ ...prev, [option.name]: false }));
       }
     }, 300),
-    []
+    [setSearchLoadingMap, setSearchOptionsMap]
   );
 
   // Load initial options for searchable filters

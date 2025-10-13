@@ -224,6 +224,7 @@ const UserDashboard: React.FC<UserDashboardProps> = ({
         fetchTeams(accessToken, userID, userRole, currentOrg, setTeams)
       }
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userID, token, accessToken, keys, userRole])
 
   useEffect(() => {
@@ -251,6 +252,7 @@ const UserDashboard: React.FC<UserDashboardProps> = ({
       console.log(`fetching teams`)
       fetchTeams(accessToken, userID, userRole, currentOrg, setTeams)
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentOrg])
 
   useEffect(() => {
@@ -273,7 +275,7 @@ const UserDashboard: React.FC<UserDashboardProps> = ({
       }
       setTeamSpend(sum)
     }
-  }, [selectedTeam])
+  }, [selectedTeam, keys])
 
   if (invitation_id != null) {
     return <Onboarding></Onboarding>

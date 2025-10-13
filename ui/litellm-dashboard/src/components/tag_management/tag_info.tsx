@@ -22,7 +22,7 @@ const TagInfoView: React.FC<TagInfoViewProps> = ({ tagId, onClose, accessToken, 
   const [isEditing, setIsEditing] = useState<boolean>(editTag)
   const [userModels, setUserModels] = useState<string[]>([])
 
-  const fetchTagDetails = async () => {
+  const fetchTagDetails = React.useCallback(async () => {
     if (!accessToken) return
     try {
       const response = await tagInfoCall(accessToken, [tagId])
@@ -41,11 +41,11 @@ const TagInfoView: React.FC<TagInfoViewProps> = ({ tagId, onClose, accessToken, 
       console.error("Error fetching tag details:", error)
       NotificationsManager.fromBackend("Error fetching tag details: " + error)
     }
-  }
+  }, [accessToken, tagId, editTag, form])
 
   useEffect(() => {
     fetchTagDetails()
-  }, [tagId, accessToken])
+  }, [tagId, accessToken, fetchTagDetails])
 
   useEffect(() => {
     if (accessToken) {

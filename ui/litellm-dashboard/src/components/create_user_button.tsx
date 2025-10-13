@@ -106,7 +106,7 @@ const Createuser: React.FC<CreateuserProps> = ({
     setBaseUrl(getProxyBaseUrl())
 
     fetchData() // Call the function to fetch model data when the component mounts
-  }, []) // Empty dependency array to run only once
+  }, [accessToken, userID]) // Added accessToken and userID to dependency array
 
   const handleOk = () => {
     setIsModalVisible(false)

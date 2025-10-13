@@ -79,7 +79,7 @@ const ViewUserSpend: React.FC<ViewUserSpendProps> = ({ userID, userRole, accessT
             }
           }
       }
-    }, [selectedTeam, userMaxBudget]);
+    }, [selectedTeam, userMaxBudget, userID]);
     const [userModels, setUserModels] = useState([]);
     useEffect(() => {
       const fetchData = async () => {

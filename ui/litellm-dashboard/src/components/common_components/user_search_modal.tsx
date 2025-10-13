@@ -88,7 +88,7 @@ const UserSearchModal: React.FC<UserSearchModalProps> = ({
 
   const debouncedSearch = useCallback(
     debounce((text: string, fieldName: 'user_email' | 'user_id') => fetchUsers(text, fieldName), 300),
-    []
+    [accessToken]
   );
 
   const handleSearch = (value: string, fieldName: 'user_email' | 'user_id'): void => {

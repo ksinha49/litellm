@@ -97,7 +97,7 @@ const CredentialsPanel: React.FC<CredentialsPanelProps> = ({ accessToken, upload
       return;
     }
     fetchCredentials(accessToken);
-  }, [accessToken]);
+  }, [accessToken, fetchCredentials]);
 
   const renderProviderBadge = (provider: string) => {
     const providerColors: Record<string, string> = {

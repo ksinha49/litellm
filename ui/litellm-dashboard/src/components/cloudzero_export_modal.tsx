@@ -47,6 +47,7 @@ const CloudZeroExportModal: React.FC<CloudZeroExportModalProps> = ({
     if (isOpen && accessToken) {
       loadExistingSettings();
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, accessToken]);
 
   const loadExistingSettings = async () => {

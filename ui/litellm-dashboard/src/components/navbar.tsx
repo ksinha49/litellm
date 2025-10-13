@@ -58,7 +58,7 @@ const Navbar: React.FC<NavbarProps> = ({
     };
 
     initializeProxySettings();
-  }, [accessToken]);
+  }, [accessToken, setProxySettings]);
 
   useEffect(() => {
     setLogoutUrl(proxySettings?.PROXY_LOGOUT_URL || "");

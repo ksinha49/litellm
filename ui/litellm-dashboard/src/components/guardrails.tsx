@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react"
+import React, { useState, useEffect, useCallback } from "react"
 import { Card, Text, Button, Icon, TextInput } from "@tremor/react"
 import { PlusIcon } from "@heroicons/react/outline"
 import { Modal, message } from "antd"
@@ -41,7 +41,7 @@ const GuardrailsPanel: React.FC<GuardrailsPanelProps> = ({ accessToken, userRole
 
   const isAdmin = userRole ? isAdminRole(userRole) : false
 
-  const fetchGuardrails = async () => {
+  const fetchGuardrails = useCallback(async () => {
     if (!accessToken) {
       return
     }
@@ -56,11 +56,11 @@ const GuardrailsPanel: React.FC<GuardrailsPanelProps> = ({ accessToken, userRole
     } finally {
       setIsLoading(false)
     }
-  }
+  }, [accessToken])
 
   useEffect(() => {
     fetchGuardrails()
-  }, [accessToken])
+  }, [fetchGuardrails])
 
   const handleAddGuardrail = () => {
     if (selectedGuardrailId) {

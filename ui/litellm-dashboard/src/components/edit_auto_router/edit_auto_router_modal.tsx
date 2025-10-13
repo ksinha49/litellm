@@ -35,7 +35,7 @@ const EditAutoRouterModal: React.FC<EditAutoRouterModalProps> = ({
     if (isVisible && modelData) {
       initializeForm();
     }
-  }, [isVisible, modelData]);
+  }, [isVisible, modelData, form, modelInfo]);
 
   useEffect(() => {
     const fetchModelAccessGroups = async () => {

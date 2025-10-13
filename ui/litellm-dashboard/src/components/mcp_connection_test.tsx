@@ -28,20 +28,20 @@ const MCPConnectionTest: React.FC<MCPConnectionTestProps> = ({
   const [connectionSuccess, setConnectionSuccess] = React.useState<boolean>(false);
   const [showDetails, setShowDetails] = React.useState<boolean>(false);
 
-  const testMCPConnection = async () => {
+  const testMCPConnection = React.useCallback(async () => {
     setIsLoading(true);
     setShowDetails(false);
     setConnectionError(null);
     setRawRequest(null);
     setRawResponse(null);
     setConnectionSuccess(false);
-    
+
     // Add a small delay to ensure form values are fully populated
     await new Promise(resolve => setTimeout(resolve, 100));
-    
+
     try {
       console.log("Testing MCP connection with form values:", formValues);
-      
+
       // Prepare the MCP server config from form values
       const mcpServerConfig = {
         server_id: formValues.server_id || "",
@@ -58,7 +58,7 @@ const MCPConnectionTest: React.FC<MCPConnectionTestProps> = ({
       // Test connection
       const connectionResponse = await testMCPConnectionRequest(accessToken, mcpServerConfig);
       console.log("Connection test response:", connectionResponse);
-      
+
       if (connectionResponse.status === "ok") {
         setConnectionError(null);
         setConnectionSuccess(true);
@@ -74,7 +74,7 @@ const MCPConnectionTest: React.FC<MCPConnectionTestProps> = ({
       setIsLoading(false);
       if (onTestComplete) onTestComplete();
     }
-  };
+  }, [formValues, accessToken, onTestComplete]);
 
   React.useEffect(() => {
     // Run the test once when component mounts
@@ -82,9 +82,9 @@ const MCPConnectionTest: React.FC<MCPConnectionTestProps> = ({
     const timer = setTimeout(() => {
       testMCPConnection();
     }, 200);
-    
+
     return () => clearTimeout(timer);
-  }, []); // Empty dependency array means this runs once on mount
+  }, [testMCPConnection]);
 
   const getCleanErrorMessage = (errorMsg: string) => {
     if (!errorMsg) return "Unknown error";

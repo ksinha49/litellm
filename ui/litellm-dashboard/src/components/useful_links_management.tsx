@@ -1,18 +1,18 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { message, Modal } from "antd";
 import { PlusCircleIcon, PencilIcon, TrashIcon, ChevronDownIcon, ChevronRightIcon } from "@heroicons/react/outline";
 import { isAdminRole } from "../utils/roles";
 import { getPublicModelHubInfo, updateUsefulLinksCall, getProxyBaseUrl } from "./networking";
-import { 
-  Card, 
-  Title, 
-  Text, 
-  Table, 
-  TableHead, 
-  TableHeaderCell, 
-  TableBody, 
-  TableRow, 
-  TableCell 
+import {
+  Card,
+  Title,
+  Text,
+  Table,
+  TableHead,
+  TableHeaderCell,
+  TableBody,
+  TableRow,
+  TableCell
 } from "@tremor/react";
 import NotificationsManager from "./molecules/notifications_manager";
 
@@ -37,23 +37,23 @@ const UsefulLinksManagement: React.FC<UsefulLinksManagementProps> = ({
   const [loading, setLoading] = useState(false);
   const [isExpanded, setIsExpanded] = useState(true);
 
-  const fetchUsefulLinks = async () => {
+  const fetchUsefulLinks = useCallback(async () => {
     if (!accessToken) return;
-    
+
     try {
       setLoading(true);
       const response = await getPublicModelHubInfo();
-      
+
       if (response && response.useful_links) {
         const usefulLinks = response.useful_links || {};
-        
+
         // Convert object to array of links with ids
         const linksArray = Object.entries(usefulLinks).map(([displayName, url], index) => ({
           id: `${index}-${displayName}`,
           displayName,
           url: url as string,
         }));
-        
+
         setLinks(linksArray);
       } else {
         setLinks([]);
@@ -64,11 +64,11 @@ const UsefulLinksManagement: React.FC<UsefulLinksManagementProps> = ({
     } finally {
       setLoading(false);
     }
-  };
+  }, [accessToken]);
 
   useEffect(() => {
     fetchUsefulLinks();
-  }, [accessToken]);
+  }, [accessToken, fetchUsefulLinks]);
 
   // Check if user is admin
   if (!isAdminRole(userRole || "")) {

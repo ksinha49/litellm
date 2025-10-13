@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef, useMemo } from "react";
+import React, { useEffect, useState, useRef, useMemo, useCallback } from "react";
 import { modelHubPublicModelsCall, proxyBaseUrl, getUiConfig, getPublicModelHubInfo } from "./networking";
 import { ModelDataTable } from "./model_dashboard/table";
 import { ColumnDef } from "@tanstack/react-table";
@@ -47,7 +47,7 @@ interface PublicModelHubProps {
 const PublicModelHub: React.FC<PublicModelHubProps> = ({ accessToken }) => {
   const [modelHubData, setModelHubData] = useState<ModelGroupInfo[] | null>(null);
   const [pageTitle, setPageTitle] = useState<string>("Ameritas LLM API");
-  const defaultDocsDescription = `Ameritas has deployed a centralized AI Services Hub built on LiteLLM to give every team consistent, secure, and scalable access to generative AI. The hub abstracts multiple language models behind a unified API, automatically handling authentication, budget controls, rate limits, and observability so developers can focus on building features rather than managing infrastructure.\n\nAcross the enterprise, the hub is used for document summarization, customer-service automation, knowledge retrieval, and bespoke model experimentation. Business units can onboard new models without modifying existing code, while governance teams maintain full visibility into usage and cost. This shared platform has turned AI from a niche experiment into an enterprise-wide capability—accelerating innovation while preserving compliance and operational control.`;
+  const defaultDocsDescription = useMemo(() => `Ameritas has deployed a centralized AI Services Hub built on LiteLLM to give every team consistent, secure, and scalable access to generative AI. The hub abstracts multiple language models behind a unified API, automatically handling authentication, budget controls, rate limits, and observability so developers can focus on building features rather than managing infrastructure.\n\nAcross the enterprise, the hub is used for document summarization, customer-service automation, knowledge retrieval, and bespoke model experimentation. Business units can onboard new models without modifying existing code, while governance teams maintain full visibility into usage and cost. This shared platform has turned AI from a niche experiment into an enterprise-wide capability—accelerating innovation while preserving compliance and operational control.`, []);
   // Store a custom description for the docs page. Default to an enterprise-wide description
   // instead of a marketing tagline to keep the UI neutral when no description
   // is provided.
@@ -65,6 +65,16 @@ const PublicModelHub: React.FC<PublicModelHubProps> = ({ accessToken }) => {
   const [proxySettings, setProxySettings] = useState<any>({});
   const tableRef = useRef<TableInstance<any>>(null);
 
+  const fetchPublicModelHubInfo = useCallback(async () => {
+    const publicModelHubInfo = await getPublicModelHubInfo();
+    console.log("Public Model Hub Info:", publicModelHubInfo);
+    setPageTitle(publicModelHubInfo.docs_title);
+    // Fall back to the default enterprise-wide description when none is provided
+    setCustomDocsDescription(publicModelHubInfo.custom_docs_description || defaultDocsDescription);
+    setLitellmVersion(publicModelHubInfo.litellm_version);
+    setUsefulLinks(publicModelHubInfo.useful_links || {});
+  }, [defaultDocsDescription]);
+
   useEffect(() => {
     const fetchPublicData = async () => {
       try {
@@ -80,21 +90,10 @@ const PublicModelHub: React.FC<PublicModelHubProps> = ({ accessToken }) => {
       }
     };
 
-    const fetchPublicModelHubInfo = async () => {
-      const publicModelHubInfo = await getPublicModelHubInfo();
-      console.log("Public Model Hub Info:", publicModelHubInfo);
-      setPageTitle(publicModelHubInfo.docs_title);
-      // Fall back to the default enterprise-wide description when none is provided
-      setCustomDocsDescription(publicModelHubInfo.custom_docs_description || defaultDocsDescription);
-      setLitellmVersion(publicModelHubInfo.litellm_version);
-      setUsefulLinks(publicModelHubInfo.useful_links || {});
-    };
-
-
     fetchPublicModelHubInfo();
 
     fetchPublicData();
-  }, []);
+  }, [fetchPublicModelHubInfo]);
 
   // Clear filters when filter values change to avoid confusion
   useEffect(() => {
