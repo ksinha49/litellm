@@ -293,19 +293,26 @@ async def _add_model_to_db(
         )
         _encrypted_litellm_params_dict[k] = prefixed_encrypted_value
 
-    # Ensure the encrypted dict is JSON-serializable by doing a round-trip
-    _encrypted_litellm_params_dict = json.loads(json.dumps(_encrypted_litellm_params_dict, default=str))
+    # Prisma expects JSON fields as JSON strings, not dicts
+    # This is the same pattern used in jsonify_object() in utils.py
+    try:
+        litellm_params_json_string = json.dumps(_encrypted_litellm_params_dict)
+        model_info_json_string = json.dumps(model_params.model_info.model_dump(
+            mode="json", exclude_none=True
+        ))
+    except Exception as e:
+        verbose_proxy_logger.error(f"Failed to serialize JSON fields: {e}")
+        raise ValueError(f"Failed to serialize model data to JSON: {e}")
 
     _data: dict = {
         "model_id": model_params.model_info.id,
         "model_name": model_params.model_name,
-        "litellm_params": _encrypted_litellm_params_dict,  # Use the encrypted dict directly
-        "model_info": model_params.model_info.model_dump(
-            mode="json", exclude_none=True
-        ),  # type: ignore
+        "litellm_params": litellm_params_json_string,  # Pass as JSON string for Prisma
+        "model_info": model_info_json_string,  # Pass as JSON string for Prisma
         "created_by": user_api_key_dict.user_id or LITELLM_PROXY_ADMIN_NAME,
         "updated_by": user_api_key_dict.user_id or LITELLM_PROXY_ADMIN_NAME,
     }
+
     if model_params.model_info.id is not None:
         _data["model_id"] = model_params.model_info.id
     if should_create_model_in_db:
@@ -917,11 +924,15 @@ async def update_model(
                 else:
                     pass
 
-            # Ensure the merged dict is JSON-serializable
-            merged_dictionary = json.loads(json.dumps(merged_dictionary, default=str))
+            # Prisma expects JSON fields as JSON strings
+            try:
+                litellm_params_json_string = json.dumps(merged_dictionary)
+            except Exception as e:
+                verbose_proxy_logger.error(f"Failed to serialize litellm_params for update: {e}")
+                raise ValueError(f"Failed to serialize litellm_params to JSON: {e}")
 
             _data: dict = {
-                "litellm_params": merged_dictionary,  # type: ignore
+                "litellm_params": litellm_params_json_string,  # Pass as JSON string for Prisma
                 "updated_by": user_api_key_dict.user_id or LITELLM_PROXY_ADMIN_NAME,
             }
             model_response = await prisma_client.db.litellm_proxymodeltable.update(
