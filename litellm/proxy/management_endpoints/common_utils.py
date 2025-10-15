@@ -42,10 +42,20 @@ def _set_object_metadata_field(
         field_name: Name of the metadata field to set
         value: Value to set for the field
     """
+    from litellm.proxy.guardrails.guardrail_helpers import clean_guardrails_from_metadata
+
     if field_name in LiteLLM_ManagementEndpoint_MetadataFields_Premium:
         _premium_user_check()
     object_data.metadata = object_data.metadata or {}
-    object_data.metadata[field_name] = value
+
+    # If updating guardrails, clean old guardrail data first
+    if field_name == "guardrails":
+        object_data.metadata = clean_guardrails_from_metadata(
+            metadata=object_data.metadata,
+            new_guardrails=value,
+        )
+    else:
+        object_data.metadata[field_name] = value
 
 
 async def _upsert_budget_and_membership(

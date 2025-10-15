@@ -1,6 +1,6 @@
 import os
 import sys
-from typing import Dict
+from typing import Dict, Optional, Any
 
 import litellm
 from litellm._logging import verbose_proxy_logger
@@ -116,3 +116,52 @@ async def should_proceed_based_on_api_key(
         # Do not proceeed if - "metadata": { "guardrails": { "lakera_prompt_injection": false } }
         return False
     return True
+
+
+def clean_guardrails_from_metadata(
+    metadata: Optional[Dict[str, Any]],
+    new_guardrails: Optional[Any] = None,
+) -> Optional[Dict[str, Any]]:
+    """
+    Clean old guardrail data from metadata and optionally set new guardrails.
+
+    This function removes residual guardrail data that may persist in metadata,
+    including:
+    - Old guardrail lists
+    - Stale guardrail configurations
+    - standard_logging_guardrail_information (which should be set per-request, not stored)
+
+    Args:
+        metadata: The metadata dictionary to clean
+        new_guardrails: Optional new guardrails to set (list, dict, or None to remove all)
+
+    Returns:
+        Cleaned metadata dictionary, or None if metadata was None
+    """
+    if metadata is None:
+        return None
+
+    # Create a copy to avoid modifying the original
+    cleaned_metadata = metadata.copy()
+
+    # Remove per-request guardrail information that shouldn't be stored
+    if "standard_logging_guardrail_information" in cleaned_metadata:
+        del cleaned_metadata["standard_logging_guardrail_information"]
+        verbose_proxy_logger.debug(
+            "Removed standard_logging_guardrail_information from metadata - this should be set per-request only"
+        )
+
+    # Handle guardrails field
+    if new_guardrails is None or (isinstance(new_guardrails, (list, dict)) and len(new_guardrails) == 0):
+        # Remove guardrails entirely if None or empty
+        if "guardrails" in cleaned_metadata:
+            del cleaned_metadata["guardrails"]
+            verbose_proxy_logger.debug("Removed guardrails from metadata (None or empty)")
+    else:
+        # Set new guardrails, replacing any old ones
+        cleaned_metadata["guardrails"] = new_guardrails
+        verbose_proxy_logger.debug(
+            f"Set new guardrails in metadata: {new_guardrails}"
+        )
+
+    return cleaned_metadata

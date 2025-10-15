@@ -394,17 +394,25 @@ class CustomGuardrail(CustomLogger):
             guardrail_usage=guardrail_usage,
             action_reason=action_reason,
         )
+
+        # Add to both metadata and litellm_metadata if they exist to ensure logging compatibility
+        added_to_metadata = False
+
+        if "litellm_metadata" in request_data:
+            if request_data["litellm_metadata"] is None:
+                request_data["litellm_metadata"] = {}
+            request_data["litellm_metadata"]["standard_logging_guardrail_information"] = slg
+            added_to_metadata = True
+
         if "metadata" in request_data:
             if request_data["metadata"] is None:
                 request_data["metadata"] = {}
             request_data["metadata"]["standard_logging_guardrail_information"] = slg
-        elif "litellm_metadata" in request_data:
-            request_data["litellm_metadata"][
-                "standard_logging_guardrail_information"
-            ] = slg
-        else:
+            added_to_metadata = True
+
+        if not added_to_metadata:
             verbose_logger.warning(
-                "unable to log guardrail information. No metadata found in request_data"
+                "unable to log guardrail information. No metadata or litellm_metadata found in request_data"
             )
 
     async def apply_guardrail(

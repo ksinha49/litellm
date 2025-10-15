@@ -2712,6 +2712,8 @@ def _update_team_metadata_field(updated_kv: dict, field_name: str) -> None:
         updated_kv: The key-value dict being used for the update
         field_name: Name of the metadata field being updated
     """
+    from litellm.proxy.guardrails.guardrail_helpers import clean_guardrails_from_metadata
+
     if field_name in LiteLLM_ManagementEndpoint_MetadataFields_Premium:
         _premium_user_check()
 
@@ -2719,7 +2721,14 @@ def _update_team_metadata_field(updated_kv: dict, field_name: str) -> None:
         # remove field from updated_kv
         _value = updated_kv.pop(field_name)
         if "metadata" in updated_kv and updated_kv["metadata"] is not None:
-            updated_kv["metadata"][field_name] = _value
+            # If updating guardrails, clean old guardrail data first
+            if field_name == "guardrails":
+                updated_kv["metadata"] = clean_guardrails_from_metadata(
+                    metadata=updated_kv["metadata"],
+                    new_guardrails=_value,
+                )
+            else:
+                updated_kv["metadata"][field_name] = _value
         else:
             updated_kv["metadata"] = {field_name: _value}
 

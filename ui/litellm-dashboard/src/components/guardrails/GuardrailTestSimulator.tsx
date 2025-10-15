@@ -24,8 +24,22 @@ const GuardrailTestSimulator: React.FC<GuardrailTestSimulatorProps> = ({
   const [activeTab, setActiveTab] = useState("manual");
 
   // Check if the guardrail type is supported for testing
-  const supportedGuardrailTypes = ["bedrock", "presidio", "lakera", "lakera_v2"];
-  const isSupportedForTesting = supportedGuardrailTypes.includes(guardrailType.toLowerCase());
+  // Support both standard names and any variations
+  const supportedGuardrailTypes = ["bedrock", "presidio", "lakera", "lakera_v2", "aws_bedrock_guardrails"];
+  const normalizedType = guardrailType.toLowerCase().replace(/_/g, "").replace(/\s+/g, "");
+
+  // Check direct match or normalized match
+  const isSupportedForTesting =
+    supportedGuardrailTypes.includes(guardrailType.toLowerCase()) ||
+    supportedGuardrailTypes.some(type => type.replace(/_/g, "").replace(/\s+/g, "") === normalizedType) ||
+    normalizedType.includes("bedrock") ||
+    normalizedType.includes("presidio") ||
+    normalizedType.includes("lakera");
+
+  // Debug logging
+  console.log("GuardrailTestSimulator - guardrailType:", guardrailType);
+  console.log("GuardrailTestSimulator - normalizedType:", normalizedType);
+  console.log("GuardrailTestSimulator - isSupportedForTesting:", isSupportedForTesting);
 
   if (!isSupportedForTesting) {
     return (
@@ -37,6 +51,10 @@ const GuardrailTestSimulator: React.FC<GuardrailTestSimulatorProps> = ({
               Testing is currently supported for: Bedrock, Presidio, and Lakera guardrails.
               <br />
               Your guardrail type: <strong>{guardrailType}</strong>
+              <br />
+              <Text className="text-xs text-gray-500">
+                (If you believe this should be supported, check the guardrail configuration or contact support)
+              </Text>
             </>
           }
           type="info"
