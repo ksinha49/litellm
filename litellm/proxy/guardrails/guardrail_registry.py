@@ -200,6 +200,32 @@ class GuardrailRegistry:
     def __init__(self):
         pass
 
+    @property
+    def _in_memory_handler(self) -> 'InMemoryGuardrailHandler':
+        """Lazy access to the global IN_MEMORY_GUARDRAIL_HANDLER instance"""
+        return IN_MEMORY_GUARDRAIL_HANDLER
+
+    def initialize_guardrail(
+        self,
+        guardrail: Guardrail,
+        config_file_path: Optional[str] = None,
+    ) -> Optional[Guardrail]:
+        """
+        Initialize a guardrail from a dictionary and add it to the litellm callback manager
+
+        Delegates to the global IN_MEMORY_GUARDRAIL_HANDLER instance.
+
+        Returns a Guardrail object if the guardrail is initialized successfully
+        """
+        return self._in_memory_handler.initialize_guardrail(
+            guardrail=guardrail, config_file_path=config_file_path
+        )
+
+    @property
+    def guardrail_id_to_custom_guardrail(self) -> Dict[str, Optional[CustomGuardrail]]:
+        """Access to the in-memory guardrail mapping"""
+        return self._in_memory_handler.guardrail_id_to_custom_guardrail
+
     ###########################################################
     ########### In memory management helpers for guardrails ###########
     ############################################################

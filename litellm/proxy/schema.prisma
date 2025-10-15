@@ -520,6 +520,37 @@ model LiteLLM_GuardrailsTable {
   updated_at DateTime @updatedAt
 }
 
+// Guardrail Test History table for storing guardrail test results
+model LiteLLM_GuardrailTestHistoryTable {
+  test_history_id String @id @default(uuid())
+  test_id String
+  guardrail_id String?
+  guardrail_name String
+  guardrail_type String
+  test_scenario_name String?
+  content_source String
+  test_content_hash String
+  test_content_preview String?
+  detected Boolean
+  action String
+  action_reason String?
+  assessment_details Json?
+  guardrail_coverage Json?
+  guardrail_outputs Json?
+  guardrail_usage Json?
+  duration_ms Float
+  passed_validation Boolean
+  validation_errors Json?
+  created_by String?
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  @@index([guardrail_id])
+  @@index([guardrail_type])
+  @@index([created_at])
+  @@index([created_by])
+}
+
 // Prompt table for storing prompt configurations
 model LiteLLM_PromptTable {
   id String @id @default(uuid())
