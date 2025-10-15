@@ -1064,6 +1064,20 @@ def move_guardrails_to_metadata(
             f"Guardrails applied - org: {organization_id}, team: {team_id}, "
             f"guardrails: {final_guardrails}"
         )
+        verbose_proxy_logger.debug(
+            "Guardrails propagation details - initial: %s, final: %s, "
+            "from_key_metadata: %s, from_team_metadata: %s, from_org_metadata: %s",
+            initial_guardrails,
+            final_guardrails,
+            bool(user_api_key_dict.metadata and "guardrails" in user_api_key_dict.metadata),
+            bool(user_api_key_dict.team_metadata and "guardrails" in user_api_key_dict.team_metadata),
+            bool(user_api_key_dict.organization_metadata and "guardrails" in user_api_key_dict.organization_metadata)
+        )
+    else:
+        verbose_proxy_logger.debug(
+            "No guardrails applied from team/key/org metadata. Initial guardrails: %s",
+            initial_guardrails
+        )
 
     # Check request-level guardrails
     if "guardrails" in data:

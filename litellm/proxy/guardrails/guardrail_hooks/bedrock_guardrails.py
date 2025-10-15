@@ -540,12 +540,42 @@ class BedrockGuardrail(CustomGuardrail, BaseAWSLLM):
                 "Bedrock API response keys: %s", list(response_json.keys())
             )
 
+            # Log action and actionReason for detection diagnosis
+            action = response_json.get("action")
+            action_reason = response_json.get("actionReason")
+            verbose_proxy_logger.debug(
+                "Bedrock guardrail action=%s, actionReason=%s",
+                action,
+                action_reason[:200] if action_reason else None
+            )
+
             # Extract assessments
             assessments = response_json.get("assessments")
             if assessments and isinstance(assessments, list) and len(assessments) > 0:
                 verbose_proxy_logger.debug(
                     "Found %d assessments in Bedrock response", len(assessments)
                 )
+
+                # Log topic policy details for diagnosis
+                for idx, assessment in enumerate(assessments):
+                    if isinstance(assessment, dict):
+                        topic_policy = assessment.get("topicPolicy")
+                        if topic_policy:
+                            topics = topic_policy.get("topics", [])
+                            verbose_proxy_logger.debug(
+                                "Assessment %d: topicPolicy found with %d topics",
+                                idx,
+                                len(topics) if topics else 0
+                            )
+                            if topics:
+                                for topic in topics:
+                                    verbose_proxy_logger.debug(
+                                        "  Topic: name=%s, type=%s, action=%s",
+                                        topic.get("name"),
+                                        topic.get("type"),
+                                        topic.get("action")
+                                    )
+
                 # Apply PII redaction to assessment details for logging
                 redacted_response = _redact_pii_matches({"assessments": assessments})
                 assessment_details = redacted_response.get("assessments") if redacted_response else assessments
@@ -589,6 +619,15 @@ class BedrockGuardrail(CustomGuardrail, BaseAWSLLM):
             guardrail_detected = self._response_indicates_detection(
                 guardrail_json_response
             )
+
+            verbose_proxy_logger.debug(
+                "Bedrock guardrail detection result: detected=%s, action=%s, has_assessments=%s, has_action_reason=%s",
+                guardrail_detected,
+                guardrail_json_response.get("action"),
+                bool(guardrail_json_response.get("assessments")),
+                bool(guardrail_json_response.get("actionReason"))
+            )
+
             if (
                 guardrail_detected is not None
                 and "detected" not in guardrail_json_response
@@ -832,6 +871,41 @@ class BedrockGuardrail(CustomGuardrail, BaseAWSLLM):
             "ALLOW",
         }:
             return True
+
+        # Check actionReason for detection signals (especially for detection-only policies)
+        action_reason = response.get("actionReason")
+        if action_reason and isinstance(action_reason, str):
+            # AWS Bedrock includes actionReason explaining why action was taken
+            # For detection-only topic policies, this contains topic match info even when action="NONE"
+            detection_keywords = [
+                "topic", "denied", "blocked", "detected", "matched",
+                "pii", "sensitive", "filtered", "intervened", "policy"
+            ]
+            action_reason_lower = action_reason.lower()
+            if any(keyword in action_reason_lower for keyword in detection_keywords):
+                verbose_proxy_logger.debug(
+                    "Detected guardrail trigger via actionReason: %s", action_reason
+                )
+                return True
+
+        # Check usage for policy evaluation signals
+        usage = response.get("usage")
+        if usage and isinstance(usage, dict):
+            # If topicPolicyUnits > 0, topic policy was evaluated and likely detected something
+            topic_units = usage.get("topicPolicyUnits", 0)
+            if topic_units and topic_units > 0:
+                # Check if there are assessments with topic policy
+                assessments = response.get("assessments")
+                if assessments and isinstance(assessments, list):
+                    for assessment in assessments:
+                        if isinstance(assessment, dict):
+                            topic_policy = assessment.get("topicPolicy")
+                            # For detection-only, topics array may be empty but topicPolicy exists
+                            if topic_policy is not None:
+                                verbose_proxy_logger.debug(
+                                    "Detected topic policy evaluation (topicPolicyUnits=%s)", topic_units
+                                )
+                                return True
 
         if self._response_contains_detection(response):
             return True
