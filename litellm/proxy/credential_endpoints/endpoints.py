@@ -12,7 +12,10 @@ from litellm.litellm_core_utils.credential_accessor import CredentialAccessor
 from litellm.litellm_core_utils.litellm_logging import _get_masked_values
 from litellm.proxy._types import CommonProxyErrors, UserAPIKeyAuth
 from litellm.proxy.auth.user_api_key_auth import user_api_key_auth
-from litellm.proxy.common_utils.encrypt_decrypt_utils import encrypt_value_helper
+from litellm.proxy.common_utils.encrypt_decrypt_utils import (
+    encrypt_value_helper,
+    decrypt_value_helper,
+)
 from litellm.proxy.utils import handle_exception_on_proxy, jsonify_object
 from litellm.types.utils import CreateCredentialItem, CredentialItem
 
@@ -27,6 +30,19 @@ class CredentialHelperUtils:
         for key, value in credential.credential_values.items():
             prefixed_encrypted_credential_values[key] = encrypt_value_helper(value)
         credential.credential_values = prefixed_encrypted_credential_values
+        return credential
+
+    @staticmethod
+    def decrypt_credential_values(credential: CredentialItem) -> CredentialItem:
+        """Decrypt values in credential.credential_values loaded from DB"""
+        decrypted_credential_values = {}
+        for key, value in credential.credential_values.items():
+            decrypted_value = decrypt_value_helper(value=value, key=key)
+            # If decryption returns None, keep the original value
+            decrypted_credential_values[key] = (
+                decrypted_value if decrypted_value is not None else value
+            )
+        credential.credential_values = decrypted_credential_values
         return credential
 
 
@@ -244,37 +260,46 @@ def update_db_credential(
 ) -> CredentialItem:
     """
     Update a credential in the DB.
+
+    Decrypts existing DB credential, merges with update, then re-encrypts.
     """
+    # Decrypt the existing DB credential first
+    decrypted_db_credential = CredentialHelperUtils.decrypt_credential_values(
+        CredentialItem(
+            credential_name=db_credential.credential_name,
+            credential_info=db_credential.credential_info,
+            credential_values=db_credential.credential_values,
+        )
+    )
+
+    # Start with decrypted values
     merged_credential = CredentialItem(
-        credential_name=db_credential.credential_name,
-        credential_info=db_credential.credential_info,
-        credential_values=db_credential.credential_values,
+        credential_name=decrypted_db_credential.credential_name,
+        credential_info=decrypted_db_credential.credential_info,
+        credential_values=decrypted_db_credential.credential_values,
     )
 
-    encrypted_credential = CredentialHelperUtils.encrypt_credential_values(
-        updated_patch
-    )
-    # update model name
-    if encrypted_credential.credential_name:
-        merged_credential.credential_name = encrypted_credential.credential_name
+    # Update with new values (not encrypted yet)
+    # update credential name
+    if updated_patch.credential_name:
+        merged_credential.credential_name = updated_patch.credential_name
 
-    # update litellm params
-    if encrypted_credential.credential_values:
-        # Encrypt any sensitive values
-        encrypted_params = {
-            k: v for k, v in encrypted_credential.credential_values.items()
-        }
+    # update credential values (merge plaintext values)
+    if updated_patch.credential_values:
+        merged_credential.credential_values.update(updated_patch.credential_values)
 
-        merged_credential.credential_values.update(encrypted_params)
-
-    # update model info
-    if encrypted_credential.credential_info:
-        """Update credential info"""
+    # update credential info
+    if updated_patch.credential_info:
         if "credential_info" not in merged_credential.credential_info:
             merged_credential.credential_info = {}
-        merged_credential.credential_info.update(encrypted_credential.credential_info)
+        merged_credential.credential_info.update(updated_patch.credential_info)
 
-    return merged_credential
+    # Now encrypt all values before returning
+    encrypted_credential = CredentialHelperUtils.encrypt_credential_values(
+        merged_credential
+    )
+
+    return encrypted_credential
 
 
 @router.patch(

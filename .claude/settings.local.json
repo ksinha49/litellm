@@ -2,7 +2,8 @@
   "permissions": {
     "allow": [
       "Bash(bash:*)",
-      "Bash(npm run lint)"
+      "Bash(npm run lint)",
+      "Bash(python:*)"
     ],
     "deny": [],
     "ask": []

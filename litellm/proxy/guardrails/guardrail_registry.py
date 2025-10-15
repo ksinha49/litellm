@@ -12,6 +12,10 @@ from litellm.integrations.custom_guardrail import CustomGuardrail
 from litellm.litellm_core_utils.safe_json_dumps import safe_dumps
 from litellm.proxy.utils import PrismaClient
 from litellm.secret_managers.main import get_secret
+from litellm.proxy.common_utils.encrypt_decrypt_utils import (
+    encrypt_value_helper,
+    decrypt_value_helper,
+)
 from litellm.types.guardrails import (
     Guardrail,
     GuardrailEventHooks,
@@ -226,6 +230,54 @@ class GuardrailRegistry:
         """Access to the in-memory guardrail mapping"""
         return self._in_memory_handler.guardrail_id_to_custom_guardrail
 
+    def _encrypt_guardrail_params(self, litellm_params: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Encrypt sensitive fields in litellm_params before storing in database.
+
+        Similar to model encryption logic in model_management_endpoints.py
+        """
+        import json
+
+        encrypted_params = {}
+        for k, v in litellm_params.items():
+            # Convert value to JSON-serializable format first
+            if not isinstance(v, (str, int, float, bool, type(None))):
+                v = json.loads(json.dumps(v, default=str))
+
+            # Encrypt the value
+            encrypted_value = encrypt_value_helper(value=v)
+            encrypted_params[k] = encrypted_value
+
+        return encrypted_params
+
+    def _decrypt_guardrail_params(self, litellm_params_data: Any) -> Dict[str, Any]:
+        """
+        Decrypt litellm_params after loading from database.
+
+        Similar to parse_model_litellm_params in proxy_server.py
+        """
+        # Handle different input types
+        if isinstance(litellm_params_data, str):
+            import json
+            params_dict = json.loads(litellm_params_data)
+        elif isinstance(litellm_params_data, dict):
+            params_dict = litellm_params_data
+        else:
+            # Already a LitellmParams object or other type
+            return litellm_params_data
+
+        # Decrypt each string value
+        decrypted_params = {}
+        for k, v in params_dict.items():
+            if isinstance(v, str):
+                decrypted_value = decrypt_value_helper(value=v, key=k)
+                # If decryption returns None, keep the original value
+                decrypted_params[k] = decrypted_value if decrypted_value is not None else v
+            else:
+                decrypted_params[k] = v
+
+        return decrypted_params
+
     ###########################################################
     ########### In memory management helpers for guardrails ###########
     ############################################################
@@ -253,11 +305,16 @@ class GuardrailRegistry:
         self, guardrail: Guardrail, prisma_client: PrismaClient
     ):
         """
-        Add a guardrail to the database
+        Add a guardrail to the database with encrypted credentials
         """
         try:
             guardrail_name = guardrail.get("guardrail_name")
-            litellm_params: str = safe_dumps(dict(guardrail.get("litellm_params", {})))
+
+            # Get litellm_params and encrypt sensitive fields
+            raw_litellm_params = dict(guardrail.get("litellm_params", {}))
+            encrypted_litellm_params = self._encrypt_guardrail_params(raw_litellm_params)
+            litellm_params: str = safe_dumps(encrypted_litellm_params)
+
             guardrail_info: str = safe_dumps(guardrail.get("guardrail_info", {}))
 
             # Create guardrail in DB
@@ -299,11 +356,16 @@ class GuardrailRegistry:
         self, guardrail_id: str, guardrail: Guardrail, prisma_client: PrismaClient
     ):
         """
-        Update a guardrail in the database
+        Update a guardrail in the database with encrypted credentials
         """
         try:
             guardrail_name = guardrail.get("guardrail_name")
-            litellm_params: str = safe_dumps(dict(guardrail.get("litellm_params", {})))
+
+            # Get litellm_params and encrypt sensitive fields
+            raw_litellm_params = dict(guardrail.get("litellm_params", {}))
+            encrypted_litellm_params = self._encrypt_guardrail_params(raw_litellm_params)
+            litellm_params: str = safe_dumps(encrypted_litellm_params)
+
             guardrail_info: str = safe_dumps(guardrail.get("guardrail_info", {}))
 
             # Update in DB
@@ -322,12 +384,12 @@ class GuardrailRegistry:
         except Exception as e:
             raise Exception(f"Error updating guardrail in DB: {str(e)}")
 
-    @staticmethod
     async def get_all_guardrails_from_db(
+        self,
         prisma_client: PrismaClient,
     ) -> List[Guardrail]:
         """
-        Get all guardrails from the database
+        Get all guardrails from the database and decrypt credentials
         """
         try:
             guardrails_from_db = (
@@ -338,7 +400,17 @@ class GuardrailRegistry:
 
             guardrails: List[Guardrail] = []
             for guardrail in guardrails_from_db:
-                guardrails.append(Guardrail(**(dict(guardrail))))  # type: ignore
+                # Convert to dict
+                guardrail_dict = dict(guardrail)
+
+                # Decrypt litellm_params if present
+                if "litellm_params" in guardrail_dict:
+                    decrypted_params = self._decrypt_guardrail_params(
+                        guardrail_dict["litellm_params"]
+                    )
+                    guardrail_dict["litellm_params"] = decrypted_params
+
+                guardrails.append(Guardrail(**guardrail_dict))  # type: ignore
 
             return guardrails
         except Exception as e:
@@ -348,7 +420,7 @@ class GuardrailRegistry:
         self, guardrail_id: str, prisma_client: PrismaClient
     ) -> Optional[Guardrail]:
         """
-        Get a guardrail by its ID from the database
+        Get a guardrail by its ID from the database and decrypt credentials
         """
         try:
             guardrail = await prisma_client.db.litellm_guardrailstable.find_unique(
@@ -358,7 +430,17 @@ class GuardrailRegistry:
             if not guardrail:
                 return None
 
-            return Guardrail(**(dict(guardrail)))  # type: ignore
+            # Convert to dict
+            guardrail_dict = dict(guardrail)
+
+            # Decrypt litellm_params if present
+            if "litellm_params" in guardrail_dict:
+                decrypted_params = self._decrypt_guardrail_params(
+                    guardrail_dict["litellm_params"]
+                )
+                guardrail_dict["litellm_params"] = decrypted_params
+
+            return Guardrail(**guardrail_dict)  # type: ignore
         except Exception as e:
             raise Exception(f"Error getting guardrail from DB: {str(e)}")
 
@@ -366,7 +448,7 @@ class GuardrailRegistry:
         self, guardrail_name: str, prisma_client: PrismaClient
     ) -> Optional[Guardrail]:
         """
-        Get a guardrail by its name from the database
+        Get a guardrail by its name from the database and decrypt credentials
         """
         try:
             guardrail = await prisma_client.db.litellm_guardrailstable.find_unique(
@@ -376,7 +458,17 @@ class GuardrailRegistry:
             if not guardrail:
                 return None
 
-            return Guardrail(**(dict(guardrail)))  # type: ignore
+            # Convert to dict
+            guardrail_dict = dict(guardrail)
+
+            # Decrypt litellm_params if present
+            if "litellm_params" in guardrail_dict:
+                decrypted_params = self._decrypt_guardrail_params(
+                    guardrail_dict["litellm_params"]
+                )
+                guardrail_dict["litellm_params"] = decrypted_params
+
+            return Guardrail(**guardrail_dict)  # type: ignore
         except Exception as e:
             raise Exception(f"Error getting guardrail from DB: {str(e)}")
 
