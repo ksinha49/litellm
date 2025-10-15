@@ -330,6 +330,68 @@ class GuardrailTestService:
 
             return initialized_guardrail, guardrail_callback
 
+    def _extract_guardrail_info_from_request_data(
+        self,
+        data: Dict[str, Any],
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Extract guardrail information from request_data metadata.
+
+        This is used for detection-only policies that don't raise exceptions
+        but still populate metadata in the request.
+
+        Args:
+            data: The request data dictionary
+
+        Returns:
+            Dictionary with guardrail info or None if not found
+        """
+        # Check both metadata and litellm_metadata locations
+        metadata = data.get("metadata") or data.get("litellm_metadata")
+        if not metadata or not isinstance(metadata, dict):
+            return None
+
+        # Get the standard logging guardrail information
+        guardrail_info = metadata.get("standard_logging_guardrail_information")
+        if not guardrail_info or not isinstance(guardrail_info, dict):
+            return None
+
+        # Extract the relevant fields
+        detected = guardrail_info.get("detected")
+        if detected is None:
+            # If detected not explicitly set, check if there are assessments/outputs
+            guardrail_response = guardrail_info.get("guardrail_response", {})
+            if isinstance(guardrail_response, dict):
+                # Check for assessments, outputs, or action
+                action = guardrail_response.get("action", "NONE")
+                assessments = guardrail_response.get("assessments")
+                outputs = guardrail_response.get("outputs")
+
+                # If there are assessments or outputs, something was detected
+                if assessments or outputs:
+                    detected = True
+                # If action is not NONE, something was detected
+                elif action and action.upper() not in {"", "NONE", "NO_ACTION", "ALLOW"}:
+                    detected = True
+                else:
+                    detected = False
+
+        # Get action from guardrail_response or default to NONE
+        guardrail_response = guardrail_info.get("guardrail_response", {})
+        action = "NONE"
+        if isinstance(guardrail_response, dict):
+            action = guardrail_response.get("action", "NONE")
+
+        return {
+            "detected": bool(detected),
+            "action": action,
+            "action_reason": guardrail_info.get("action_reason"),
+            "assessment_details": guardrail_info.get("assessment_details"),
+            "guardrail_coverage": guardrail_info.get("guardrail_coverage"),
+            "guardrail_outputs": guardrail_info.get("guardrail_outputs"),
+            "guardrail_usage": guardrail_info.get("guardrail_usage"),
+        }
+
     async def _execute_guardrail_test(
         self,
         guardrail_callback: Any,
@@ -391,7 +453,16 @@ class GuardrailTestService:
                         call_type="completion",
                     )
 
-            # If no exception was raised, content passed
+            # Check if guardrail added metadata to request_data (for detection-only policies)
+            # Detection-only policies don't raise exceptions but still populate metadata
+            guardrail_info = self._extract_guardrail_info_from_request_data(data)
+            if guardrail_info:
+                verbose_proxy_logger.debug(
+                    f"Extracted guardrail info from request_data: detected={guardrail_info.get('detected')}, action={guardrail_info.get('action')}"
+                )
+                return guardrail_info
+
+            # If no exception was raised and no metadata found, content passed
             return {
                 "detected": False,
                 "action": "NONE",
