@@ -62,22 +62,22 @@ const cacheTypeParams: Record<string, CacheParamField[]> = {
     },
   ],
   s3: [
-    { key: "bucket", label: "Bucket" },
-    { key: "region", label: "Region" },
+    { key: "s3_bucket_name", label: "Bucket" },
+    { key: "s3_region_name", label: "Region" },
     {
-      key: "aws_access_key_id",
+      key: "s3_aws_access_key_id",
       label: "AWS Access Key ID",
       type: "password",
       placeholder: "os.environ/AWS_ACCESS_KEY_ID",
     },
     {
-      key: "aws_secret_access_key",
+      key: "s3_aws_secret_access_key",
       label: "AWS Secret Access Key",
       type: "password",
       placeholder: "os.environ/AWS_SECRET_ACCESS_KEY",
     },
     {
-      key: "aws_session_token",
+      key: "s3_aws_session_token",
       label: "AWS Session Token",
       type: "password",
       placeholder: "os.environ/AWS_SESSION_TOKEN",

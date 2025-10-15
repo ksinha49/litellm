@@ -128,7 +128,7 @@ export const callbackInfo: Record<string, CallbackInfo> = {
     },
     [Callbacks.S3]: {
         logo: `${asset_logos_folder}aws.svg`,
-        supports_key_team_logging: false,
+        supports_key_team_logging: true,
         dynamic_params: {
           "s3_bucket_name": "text",
           "s3_region_name": "text",

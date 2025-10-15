@@ -868,6 +868,8 @@ LITELLM_SETTINGS_SAFE_DB_OVERRIDES = [
     "langfuse_default_tags",
     "enable_preview_features",
     "json_logs",
+    "cache",
+    "cache_params",
 ]
 
 LITELLM_SETTINGS_DEFAULTS = {

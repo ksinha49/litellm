@@ -2696,12 +2696,19 @@ class ProxyConfig:
 
     def _add_callbacks_from_db_config(self, config_data: dict) -> None:
         """
-        Adds callbacks from DB config to litellm
+        Synchronizes callbacks from DB config to litellm.
+        Clears existing callbacks and sets them to match the config exactly.
+        This ensures removed callbacks actually stop running.
         """
         litellm_settings = config_data.get("litellm_settings", {}) or {}
         success_callbacks = litellm_settings.get("success_callback", None)
         failure_callbacks = litellm_settings.get("failure_callback", None)
 
+        # Clear existing callbacks to ensure proper synchronization
+        litellm.success_callback = []
+        litellm.failure_callback = []
+
+        # Add success callbacks from config
         if success_callbacks is not None and isinstance(success_callbacks, list):
             for success_callback in success_callbacks:
                 if (
@@ -2711,12 +2718,12 @@ class ProxyConfig:
                     _add_custom_logger_callback_to_specific_event(
                         success_callback, "success"
                     )
-                elif success_callback not in litellm.success_callback:
+                else:
                     litellm.logging_callback_manager.add_litellm_success_callback(
                         success_callback
                     )
 
-        # Add failure callbacks from DB to litellm
+        # Add failure callbacks from config
         if failure_callbacks is not None and isinstance(failure_callbacks, list):
             for failure_callback in failure_callbacks:
                 if (
@@ -2726,10 +2733,56 @@ class ProxyConfig:
                     _add_custom_logger_callback_to_specific_event(
                         failure_callback, "failure"
                     )
-                elif failure_callback not in litellm.failure_callback:
+                else:
                     litellm.logging_callback_manager.add_litellm_failure_callback(
                         failure_callback
                     )
+
+        # Apply other litellm settings
+        self._apply_litellm_settings_from_db_config(config_data)
+
+    def _apply_litellm_settings_from_db_config(self, config_data: dict) -> None:
+        """
+        Applies all litellm_settings from DB config to the litellm module.
+        This includes boolean flags, list settings, and other configuration.
+
+        Previously, only callbacks were applied on config update, causing settings like
+        turn_off_message_logging to not take effect until proxy restart.
+        """
+        litellm_settings = config_data.get("litellm_settings", {}) or {}
+
+        # Apply boolean settings
+        boolean_settings = [
+            'turn_off_message_logging',
+            'redact_user_api_key_info',
+            'json_logs',
+            'enable_preview_features'
+        ]
+
+        for setting_name in boolean_settings:
+            if setting_name in litellm_settings:
+                setattr(litellm, setting_name, bool(litellm_settings[setting_name]))
+                verbose_proxy_logger.debug(
+                    f"Applied litellm setting: {setting_name}={bool(litellm_settings[setting_name])}"
+                )
+
+        # Apply list settings
+        if 'langfuse_default_tags' in litellm_settings:
+            tags = litellm_settings['langfuse_default_tags']
+            if isinstance(tags, list):
+                litellm.langfuse_default_tags = tags
+                verbose_proxy_logger.debug(
+                    f"Applied litellm setting: langfuse_default_tags={tags}"
+                )
+
+        # Apply general callbacks list (different from success_callback/failure_callback)
+        if 'callbacks' in litellm_settings:
+            callbacks = litellm_settings['callbacks']
+            if isinstance(callbacks, list):
+                litellm.callbacks = callbacks
+                verbose_proxy_logger.debug(
+                    f"Applied litellm setting: callbacks={callbacks}"
+                )
 
     def _encrypt_env_variables(
         self, environment_variables: dict, new_encryption_key: Optional[str] = None
@@ -8463,24 +8516,6 @@ async def update_config(config_info: ConfigYAML):  # noqa: PLR0915
                 **config["litellm_settings"],
                 **updated_litellm_settings,
             }
-
-            # if litellm.success_callback in updated_litellm_settings and config["litellm_settings"]
-            if (
-                "success_callback" in updated_litellm_settings
-                and "success_callback" in config["litellm_settings"]
-            ):
-                # check both success callback are lists
-                if isinstance(
-                    config["litellm_settings"]["success_callback"], list
-                ) and isinstance(updated_litellm_settings["success_callback"], list):
-                    combined_success_callback = (
-                        config["litellm_settings"]["success_callback"]
-                        + updated_litellm_settings["success_callback"]
-                    )
-                    combined_success_callback = list(set(combined_success_callback))
-                    config["litellm_settings"][
-                        "success_callback"
-                    ] = combined_success_callback
 
         # Save the updated config
         await proxy_config.save_config(new_config=config)
