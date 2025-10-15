@@ -27,6 +27,12 @@ cat ui_colors.json
 # Increase Node.js heap limit to prevent build worker OOM kills
 export NODE_OPTIONS=--max-old-space-size=4096
 
+# Clean build cache and output directories to ensure fresh build
+echo "Cleaning build cache and output directories..."
+rm -rf .next
+rm -rf out
+rm -rf node_modules/.cache
+
 # Run npm build
 npm run build
 

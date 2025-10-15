@@ -77,11 +77,14 @@ else
     echo "Git metadata not available"
 fi
 
-# Clean existing Admin UI build output to avoid stale files
+# Clean existing Admin UI build output and Next.js cache to avoid stale files
+echo "Cleaning Admin UI output directory..."
 rm -rf litellm/proxy/_experimental/out
 
 # cd in to /ui/litellm-dashboard
 cd ui/litellm-dashboard
+
+# Note: build_ui.sh will clean .next, out, and node_modules/.cache before building
 
 # ensure have access to build_ui.sh
 chmod +x ./build_ui.sh

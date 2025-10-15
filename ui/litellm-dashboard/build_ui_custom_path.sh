@@ -33,6 +33,12 @@ fi
 # Install dependencies
 npm ci
 
+# Clean build cache and output directories to ensure fresh build
+echo "Cleaning build cache and output directories..."
+rm -rf .next
+rm -rf out
+rm -rf node_modules/.cache
+
 # Run npm build with the environment variable
 UI_BASE_PATH=$UI_BASE_PATH npm run build
 
