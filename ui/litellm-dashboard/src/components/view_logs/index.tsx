@@ -161,29 +161,6 @@ export default function SpendLogsTable({
     }
   }, [isCustomDate])
 
-  // Log query state changes for debugging
-  useEffect(() => {
-    console.log("[Request Logs] Query state:", {
-      isLoading: logs.isLoading,
-      isFetching: logs.isFetching,
-      isError: logs.isError,
-      dataCount: logs.data?.data?.length || 0,
-      total: logs.data?.total || 0,
-      currentPage,
-      isLiveTail,
-      isCustomDate,
-      queryEnabled: !!accessToken && !!token && !!userRole && !!userID && activeTab === "request logs",
-    })
-  }, [logs.isLoading, logs.isFetching, logs.isError, logs.data, currentPage, isLiveTail, isCustomDate, activeTab, accessToken, token, userRole, userID])
-
-  // Update last updated time when data successfully loads
-  useEffect(() => {
-    if (logs.isSuccess && logs.data && !logs.isFetching) {
-      setLastUpdatedTime(new Date())
-      console.log("[Request Logs] Data updated successfully at", new Date().toLocaleTimeString())
-    }
-  }, [logs.isSuccess, logs.data, logs.isFetching])
-
   const LiveTailControls = () => {
     return (
       <div className="flex items-center gap-2">
@@ -272,6 +249,29 @@ export default function SpendLogsTable({
     refetchInterval: isLiveTail && currentPage === 1 ? 15000 : false,
     refetchIntervalInBackground: true,
   })
+
+  // Log query state changes for debugging
+  useEffect(() => {
+    console.log("[Request Logs] Query state:", {
+      isLoading: logs.isLoading,
+      isFetching: logs.isFetching,
+      isError: logs.isError,
+      dataCount: logs.data?.data?.length || 0,
+      total: logs.data?.total || 0,
+      currentPage,
+      isLiveTail,
+      isCustomDate,
+      queryEnabled: !!accessToken && !!token && !!userRole && !!userID && activeTab === "request logs",
+    })
+  }, [logs.isLoading, logs.isFetching, logs.isError, logs.data, currentPage, isLiveTail, isCustomDate, activeTab, accessToken, token, userRole, userID])
+
+  // Update last updated time when data successfully loads
+  useEffect(() => {
+    if (logs.isSuccess && logs.data && !logs.isFetching) {
+      setLastUpdatedTime(new Date())
+      console.log("[Request Logs] Data updated successfully at", new Date().toLocaleTimeString())
+    }
+  }, [logs.isSuccess, logs.data, logs.isFetching])
 
   const logsData = logs.data || {
     data: [],
