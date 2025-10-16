@@ -60,7 +60,9 @@ interface ProviderParamsResponse {
   [provider: string]: { [key: string]: ProviderParam };
 }
 
-type ProviderParamStructure = Record<string, ProviderParamStructure | true>;
+interface ProviderParamStructure {
+  [key: string]: ProviderParamStructure | true;
+}
 
 const collectAllowedParamKeys = (
   fields: { [key: string]: ProviderParam } | undefined
