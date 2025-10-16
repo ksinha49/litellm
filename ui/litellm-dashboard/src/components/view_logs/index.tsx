@@ -159,7 +159,7 @@ export default function SpendLogsTable({
       console.log("[Request Logs] Auto-disabling Live Tail due to custom date range selection")
       setIsLiveTail(false)
     }
-  }, [isCustomDate])
+  }, [isCustomDate, isLiveTail])
 
   const LiveTailControls = () => {
     return (
@@ -828,8 +828,8 @@ export default function SpendLogsTable({
                       <div>
                         <h4 className="text-sm font-medium text-yellow-800">Live Tail with Custom Date Range</h4>
                         <p className="text-sm text-yellow-700 mt-1">
-                          Auto-refresh is enabled, but you're viewing a custom time range. New logs created after{" "}
-                          <span className="font-mono">{moment(endTime).format("MMM D, YYYY HH:mm")}</span> won't appear.
+                          Auto-refresh is enabled, but you&apos;re viewing a custom time range. New logs created after{" "}
+                          <span className="font-mono">{moment(endTime).format("MMM D, YYYY HH:mm")}</span> won&apos;t appear.
                           Consider using a preset time range for live updates.
                         </p>
                       </div>
