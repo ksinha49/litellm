@@ -3888,6 +3888,7 @@ class StandardLoggingPayloadSetup:
             requester_custom_headers=None,
             user_api_key_request_route=None,
             cold_storage_object_key=None,
+            standard_logging_guardrail_information=None,
         )
         if isinstance(metadata, dict):
             # Filter the metadata dictionary to include only the specified keys
@@ -4548,6 +4549,7 @@ def get_standard_logging_metadata(
         requester_custom_headers=None,
         user_api_key_request_route=None,
         cold_storage_object_key=None,
+        standard_logging_guardrail_information=None,
     )
     if isinstance(metadata, dict):
         # Filter the metadata dictionary to include only the specified keys
