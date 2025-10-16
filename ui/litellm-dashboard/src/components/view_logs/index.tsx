@@ -893,7 +893,7 @@ export default function SpendLogsTable({
                         </div>
                         <div>
                           <span className="font-medium text-gray-700">Active Filters:</span>
-                          <span className="ml-2">{Object.keys(filters).filter(k => filters[k]).length}</span>
+                          <span className="ml-2">{Object.keys(filters).filter(k => filters[k as keyof typeof filters]).length}</span>
                         </div>
                         <div className="col-span-2">
                           <span className="font-medium text-gray-700">API Endpoint:</span>
