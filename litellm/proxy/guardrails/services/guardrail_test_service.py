@@ -427,6 +427,9 @@ class GuardrailTestService:
                 "model": "gpt-3.5-turbo",
             }
 
+        data.setdefault("metadata", {})
+        data.setdefault("litellm_metadata", {})
+
         # Create mock user API key dict
         user_api_key_dict = UserAPIKeyAuth()
 
