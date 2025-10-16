@@ -105,7 +105,9 @@ const GuardrailTable: React.FC<GuardrailTableProps> = ({
       accessorKey: "litellm_params.guardrail",
       cell: ({ row }) => {
         const guardrail = row.original
-        const { logo, displayName } = getGuardrailLogoAndName(guardrail.litellm_params.guardrail)
+        // Handle null litellm_params gracefully
+        const guardrailValue = guardrail.litellm_params?.guardrail || null
+        const { logo, displayName } = getGuardrailLogoAndName(guardrailValue)
         return (
           <div className="flex items-center space-x-2">
             {logo && (
@@ -131,7 +133,8 @@ const GuardrailTable: React.FC<GuardrailTableProps> = ({
       accessorKey: "litellm_params.mode",
       cell: ({ row }) => {
         const guardrail = row.original
-        return <span className="text-xs">{guardrail.litellm_params.mode}</span>
+        const mode = guardrail.litellm_params?.mode || "-"
+        return <span className="text-xs">{mode}</span>
       },
     },
     {
@@ -139,13 +142,17 @@ const GuardrailTable: React.FC<GuardrailTableProps> = ({
       accessorKey: "litellm_params.default_on",
       cell: ({ row }) => {
         const guardrail = row.original
+        // Handle null litellm_params gracefully
+        const hasLitellmParams = guardrail.litellm_params !== null && guardrail.litellm_params !== undefined
+        const defaultOn = hasLitellmParams ? guardrail.litellm_params.default_on : null
+
         return (
           <Badge
-            color={guardrail.litellm_params?.default_on ? "green" : "gray"}
+            color={defaultOn === true ? "green" : defaultOn === false ? "gray" : "gray"}
             className="text-xs font-normal"
             size="xs"
           >
-            {guardrail.litellm_params?.default_on ? "Default On" : "Default Off"}
+            {defaultOn === true ? "Default On" : defaultOn === false ? "Default Off" : "Unknown"}
           </Badge>
         )
       },
@@ -297,14 +304,14 @@ const GuardrailTable: React.FC<GuardrailTableProps> = ({
             guardrail_name: selectedGuardrail.guardrail_name || "",
             provider:
               Object.keys(guardrail_provider_map).find(
-                (key) => guardrail_provider_map[key] === selectedGuardrail?.litellm_params.guardrail,
+                (key) => guardrail_provider_map[key] === selectedGuardrail?.litellm_params?.guardrail,
               ) || "",
-            mode: selectedGuardrail.litellm_params.mode,
-            default_on: selectedGuardrail.litellm_params.default_on,
-            pii_entities_config: selectedGuardrail.litellm_params.pii_entities_config,
-            ...selectedGuardrail.guardrail_info,
+            mode: selectedGuardrail.litellm_params?.mode || "",
+            default_on: selectedGuardrail.litellm_params?.default_on ?? false,
+            pii_entities_config: selectedGuardrail.litellm_params?.pii_entities_config || {},
+            ...(selectedGuardrail.guardrail_info || {}),
           }}
-          initialLitellmParams={selectedGuardrail.litellm_params}
+          initialLitellmParams={selectedGuardrail.litellm_params || {}}
         />
       )}
     </div>
