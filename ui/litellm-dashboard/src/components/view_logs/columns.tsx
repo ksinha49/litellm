@@ -39,6 +39,7 @@ export type LogEntry = {
   end_user?: string;
   custom_llm_provider?: string;
   metadata?: Record<string, any>;
+  guardrail_information?: any;
   cache_hit: string;
   cache_key?: string;
   request_tags?: Record<string, any>;
