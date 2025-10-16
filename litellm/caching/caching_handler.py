@@ -565,7 +565,9 @@ class LLMCachingHandler:
         Raises:
             None
         """
-        if litellm.cache is None:
+        from litellm.caching import Cache
+
+        if litellm.cache is None or not isinstance(litellm.cache, Cache):
             return None
 
         new_kwargs = kwargs.copy()
@@ -858,8 +860,12 @@ class LLMCachingHandler:
         Returns:
             bool: True if the result should be stored in the cache, False otherwise.
         """
+        from litellm.caching import Cache
+
         return (
             (litellm.cache is not None)
+            and isinstance(litellm.cache, Cache)
+            and hasattr(litellm.cache, "supported_call_types")
             and litellm.cache.supported_call_types is not None
             and (str(original_function.__name__) in litellm.cache.supported_call_types)
             and (kwargs.get("cache", {}).get("no-store", False) is not True)
@@ -879,8 +885,12 @@ class LLMCachingHandler:
         Returns:
             bool: True if the call type is supported by the cache, False otherwise.
         """
+        from litellm.caching import Cache
+
         if (
             litellm.cache is not None
+            and isinstance(litellm.cache, Cache)
+            and hasattr(litellm.cache, "supported_call_types")
             and litellm.cache.supported_call_types is not None
             and str(original_function.__name__) in litellm.cache.supported_call_types
         ):

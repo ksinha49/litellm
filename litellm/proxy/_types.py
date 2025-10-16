@@ -1224,6 +1224,7 @@ class TeamBase(LiteLLMPydanticObjectBase):
 
     models: list = []
     blocked: bool = False
+    guardrails: Optional[List[str]] = None
 
 
 class NewTeamRequest(TeamBase):
@@ -1834,6 +1835,7 @@ class LiteLLM_VerificationToken(LiteLLMPydanticObjectBase):
     updated_by: Optional[str] = None
     object_permission_id: Optional[str] = None
     object_permission: Optional[LiteLLM_ObjectPermissionTable] = None
+    guardrails: Optional[List[str]] = None
 
     model_config = ConfigDict(protected_namespaces=())
 
@@ -1854,6 +1856,7 @@ class LiteLLM_VerificationTokenView(LiteLLM_VerificationToken):
     team_model_aliases: Optional[Dict] = None
     team_member: Optional[Member] = None
     team_metadata: Optional[Dict] = None
+    team_guardrails: Optional[List[str]] = None
 
     # Organization Specific Params
     organization_id: Optional[str] = None
@@ -2047,6 +2050,7 @@ class LiteLLM_OrganizationTable(LiteLLMPydanticObjectBase):
     updated_by: str
     users: Optional[List[LiteLLM_UserTable]] = None
     litellm_budget_table: Optional[LiteLLM_BudgetTable] = None
+    guardrails: Optional[List[str]] = None
 
     #########################################################
     # Object Permission - MCP, Vector Stores etc.
