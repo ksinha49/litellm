@@ -278,6 +278,26 @@ class GuardrailRegistry:
             else:
                 decrypted_params[k] = v
 
+        # Validate AWS credentials are properly decrypted
+        # Check if critical credential fields are still encrypted (contain salt prefix)
+        aws_credential_keys = ['aws_access_key_id', 'aws_secret_access_key', 'aws_session_token']
+        for key in aws_credential_keys:
+            if key in decrypted_params:
+                value = decrypted_params[key]
+                # Check if value is still encrypted (has salt prefix like "litellm_salt_...")
+                if isinstance(value, str) and ':' in value:
+                    prefix = value.split(':', 1)[0]
+                    if prefix.startswith('litellm'):
+                        from litellm._logging import verbose_proxy_logger
+                        error_msg = (
+                            f"Failed to decrypt guardrail parameter '{key}'. "
+                            f"Value still appears encrypted with prefix '{prefix}'. "
+                            "This usually means LITELLM_SALT_KEY does not match the key used during encryption. "
+                            "Check: https://docs.litellm.ai/docs/proxy/prod#5-set-litellm-salt-key"
+                        )
+                        verbose_proxy_logger.error(error_msg)
+                        raise Exception(error_msg)
+
         return decrypted_params
 
     ###########################################################

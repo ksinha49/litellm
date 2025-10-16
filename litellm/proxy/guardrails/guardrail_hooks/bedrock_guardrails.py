@@ -430,6 +430,40 @@ class BedrockGuardrail(CustomGuardrail, BaseAWSLLM):
             aws_region_name=aws_region_name,
         )
 
+        # Debug log credential status (masked for security)
+        verbose_proxy_logger.debug(
+            "Bedrock Guardrail credentials loaded: "
+            f"aws_access_key_id={'[SET]' if aws_access_key_id else '[NOT SET]'}, "
+            f"aws_secret_access_key={'[SET]' if aws_secret_access_key else '[NOT SET]'}, "
+            f"aws_session_token={'[SET]' if aws_session_token else '[NOT SET]'}, "
+            f"region={aws_region_name}, "
+            f"role_name={aws_role_name or '[NOT SET]'}, "
+            f"profile_name={aws_profile_name or '[NOT SET]'}"
+        )
+
+        # Validate credentials exist (either explicit keys or IAM role/profile)
+        has_explicit_credentials = aws_access_key_id and aws_secret_access_key
+        has_iam_credentials = aws_role_name or aws_profile_name
+
+        if not has_explicit_credentials and not has_iam_credentials:
+            verbose_proxy_logger.error(
+                "AWS credentials missing for Bedrock Guardrail. "
+                "Either provide aws_access_key_id + aws_secret_access_key, "
+                "or configure IAM role/profile authentication."
+            )
+            raise HTTPException(
+                status_code=500,
+                detail={
+                    "error": "AWS credentials missing for Bedrock Guardrail",
+                    "aws_access_key_id": "SET" if aws_access_key_id else "MISSING",
+                    "aws_secret_access_key": "SET" if aws_secret_access_key else "MISSING",
+                    "aws_role_name": aws_role_name or "NOT SET",
+                    "aws_profile_name": aws_profile_name or "NOT SET",
+                    "hint": "Check that credentials are properly decrypted. If using encrypted credentials, "
+                            "verify LITELLM_SALT_KEY matches the key used during encryption.",
+                }
+            )
+
         credentials: Credentials = self.get_credentials(
             aws_access_key_id=aws_access_key_id,
             aws_secret_access_key=aws_secret_access_key,
@@ -441,6 +475,15 @@ class BedrockGuardrail(CustomGuardrail, BaseAWSLLM):
             aws_web_identity_token=aws_web_identity_token,
             aws_sts_endpoint=aws_sts_endpoint,
         )
+
+        # Log final credential object status
+        verbose_proxy_logger.debug(
+            "Bedrock Guardrail botocore Credentials object created: "
+            f"access_key={'[SET]' if credentials.access_key else '[NOT SET]'}, "
+            f"secret_key={'[SET]' if credentials.secret_key else '[NOT SET]'}, "
+            f"token={'[SET]' if credentials.token else '[NOT SET]'}"
+        )
+
         return credentials, aws_region_name
 
     def _prepare_request(
@@ -775,7 +818,12 @@ class BedrockGuardrail(CustomGuardrail, BaseAWSLLM):
                 response.status_code,
                 response.text,
             )
+
+            # Extract error details from AWS response
             aws_error_message: str = ""
+            aws_error_code: Optional[str] = None
+            aws_error_type: Optional[str] = None
+
             if isinstance(response_json, dict):
                 aws_error_message = (
                     response_json.get("message")
@@ -785,23 +833,95 @@ class BedrockGuardrail(CustomGuardrail, BaseAWSLLM):
                     or response_json.get("detail")
                     or ""
                 )
+                # AWS often includes __type or errorType field
+                aws_error_code = (
+                    response_json.get("__type")
+                    or response_json.get("errorType")
+                    or response_json.get("code")
+                    or response_json.get("Code")
+                )
+                # Extract exception type from __type field (format: "ExceptionName" or "namespace#ExceptionName")
+                if aws_error_code and "#" in aws_error_code:
+                    aws_error_type = aws_error_code.split("#")[-1]
+                else:
+                    aws_error_type = aws_error_code
+
             if not aws_error_message:
                 aws_error_message = getattr(response, "text", "")
 
+            verbose_proxy_logger.debug(
+                "Bedrock API error details: status=%s, error_type=%s, error_code=%s, message=%s",
+                response.status_code,
+                aws_error_type,
+                aws_error_code,
+                aws_error_message[:200] if aws_error_message else None
+            )
+
+            # Build specific error message based on status code and error type
             if response.status_code == 403:
                 base_error_message = (
                     "AWS Bedrock Guardrails request failed with status 403 (Forbidden). "
                     "Verify that the IAM principal calling the guardrail has the `bedrock:ApplyGuardrail` "
                     "and `bedrock:ApplyGuardrailAction` IAM permissions."
                 )
-            elif response.status_code == 400 and "provided request is not valid" in aws_error_message.lower():
-                base_error_message = (
-                    "AWS Bedrock Guardrails request failed with status 400 (Bad Request). "
-                    "The request structure is invalid. Common causes: "
-                    "(1) Empty content array - ensure messages contain text content, "
-                    "(2) Invalid content format - verify all content items have text field, "
-                    "(3) Malformed request body - check guardrailIdentifier and guardrailVersion are correct."
-                )
+            elif response.status_code == 400:
+                # Provide specific guidance based on error type
+                if aws_error_type in ("InvalidSignatureException", "SignatureDoesNotMatch"):
+                    base_error_message = (
+                        "AWS Bedrock Guardrails request failed with status 400 - Invalid AWS signature. "
+                        "This usually indicates credential decryption failure. "
+                        "Common causes: "
+                        "(1) LITELLM_SALT_KEY does not match the key used during encryption - "
+                        "verify LITELLM_SALT_KEY environment variable is set correctly, "
+                        "(2) Credentials were encrypted with a different SALT_KEY - "
+                        "re-add credentials with the current SALT_KEY, "
+                        "(3) System time is incorrect - verify server time is synchronized. "
+                        "Documentation: https://docs.litellm.ai/docs/proxy/prod#5-set-litellm-salt-key"
+                    )
+                elif aws_error_type == "UnrecognizedClientException":
+                    base_error_message = (
+                        "AWS Bedrock Guardrails request failed with status 400 - Unrecognized client. "
+                        "AWS does not recognize the provided credentials. "
+                        "Common causes: "
+                        "(1) AWS credentials are still encrypted (decryption failed) - "
+                        "check LITELLM_SALT_KEY matches encryption key, "
+                        "(2) Invalid AWS Access Key ID - verify credentials are correct, "
+                        "(3) Credentials are for wrong AWS account - verify account ID. "
+                        "Documentation: https://docs.litellm.ai/docs/proxy/prod#5-set-litellm-salt-key"
+                    )
+                elif aws_error_type == "ValidationException":
+                    if "provided request is not valid" in aws_error_message.lower():
+                        base_error_message = (
+                            "AWS Bedrock Guardrails request failed with status 400 - ValidationException. "
+                            "The request structure is invalid. Common causes: "
+                            "(1) Empty content array - ensure messages contain text content, "
+                            "(2) Invalid content format - verify all content items have text field, "
+                            "(3) Malformed request body - check guardrailIdentifier and guardrailVersion are correct."
+                        )
+                    else:
+                        base_error_message = (
+                            "AWS Bedrock Guardrails request failed with status 400 - ValidationException. "
+                            "The request failed AWS validation. Check the error message for specific validation failures."
+                        )
+                elif aws_error_type == "ResourceNotFoundException":
+                    base_error_message = (
+                        "AWS Bedrock Guardrails request failed with status 400 - ResourceNotFoundException. "
+                        "The specified guardrail was not found. "
+                        "Verify guardrailIdentifier and guardrailVersion are correct and the guardrail exists in the specified region."
+                    )
+                elif aws_error_type == "AccessDeniedException":
+                    base_error_message = (
+                        "AWS Bedrock Guardrails request failed with status 400 - AccessDeniedException. "
+                        "The credentials do not have permission to access this guardrail. "
+                        "Verify IAM permissions include `bedrock:ApplyGuardrail` for the specified guardrail ARN."
+                    )
+                else:
+                    # Generic 400 error
+                    base_error_message = (
+                        "AWS Bedrock Guardrails request failed with status 400 (Bad Request). "
+                        f"Error type: {aws_error_type or 'Unknown'}. "
+                        "Review the AWS error message below for details."
+                    )
             else:
                 base_error_message = (
                     f"AWS Bedrock Guardrails request failed with status {response.status_code}."
@@ -821,6 +941,8 @@ class BedrockGuardrail(CustomGuardrail, BaseAWSLLM):
                 detail={
                     "error": base_error_message,
                     "aws_response": aws_response_detail,
+                    "aws_error_type": aws_error_type,
+                    "aws_error_code": aws_error_code,
                 },
             )
 
