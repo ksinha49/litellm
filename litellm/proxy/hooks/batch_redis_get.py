@@ -20,10 +20,17 @@ class _PROXY_BatchRedisRequests(CustomLogger):
     in_memory_cache: Optional[InMemoryCache] = None
 
     def __init__(self):
-        if litellm.cache is not None:
-            litellm.cache.async_get_cache = (
-                self.async_get_cache
-            )  # map the litellm 'get_cache' function to our custom function
+        # Check if cache is properly configured (not None, not boolean)
+        # litellm.cache can be: None, True, False, or a Cache object
+        if litellm.cache is not None and not isinstance(litellm.cache, bool):
+            try:
+                from litellm.caching import Cache
+                if isinstance(litellm.cache, Cache) and hasattr(litellm.cache, "async_get_cache"):
+                    litellm.cache.async_get_cache = (
+                        self.async_get_cache
+                    )  # map the litellm 'get_cache' function to our custom function
+            except ImportError:
+                pass  # Cache module not available
 
     def print_verbose(
         self, print_statement, debug_level: Literal["INFO", "DEBUG"] = "DEBUG"
@@ -61,31 +68,35 @@ class _PROXY_BatchRedisRequests(CustomLogger):
                 if isinstance(key, str) and key.startswith(cache_key_name):
                     in_memory_cache_exists = True
 
-            if in_memory_cache_exists is False and litellm.cache is not None:
+            if in_memory_cache_exists is False and litellm.cache is not None and not isinstance(litellm.cache, bool):
                 """
                 - Check if `litellm.Cache` is redis
                 - Get the relevant values
                 """
-                if litellm.cache.type is not None and isinstance(
-                    litellm.cache.cache, RedisCache
-                ):
-                    # Initialize an empty list to store the keys
-                    keys = []
-                    self.print_verbose(f"cache_key_name: {cache_key_name}")
-                    # Use the SCAN iterator to fetch keys matching the pattern
-                    keys = await litellm.cache.cache.async_scan_iter(
-                        pattern=cache_key_name, count=100
-                    )
-                    # If you need the truly "last" based on time or another criteria,
-                    # ensure your key naming or storage strategy allows this determination
-                    # Here you would sort or filter the keys as needed based on your strategy
-                    self.print_verbose(f"redis keys: {keys}")
-                    if len(keys) > 0:
-                        key_value_dict = (
-                            await litellm.cache.cache.async_batch_get_cache(
-                                key_list=keys
-                            )
+                try:
+                    from litellm.caching import Cache
+                    if (isinstance(litellm.cache, Cache) and
+                        hasattr(litellm.cache, "type") and litellm.cache.type is not None and
+                        hasattr(litellm.cache, "cache") and isinstance(litellm.cache.cache, RedisCache)):
+                        # Initialize an empty list to store the keys
+                        keys = []
+                        self.print_verbose(f"cache_key_name: {cache_key_name}")
+                        # Use the SCAN iterator to fetch keys matching the pattern
+                        keys = await litellm.cache.cache.async_scan_iter(
+                            pattern=cache_key_name, count=100
                         )
+                        # If you need the truly "last" based on time or another criteria,
+                        # ensure your key naming or storage strategy allows this determination
+                        # Here you would sort or filter the keys as needed based on your strategy
+                        self.print_verbose(f"redis keys: {keys}")
+                        if len(keys) > 0:
+                            key_value_dict = (
+                                await litellm.cache.cache.async_batch_get_cache(
+                                    key_list=keys
+                                )
+                            )
+                except ImportError:
+                    pass  # Cache module not available
 
             ## Add to cache
             if len(key_value_dict.items()) > 0:
@@ -117,33 +128,45 @@ class _PROXY_BatchRedisRequests(CustomLogger):
             cache_key: Optional[str] = None
             if "cache_key" in kwargs:
                 cache_key = kwargs["cache_key"]
-            elif litellm.cache is not None:
-                cache_key = litellm.cache.get_cache_key(
-                    *args, **kwargs
-                )  # returns "<cache_key_name>:<hash>" - we pass redis_namespace in async_pre_call_hook. Done to avoid rewriting the async_set_cache logic
+            elif litellm.cache is not None and not isinstance(litellm.cache, bool):
+                try:
+                    from litellm.caching import Cache
+                    if isinstance(litellm.cache, Cache) and hasattr(litellm.cache, "get_cache_key"):
+                        cache_key = litellm.cache.get_cache_key(
+                            *args, **kwargs
+                        )  # returns "<cache_key_name>:<hash>" - we pass redis_namespace in async_pre_call_hook. Done to avoid rewriting the async_set_cache logic
+                except ImportError:
+                    pass  # Cache module not available
 
             if (
                 cache_key is not None
                 and self.in_memory_cache is not None
                 and litellm.cache is not None
+                and not isinstance(litellm.cache, bool)
             ):
-                cache_control_args = kwargs.get("cache", {})
-                max_age = cache_control_args.get(
-                    "s-max-age", cache_control_args.get("s-maxage", float("inf"))
-                )
-                cached_result = self.in_memory_cache.get_cache(
-                    cache_key, *args, **kwargs
-                )
-                if cached_result is None:
-                    cached_result = await litellm.cache.cache.async_get_cache(
-                        cache_key, *args, **kwargs
-                    )
-                    if cached_result is not None:
-                        await self.in_memory_cache.async_set_cache(
-                            cache_key, cached_result, ttl=60
+                try:
+                    from litellm.caching import Cache
+                    if isinstance(litellm.cache, Cache):
+                        cache_control_args = kwargs.get("cache", {})
+                        max_age = cache_control_args.get(
+                            "s-max-age", cache_control_args.get("s-maxage", float("inf"))
                         )
-                return litellm.cache._get_cache_logic(
-                    cached_result=cached_result, max_age=max_age
-                )
+                        cached_result = self.in_memory_cache.get_cache(
+                            cache_key, *args, **kwargs
+                        )
+                        if cached_result is None and hasattr(litellm.cache, "cache"):
+                            cached_result = await litellm.cache.cache.async_get_cache(
+                                cache_key, *args, **kwargs
+                            )
+                            if cached_result is not None:
+                                await self.in_memory_cache.async_set_cache(
+                                    cache_key, cached_result, ttl=60
+                                )
+                        if hasattr(litellm.cache, "_get_cache_logic"):
+                            return litellm.cache._get_cache_logic(
+                                cached_result=cached_result, max_age=max_age
+                            )
+                except ImportError:
+                    pass  # Cache module not available
         except Exception:
             return None
