@@ -220,7 +220,7 @@ const extractStructuredProviderValues = (
   return traverse(structure, []);
 };
 
-const deepMerge = (target: Record<string, any>, source: Record<string, any>) => {
+const deepMerge = <T extends Record<string, any>>(target: T, source: Record<string, any>): T => {
   const output: Record<string, any> = { ...target };
 
   Object.entries(source).forEach(([key, sourceValue]) => {
@@ -239,7 +239,7 @@ const deepMerge = (target: Record<string, any>, source: Record<string, any>) => 
     }
   });
 
-  return output;
+  return output as T;
 };
 
 const EditGuardrailForm: React.FC<EditGuardrailFormProps> = ({
