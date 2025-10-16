@@ -1,5 +1,48 @@
 #!/bin/bash
 
+# ============================================
+# Memory Cleanup - Start
+# ============================================
+echo "=========================================="
+echo "Pre-build memory cleanup starting..."
+echo "=========================================="
+
+# Show initial memory state
+if command -v free &> /dev/null; then
+  echo "Memory before cleanup:"
+  free -h
+fi
+
+# Clear npm cache to free up memory
+echo "Clearing npm cache..."
+npm cache clean --force 2>/dev/null || true
+
+# Clear any previous build artifacts
+echo "Clearing previous build artifacts..."
+rm -rf .next 2>/dev/null || true
+rm -rf out 2>/dev/null || true
+rm -rf node_modules/.cache 2>/dev/null || true
+
+# Sync filesystem to flush buffers
+echo "Syncing filesystem..."
+sync
+
+# Try to drop system caches if running with sufficient privileges
+# This is optional and will fail gracefully if not permitted
+if [ -w /proc/sys/vm/drop_caches ]; then
+  echo "Dropping system caches..."
+  sync && echo 3 > /proc/sys/vm/drop_caches 2>/dev/null || true
+fi
+
+# Show memory state after cleanup
+if command -v free &> /dev/null; then
+  echo "Memory after cleanup:"
+  free -h
+fi
+
+echo "Pre-build cleanup completed."
+echo "=========================================="
+
 # Check if nvm is not installed
 if ! command -v nvm &> /dev/null; then
   # Install nvm
@@ -25,7 +68,7 @@ echo "Contents of ui_colors.json:"
 cat ui_colors.json
 
 # Increase Node.js heap limit to prevent build worker OOM kills
-export NODE_OPTIONS=--max-old-space-size=4096
+export NODE_OPTIONS="--max-old-space-size=4096 --max-semi-space-size=512"
 
 # Clean build cache and output directories to ensure fresh build
 echo "Cleaning build cache and output directories..."
@@ -67,5 +110,41 @@ else
   echo "Build failed. Deployment aborted."
   exit 1
 fi
+
+# ============================================
+# Memory Cleanup - End
+# ============================================
+echo "=========================================="
+echo "Post-build memory cleanup starting..."
+echo "=========================================="
+
+# Clear build caches and temporary files
+echo "Clearing build caches..."
+rm -rf .next 2>/dev/null || true
+rm -rf node_modules/.cache 2>/dev/null || true
+
+# Clear npm cache again
+echo "Clearing npm cache..."
+npm cache clean --force 2>/dev/null || true
+
+# Sync filesystem to ensure all writes are flushed
+echo "Syncing filesystem..."
+sync
+
+# Try to drop system caches if running with sufficient privileges
+if [ -w /proc/sys/vm/drop_caches ]; then
+  echo "Dropping system caches..."
+  sync && echo 3 > /proc/sys/vm/drop_caches 2>/dev/null || true
+fi
+
+# Show final memory state
+if command -v free &> /dev/null; then
+  echo "Memory after post-build cleanup:"
+  free -h
+fi
+
+echo "Post-build cleanup completed."
+echo "=========================================="
+
 set +x
 echo "build_ui.sh finished"
