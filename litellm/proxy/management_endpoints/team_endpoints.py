@@ -842,6 +842,19 @@ async def update_team(
 
     updated_kv = data.json(exclude_unset=True)
 
+    # IMPORTANT: Handle fields that should be clearable (e.g., empty lists)
+    # When exclude_unset=True, fields like guardrails=[] are excluded
+    # We need to explicitly include them if they were provided in the request
+    _clearable_list_fields = ["guardrails", "models", "tags", "prompts"]
+    for field in _clearable_list_fields:
+        field_value = getattr(data, field, None)
+        if field_value is not None and isinstance(field_value, list) and field not in updated_kv:
+            # Field was explicitly set to empty list, include it in update
+            updated_kv[field] = field_value
+            verbose_proxy_logger.info(
+                f"Including clearable field '{field}' with value {field_value} in team update"
+            )
+
     # Check budget_duration and budget_reset_at
     if data.budget_duration is not None:
         from litellm.proxy.common_utils.timezone_utils import get_budget_reset_time

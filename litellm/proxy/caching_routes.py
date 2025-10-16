@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 
 import litellm
 from litellm._logging import verbose_proxy_logger
-from litellm.caching.caching import RedisCache
+from litellm.caching.caching import Cache, RedisCache
 from litellm.litellm_core_utils.safe_json_dumps import safe_dumps
 from litellm.litellm_core_utils.sensitive_data_masker import SensitiveDataMasker
 from litellm.proxy._types import ProxyErrorTypes, ProxyException
@@ -17,6 +17,25 @@ router = APIRouter(
     prefix="/cache",
     tags=["caching"],
 )
+
+
+def _validate_cache_initialized() -> None:
+    """
+    Validates that litellm.cache is properly initialized as a Cache object.
+
+    Raises:
+        HTTPException: If cache is not initialized or is misconfigured.
+    """
+    if litellm.cache is None:
+        raise HTTPException(
+            status_code=503,
+            detail="Cache not initialized. Set cache configuration in your config file.",
+        )
+    if not isinstance(litellm.cache, Cache):
+        raise HTTPException(
+            status_code=500,
+            detail=f"Cache misconfigured. Expected Cache object but got {type(litellm.cache).__name__}. Please check your cache configuration.",
+        )
 
 
 def _extract_cache_params() -> Dict[str, Any]:
@@ -67,6 +86,10 @@ async def cache_ping():
                 cache_type="none",
                 set_cache_response="Caching is disabled. Enable by setting 'litellm_settings.cache: true' and appropriate cache_params in proxy_server_config.yaml.",
             )
+
+        # Validate cache is properly initialized
+        _validate_cache_initialized()
+
         litellm_cache_params = masker.mask_dict(vars(litellm.cache))
         # remove field that might reference itself
         litellm_cache_params.pop("cache", None)
@@ -141,6 +164,9 @@ async def cache_delete(request: Request):
                 status_code=503, detail="Cache not initialized. litellm.cache is None"
             )
 
+        # Validate cache is properly initialized
+        _validate_cache_initialized()
+
         request_data = await request.json()
         keys = request_data.get("keys", None)
 
@@ -192,6 +218,9 @@ async def cache_redis_info():
                 status_code=503, detail="Cache not initialized. litellm.cache is None"
             )
 
+        # Validate cache is properly initialized
+        _validate_cache_initialized()
+
         if not (
             litellm.cache.type == "redis"
             and isinstance(litellm.cache.cache, RedisCache)
@@ -240,6 +269,10 @@ async def cache_flushall():
             raise HTTPException(
                 status_code=503, detail="Cache not initialized. litellm.cache is None"
             )
+
+        # Validate cache is properly initialized
+        _validate_cache_initialized()
+
         if litellm.cache.type == "redis" and isinstance(
             litellm.cache.cache, RedisCache
         ):

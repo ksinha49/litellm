@@ -161,6 +161,12 @@ class CustomGuardrail(CustomLogger):
         ):
             return kwargs
 
+        # Log guardrail invocation
+        model = kwargs.get("model", "unknown")
+        verbose_logger.info(
+            f"[Guardrail Invoked] guardrail={self.guardrail_name} event=pre_call model={model} call_type={call_type}"
+        )
+
         # CHECK IF GUARDRAIL REJECTS THE REQUEST
         if call_type == CallTypes.completion or call_type == CallTypes.acompletion:
             result = await self.async_pre_call_hook(
@@ -206,6 +212,12 @@ class CustomGuardrail(CustomLogger):
             is not True
         ):
             return response
+
+        # Log guardrail invocation
+        model = request_data.get("model", "unknown")
+        verbose_logger.info(
+            f"[Guardrail Invoked] guardrail={self.guardrail_name} event=post_call model={model} call_type={call_type}"
+        )
 
         # CHECK IF GUARDRAIL REJECTS THE REQUEST
         result = await self.async_post_call_success_hook(

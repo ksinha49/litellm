@@ -84,14 +84,19 @@ class LLMCachingHandler:
         request_kwargs: Dict[str, Any],
         start_time: datetime.datetime,
     ):
-        from litellm.caching import DualCache, RedisCache
+        from litellm.caching import Cache, DualCache, RedisCache
 
         self.async_streaming_chunks: List[ModelResponse] = []
         self.sync_streaming_chunks: List[ModelResponse] = []
         self.request_kwargs = request_kwargs
         self.original_function = original_function
         self.start_time = start_time
-        if litellm.cache is not None and isinstance(litellm.cache.cache, RedisCache):
+        if (
+            litellm.cache is not None
+            and isinstance(litellm.cache, Cache)
+            and hasattr(litellm.cache, "cache")
+            and isinstance(litellm.cache.cache, RedisCache)
+        ):
             self.dual_cache: Optional[DualCache] = DualCache(
                 redis_cache=litellm.cache.cache,
                 in_memory_cache=in_memory_cache_obj,

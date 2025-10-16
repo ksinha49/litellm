@@ -860,6 +860,20 @@ async def prepare_key_update_data(
     data_json: dict = data.model_dump(exclude_unset=True)
     data_json.pop("key", None)
     data_json.pop("new_key", None)
+
+    # IMPORTANT: Handle fields that should be clearable (e.g., empty lists)
+    # When exclude_unset=True, fields like guardrails=[] are excluded
+    # We need to explicitly include them if they were provided in the request
+    _clearable_list_fields = ["guardrails", "models", "tags", "prompts", "enforced_params", "allowed_routes"]
+    for field in _clearable_list_fields:
+        field_value = getattr(data, field, None)
+        if field_value is not None and isinstance(field_value, list) and field not in data_json:
+            # Field was explicitly set to empty list, include it in update
+            data_json[field] = field_value
+            verbose_proxy_logger.info(
+                f"Including clearable field '{field}' with value {field_value} in key update"
+            )
+
     if (
         data.metadata is not None
         and data.metadata.get("service_account_id") is not None

@@ -2126,6 +2126,16 @@ class StandardCallbackDynamicParams(TypedDict, total=False):
     arize_space_key: Optional[str]
     arize_space_id: Optional[str]
 
+    # S3 dynamic params
+    s3_bucket_name: Optional[str]
+    s3_path: Optional[str]
+    s3_region_name: Optional[str]
+    s3_aws_access_key_id: Optional[str]
+    s3_aws_secret_access_key: Optional[str]
+    s3_endpoint_url: Optional[str]
+    s3_use_ssl: Optional[bool]
+    s3_verify: Optional[str]
+
     # Logging settings
     turn_off_message_logging: Optional[bool]  # when true will not log messages
     litellm_disabled_callbacks: Optional[List[str]]

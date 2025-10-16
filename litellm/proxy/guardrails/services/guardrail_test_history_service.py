@@ -71,7 +71,7 @@ class GuardrailTestHistoryService:
             content_hash = self._hash_content(test_content)
 
             # Create the history record
-            history_record = await self.prisma_client.db.litellm_guardrailTestHistoryTable.create(
+            history_record = await self.prisma_client.db.litellm_guardrailstesthistorytable.create(
                 data={
                     "test_id": test_result.test_id,
                     "guardrail_id": guardrail_id,
@@ -155,7 +155,7 @@ class GuardrailTestHistoryService:
                     where["created_at"]["lte"] = end_date
 
             # Query the database
-            history_records = await self.prisma_client.db.litellm_guardrailTestHistoryTable.find_many(
+            history_records = await self.prisma_client.db.litellm_guardrailstesthistorytable.find_many(
                 where=where,
                 order_by={"created_at": "desc"},
                 take=limit,
@@ -185,7 +185,7 @@ class GuardrailTestHistoryService:
             return None
 
         try:
-            record = await self.prisma_client.db.litellm_guardrailTestHistoryTable.find_unique(
+            record = await self.prisma_client.db.litellm_guardrailstesthistorytable.find_unique(
                 where={"test_history_id": test_history_id}
             )
 
@@ -235,7 +235,7 @@ class GuardrailTestHistoryService:
                 where["guardrail_type"] = guardrail_type
 
             # Get all records in date range
-            records = await self.prisma_client.db.litellm_guardrailTestHistoryTable.find_many(
+            records = await self.prisma_client.db.litellm_guardrailstesthistorytable.find_many(
                 where=where
             )
 
@@ -302,7 +302,7 @@ class GuardrailTestHistoryService:
         try:
             cutoff_date = datetime.utcnow() - timedelta(days=days)
 
-            result = await self.prisma_client.db.litellm_guardrailTestHistoryTable.delete_many(
+            result = await self.prisma_client.db.litellm_guardrailstesthistorytable.delete_many(
                 where={
                     "created_at": {
                         "lt": cutoff_date

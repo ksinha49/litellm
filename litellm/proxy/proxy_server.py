@@ -8625,6 +8625,18 @@ async def update_config_general_settings(
                 status_code=400,
                 detail={"error": "Invalid field={} passed in.".format(data.field_name)},
             )
+
+        # Special validation for cache field - must not be a boolean
+        if data.field_name == "cache" and isinstance(data.field_value, bool):
+            raise HTTPException(
+                status_code=400,
+                detail={
+                    "error": "Invalid cache configuration. 'cache' cannot be a boolean (True/False). "
+                    "Please configure cache properly with cache_params or delete this field to disable caching. "
+                    "Use DELETE /config/field/delete to remove incorrect cache configuration."
+                },
+            )
+
         setattr(litellm, data.field_name, data.field_value)
         db_param_name = "litellm_settings"
         existing = await prisma_client.db.litellm_config.find_first(
@@ -8651,6 +8663,110 @@ async def update_config_general_settings(
     )
 
     return response
+
+
+@router.delete(
+    "/config/field/delete",
+    tags=["config.yaml"],
+    dependencies=[Depends(user_api_key_auth)],
+    include_in_schema=False,
+)
+async def delete_config_field(
+    data: ConfigFieldUpdate,
+    user_api_key_dict: UserAPIKeyAuth = Depends(user_api_key_auth),
+):
+    """
+    Delete/reset a specific field from litellm configuration.
+    This is useful for removing incorrect or misconfigured values saved via the UI.
+
+    The field will be removed from the database configuration.
+    For litellm_settings, it will also be reset to the default value in memory.
+    """
+    global prisma_client
+    from litellm.constants import LITELLM_SETTINGS_DEFAULTS
+
+    ## VALIDATION ##
+    if prisma_client is None:
+        raise HTTPException(
+            status_code=400,
+            detail={"error": CommonProxyErrors.db_not_connected_error.value},
+        )
+
+    if user_api_key_dict.user_role != LitellmUserRoles.PROXY_ADMIN:
+        raise HTTPException(
+            status_code=400,
+            detail={"error": CommonProxyErrors.not_allowed_access.value},
+        )
+
+    if data.config_type == "general_settings":
+        if data.field_name not in ConfigGeneralSettings.model_fields:
+            raise HTTPException(
+                status_code=400,
+                detail={"error": "Invalid field={} passed in.".format(data.field_name)},
+            )
+        db_param_name = "general_settings"
+    elif data.config_type == "litellm_settings":
+        if data.field_name not in LITELLM_SETTINGS_SAFE_DB_OVERRIDES:
+            raise HTTPException(
+                status_code=400,
+                detail={"error": "Invalid field={} passed in.".format(data.field_name)},
+            )
+        # Reset to default value in memory
+        default_value = LITELLM_SETTINGS_DEFAULTS.get(data.field_name)
+        setattr(litellm, data.field_name, default_value)
+        verbose_proxy_logger.info(
+            f"Reset litellm.{data.field_name} to default value: {default_value}"
+        )
+
+        # Special handling for cache field - ensure it's properly cleared
+        if data.field_name == "cache":
+            litellm.cache = None
+            verbose_proxy_logger.info("Cache configuration cleared. litellm.cache set to None")
+
+        db_param_name = "litellm_settings"
+    else:
+        raise HTTPException(
+            status_code=400,
+            detail={"error": "Invalid config_type passed in."},
+        )
+
+    # Get existing settings
+    existing = await prisma_client.db.litellm_config.find_first(
+        where={"param_name": db_param_name}
+    )
+
+    if existing is None or existing.param_value is None:
+        raise HTTPException(
+            status_code=404,
+            detail={"error": f"No {db_param_name} configuration found in database"},
+        )
+
+    settings = dict(existing.param_value)
+
+    # Remove the field if it exists
+    if data.field_name in settings:
+        del settings[data.field_name]
+        verbose_proxy_logger.info(
+            f"Deleted field {data.field_name} from {db_param_name} configuration"
+        )
+    else:
+        raise HTTPException(
+            status_code=404,
+            detail={"error": f"Field {data.field_name} not found in {db_param_name}"},
+        )
+
+    # Update database with field removed
+    response = await prisma_client.db.litellm_config.update(
+        where={"param_name": db_param_name},
+        data={"param_value": json.dumps(settings)},  # type: ignore
+    )
+
+    return {
+        "status": "success",
+        "message": f"Field '{data.field_name}' deleted from {data.config_type}",
+        "field_name": data.field_name,
+        "config_type": data.config_type,
+    }
 
 
 @router.get(
