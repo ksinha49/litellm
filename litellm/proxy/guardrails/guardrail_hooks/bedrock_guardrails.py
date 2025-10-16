@@ -455,7 +455,15 @@ class BedrockGuardrail(CustomGuardrail, BaseAWSLLM):
         headers = {"Content-Type": "application/json"}
         if extra_headers is not None:
             headers = {"Content-Type": "application/json", **extra_headers}
-        api_base = f"https://bedrock-runtime.{aws_region_name}.amazonaws.com/guardrail/{self.guardrailIdentifier}/version/{self.guardrailVersion}/apply"
+
+        endpoint_url, _ = self.get_runtime_endpoint(
+            api_base=optional_params.get("api_base"),
+            aws_bedrock_runtime_endpoint=optional_params.get(
+                "aws_bedrock_runtime_endpoint"
+            ),
+            aws_region_name=aws_region_name,
+        )
+        api_base = f"{endpoint_url}/guardrail/{self.guardrailIdentifier}/version/{self.guardrailVersion}/apply"
         encoded_data = json.dumps(data).encode("utf-8")
         
         # first check api-key, if none, fall back to sigV4
