@@ -267,11 +267,25 @@ class BedrockGuardrail(CustomGuardrail, BaseAWSLLM):
     def _create_bedrock_input_content_request(self, messages: Optional[List[AllMessageValues]]) -> BedrockRequest:
         """
         Create a bedrock request for the input content - the LLM request.
+
+        Raises:
+            HTTPException: If messages is None/empty or no text content can be extracted
         """
         bedrock_request: BedrockRequest = BedrockRequest(source="INPUT")
         bedrock_request_content: List[BedrockContentItem] = []
-        if messages is None:
-            return bedrock_request
+
+        if messages is None or len(messages) == 0:
+            verbose_proxy_logger.warning(
+                "Bedrock Guardrail: Cannot create INPUT request - messages is None or empty"
+            )
+            raise HTTPException(
+                status_code=400,
+                detail={
+                    "error": "Cannot apply Bedrock guardrail to INPUT: No messages provided",
+                    "guardrail": self.guardrail_name,
+                }
+            )
+
         for message in messages:
             message_text_content: Optional[List[str]] = (
                 self.get_content_for_message(message=message)
@@ -279,31 +293,93 @@ class BedrockGuardrail(CustomGuardrail, BaseAWSLLM):
             if message_text_content is None:
                 continue
             for text_content in message_text_content:
-                bedrock_content_item = BedrockContentItem(
-                    text=BedrockTextContent(text=text_content)
-                )
-                bedrock_request_content.append(bedrock_content_item)
+                if text_content and text_content.strip():  # Only add non-empty text
+                    bedrock_content_item = BedrockContentItem(
+                        text=BedrockTextContent(text=text_content)
+                    )
+                    bedrock_request_content.append(bedrock_content_item)
 
+        # Validate content array is not empty before sending to AWS
+        if len(bedrock_request_content) == 0:
+            verbose_proxy_logger.warning(
+                "Bedrock Guardrail: Cannot create INPUT request - extracted 0 text content items from %d messages",
+                len(messages)
+            )
+            raise HTTPException(
+                status_code=400,
+                detail={
+                    "error": "Cannot apply Bedrock guardrail to INPUT: No text content found in messages. "
+                            "Bedrock guardrails require at least one message with text content.",
+                    "guardrail": self.guardrail_name,
+                    "messages_count": len(messages),
+                }
+            )
+
+        verbose_proxy_logger.debug(
+            "Bedrock Guardrail INPUT: extracted %d content items from %d messages",
+            len(bedrock_request_content),
+            len(messages)
+        )
         bedrock_request["content"] = bedrock_request_content
         return bedrock_request
 
     def _create_bedrock_output_content_request(self, response: Union[Any, ModelResponse]) -> BedrockRequest:
         """
         Create a bedrock request for the output content - the LLM response.
+
+        Raises:
+            HTTPException: If response is invalid or no text content can be extracted
         """
         bedrock_request: BedrockRequest = BedrockRequest(source="OUTPUT")
         bedrock_request_content: List[BedrockContentItem] = []
-        if isinstance(response, litellm.ModelResponse):
-            for choice in response.choices:
-                if isinstance(choice, litellm.Choices):
-                    if choice.message.content and isinstance(
-                        choice.message.content, str
-                    ):
+
+        if not isinstance(response, litellm.ModelResponse):
+            verbose_proxy_logger.warning(
+                "Bedrock Guardrail: Cannot create OUTPUT request - response is not a ModelResponse (type: %s)",
+                type(response).__name__
+            )
+            raise HTTPException(
+                status_code=400,
+                detail={
+                    "error": f"Cannot apply Bedrock guardrail to OUTPUT: Invalid response type {type(response).__name__}",
+                    "guardrail": self.guardrail_name,
+                }
+            )
+
+        for choice in response.choices:
+            if isinstance(choice, litellm.Choices):
+                if choice.message.content and isinstance(
+                    choice.message.content, str
+                ):
+                    content_text = choice.message.content.strip()
+                    if content_text:  # Only add non-empty text
                         bedrock_content_item = BedrockContentItem(
-                            text=BedrockTextContent(text=choice.message.content)
+                            text=BedrockTextContent(text=content_text)
                         )
                         bedrock_request_content.append(bedrock_content_item)
-            bedrock_request["content"] = bedrock_request_content
+
+        # Validate content array is not empty before sending to AWS
+        if len(bedrock_request_content) == 0:
+            verbose_proxy_logger.warning(
+                "Bedrock Guardrail: Cannot create OUTPUT request - extracted 0 text content items from response with %d choices",
+                len(response.choices) if response.choices else 0
+            )
+            raise HTTPException(
+                status_code=400,
+                detail={
+                    "error": "Cannot apply Bedrock guardrail to OUTPUT: No text content found in response. "
+                            "Bedrock guardrails require at least one choice with text content.",
+                    "guardrail": self.guardrail_name,
+                    "choices_count": len(response.choices) if response.choices else 0,
+                }
+            )
+
+        verbose_proxy_logger.debug(
+            "Bedrock Guardrail OUTPUT: extracted %d content items from %d choices",
+            len(bedrock_request_content),
+            len(response.choices) if response.choices else 0
+        )
+        bedrock_request["content"] = bedrock_request_content
         return bedrock_request
 
     def convert_to_bedrock_format(
@@ -709,6 +785,14 @@ class BedrockGuardrail(CustomGuardrail, BaseAWSLLM):
                     "AWS Bedrock Guardrails request failed with status 403 (Forbidden). "
                     "Verify that the IAM principal calling the guardrail has the `bedrock:ApplyGuardrail` "
                     "and `bedrock:ApplyGuardrailAction` IAM permissions."
+                )
+            elif response.status_code == 400 and "provided request is not valid" in aws_error_message.lower():
+                base_error_message = (
+                    "AWS Bedrock Guardrails request failed with status 400 (Bad Request). "
+                    "The request structure is invalid. Common causes: "
+                    "(1) Empty content array - ensure messages contain text content, "
+                    "(2) Invalid content format - verify all content items have text field, "
+                    "(3) Malformed request body - check guardrailIdentifier and guardrailVersion are correct."
                 )
             else:
                 base_error_message = (
