@@ -12,6 +12,10 @@ from litellm._logging import verbose_proxy_logger
 from litellm.constants import DEFAULT_MAX_RECURSE_DEPTH
 from litellm.proxy.auth.user_api_key_auth import user_api_key_auth
 from litellm.proxy.guardrails.guardrail_registry import GuardrailRegistry
+from litellm.proxy.guardrails.utils import (
+    SUPPORTED_GUARDRAIL_TYPES,
+    normalize_guardrail_type,
+)
 from litellm.types.guardrails import (
     PII_ENTITY_CATEGORIES_MAP,
     BedrockGuardrailConfigModel,
@@ -1201,32 +1205,37 @@ async def get_test_scenarios(guardrail_type: str = "bedrock"):
     ```
     """
     try:
-        guardrail_type_lower = guardrail_type.lower()
+        normalized_guardrail_type = normalize_guardrail_type(guardrail_type)
+        if not normalized_guardrail_type:
+            supported_types = ", ".join(sorted(SUPPORTED_GUARDRAIL_TYPES))
+            raise HTTPException(
+                status_code=400,
+                detail=f"Unsupported guardrail type: {guardrail_type}. Supported types: {supported_types}",
+            )
 
         # Map guardrail types to their scenario functions
         scenario_functions = {
             "bedrock": get_bedrock_test_scenarios,
             "presidio": get_presidio_test_scenarios,
             "lakera": get_lakera_test_scenarios,
-            "lakera_v2": get_lakera_test_scenarios,  # Alias for lakera
         }
 
-        if guardrail_type_lower not in scenario_functions:
-            supported_types = ", ".join(scenario_functions.keys())
+        if normalized_guardrail_type not in scenario_functions:
+            supported_types = ", ".join(sorted(SUPPORTED_GUARDRAIL_TYPES))
             raise HTTPException(
                 status_code=400,
                 detail=f"Unsupported guardrail type: {guardrail_type}. Supported types: {supported_types}",
             )
 
         # Get test scenarios for the specified type
-        get_scenarios_func = scenario_functions[guardrail_type_lower]
+        get_scenarios_func = scenario_functions[normalized_guardrail_type]
         scenario_categories = get_scenarios_func()
 
         # Count total scenarios
         total_scenarios = sum(len(scenarios) for scenarios in scenario_categories.values())
 
         return PredefinedTestScenariosResponse(
-            guardrail_type=guardrail_type_lower,
+            guardrail_type=normalized_guardrail_type,
             scenario_categories=scenario_categories,
             total_scenarios=total_scenarios,
         )
@@ -1317,10 +1326,14 @@ async def get_test_history(
             except ValueError:
                 raise HTTPException(status_code=400, detail="Invalid end_date format. Use ISO 8601 format.")
 
+        normalized_guardrail_type = (
+            normalize_guardrail_type(guardrail_type) if guardrail_type else None
+        )
+
         # Get test history
         records = await history_service.get_test_history(
             guardrail_id=guardrail_id,
-            guardrail_type=guardrail_type,
+            guardrail_type=normalized_guardrail_type,
             created_by=created_by,
             start_date=start_date_dt,
             end_date=end_date_dt,
@@ -1532,9 +1545,13 @@ async def get_test_statistics(
     try:
         history_service = GuardrailTestHistoryService(prisma_client=prisma_client)
 
+        normalized_guardrail_type = (
+            normalize_guardrail_type(guardrail_type) if guardrail_type else None
+        )
+
         stats = await history_service.get_test_statistics(
             guardrail_id=guardrail_id,
-            guardrail_type=guardrail_type,
+            guardrail_type=normalized_guardrail_type,
             days=days,
         )
 

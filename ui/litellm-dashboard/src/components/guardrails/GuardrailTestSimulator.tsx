@@ -5,6 +5,7 @@ import { ExperimentOutlined, FileTextOutlined, BulbOutlined, HistoryOutlined } f
 import ManualTestPanel from "./ManualTestPanel";
 import ScenarioTestPanel from "./ScenarioTestPanel";
 import TestHistoryPanel from "./TestHistoryPanel";
+import { normalizeGuardrailType, SUPPORTED_GUARDRAIL_TYPES } from "@/utils/guardrails";
 
 const { TabPane } = Tabs;
 
@@ -25,20 +26,19 @@ const GuardrailTestSimulator: React.FC<GuardrailTestSimulatorProps> = ({
 
   // Check if the guardrail type is supported for testing
   // Support both standard names and any variations
-  const supportedGuardrailTypes = ["bedrock", "presidio", "lakera", "lakera_v2", "aws_bedrock_guardrails"];
-  const normalizedType = guardrailType.toLowerCase().replace(/_/g, "").replace(/\s+/g, "");
+  const normalizedGuardrailType = normalizeGuardrailType(guardrailType) || guardrailType;
+  const canonicalType = normalizedGuardrailType.toLowerCase();
 
   // Check direct match or normalized match
   const isSupportedForTesting =
-    supportedGuardrailTypes.includes(guardrailType.toLowerCase()) ||
-    supportedGuardrailTypes.some(type => type.replace(/_/g, "").replace(/\s+/g, "") === normalizedType) ||
-    normalizedType.includes("bedrock") ||
-    normalizedType.includes("presidio") ||
-    normalizedType.includes("lakera");
+    SUPPORTED_GUARDRAIL_TYPES.includes(canonicalType as (typeof SUPPORTED_GUARDRAIL_TYPES)[number]) ||
+    canonicalType.includes("bedrock") ||
+    canonicalType.includes("presidio") ||
+    canonicalType.includes("lakera");
 
   // Debug logging
   console.log("GuardrailTestSimulator - guardrailType:", guardrailType);
-  console.log("GuardrailTestSimulator - normalizedType:", normalizedType);
+  console.log("GuardrailTestSimulator - normalizedType:", normalizedGuardrailType);
   console.log("GuardrailTestSimulator - isSupportedForTesting:", isSupportedForTesting);
 
   if (!isSupportedForTesting) {
@@ -110,7 +110,7 @@ const GuardrailTestSimulator: React.FC<GuardrailTestSimulatorProps> = ({
         >
           <ScenarioTestPanel
             guardrailId={guardrailId}
-            guardrailType={guardrailType}
+            guardrailType={normalizedGuardrailType}
             accessToken={accessToken}
           />
         </TabPane>
@@ -127,7 +127,7 @@ const GuardrailTestSimulator: React.FC<GuardrailTestSimulatorProps> = ({
           <TestHistoryPanel
             guardrailId={guardrailId}
             guardrailName={guardrailName}
-            guardrailType={guardrailType}
+            guardrailType={normalizedGuardrailType}
             accessToken={accessToken}
           />
         </TabPane>

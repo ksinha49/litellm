@@ -26,6 +26,7 @@ import {
 } from "./email_events/types";
 import { jsonFields } from "./common_components/check_openapi_schema"
 import NotificationsManager from "./molecules/notifications_manager";
+import { normalizeGuardrailType } from "@/utils/guardrails";
 
 const isLocal = process.env.NODE_ENV === "development";
 export const defaultProxyBaseUrl = isLocal ? "http://localhost:4000" : null;
@@ -6903,9 +6904,11 @@ export const getGuardrailTestScenariosCall = async (
   guardrailType: string = "bedrock"
 ) => {
   try {
+    const normalizedType = normalizeGuardrailType(guardrailType) || guardrailType;
+    const encodedType = encodeURIComponent(normalizedType);
     const url = proxyBaseUrl
-      ? `${proxyBaseUrl}/guardrails/test/scenarios?guardrail_type=${guardrailType}`
-      : `/guardrails/test/scenarios?guardrail_type=${guardrailType}`;
+      ? `${proxyBaseUrl}/guardrails/test/scenarios?guardrail_type=${encodedType}`
+      : `/guardrails/test/scenarios?guardrail_type=${encodedType}`;
 
     const response = await fetch(url, {
       method: "GET",
@@ -6948,7 +6951,10 @@ export const getTestHistoryCall = async (
   try {
     const params = new URLSearchParams();
     if (filters?.guardrail_id) params.append("guardrail_id", filters.guardrail_id);
-    if (filters?.guardrail_type) params.append("guardrail_type", filters.guardrail_type);
+    if (filters?.guardrail_type) {
+      const normalizedType = normalizeGuardrailType(filters.guardrail_type) || filters.guardrail_type;
+      params.append("guardrail_type", normalizedType);
+    }
     if (filters?.created_by) params.append("created_by", filters.created_by);
     if (filters?.start_date) params.append("start_date", filters.start_date);
     if (filters?.end_date) params.append("end_date", filters.end_date);
@@ -7067,7 +7073,10 @@ export const getTestStatisticsCall = async (
   try {
     const params = new URLSearchParams();
     if (guardrailId) params.append("guardrail_id", guardrailId);
-    if (guardrailType) params.append("guardrail_type", guardrailType);
+    if (guardrailType) {
+      const normalizedType = normalizeGuardrailType(guardrailType) || guardrailType;
+      params.append("guardrail_type", normalizedType);
+    }
     params.append("days", days.toString());
 
     const queryString = params.toString();

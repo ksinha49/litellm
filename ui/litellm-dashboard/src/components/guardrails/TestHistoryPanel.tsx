@@ -34,6 +34,7 @@ import {
   getGuardrailTestHistoryCall,
   getTestStatisticsCall,
 } from "../networking";
+import { normalizeGuardrailType } from "@/utils/guardrails";
 
 interface TestHistoryPanelProps {
   guardrailId: string;
@@ -95,6 +96,11 @@ const TestHistoryPanel: React.FC<TestHistoryPanelProps> = ({
   });
   const [actionFilter, setActionFilter] = useState<string>("all");
 
+  const normalizedGuardrailType = React.useMemo(
+    () => normalizeGuardrailType(guardrailType) || guardrailType,
+    [guardrailType]
+  );
+
   // Load test history and statistics
   const loadHistory = useCallback(async () => {
     if (!accessToken) {
@@ -116,7 +122,7 @@ const TestHistoryPanel: React.FC<TestHistoryPanelProps> = ({
       const statsData = await getTestStatisticsCall(
         accessToken,
         guardrailId,
-        undefined,
+        normalizedGuardrailType,
         30
       );
       setStatistics(statsData);
@@ -126,7 +132,7 @@ const TestHistoryPanel: React.FC<TestHistoryPanelProps> = ({
     } finally {
       setLoading(false);
     }
-  }, [accessToken, guardrailId]);
+  }, [accessToken, guardrailId, normalizedGuardrailType]);
 
   useEffect(() => {
     loadHistory();
