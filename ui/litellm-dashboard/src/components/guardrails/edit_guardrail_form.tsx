@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Form, Modal, Select, Switch, Input } from 'antd';
+import type { FormInstance } from 'antd';
 import { Button, TextInput } from '@tremor/react';
 import {
   guardrail_provider_map,
@@ -59,36 +60,184 @@ interface ProviderParamsResponse {
   [provider: string]: { [key: string]: ProviderParam };
 }
 
+type ProviderParamStructure = Record<string, ProviderParamStructure | true>;
+
 const collectAllowedParamKeys = (
-  fields: { [key: string]: ProviderParam } | undefined,
-  accumulator: Set<string>,
-  parentKey = ''
-) => {
-  if (!fields) return;
+  fields: { [key: string]: ProviderParam } | undefined
+): ProviderParamStructure => {
+  const structure: ProviderParamStructure = {};
+
+  if (!fields) {
+    return structure;
+  }
 
   Object.entries(fields).forEach(([fieldKey, fieldConfig]) => {
-    if (!fieldConfig) {
-      return;
-    }
-
-    if (fieldKey === 'ui_friendly_name') {
+    if (!fieldConfig || fieldKey === 'ui_friendly_name') {
       return;
     }
 
     if (fieldKey === 'optional_params') {
-      collectAllowedParamKeys(fieldConfig.fields, accumulator, parentKey);
+      structure[fieldKey] = collectAllowedParamKeys(fieldConfig.fields);
       return;
     }
 
-    const fullFieldKey = parentKey ? `${parentKey}.${fieldKey}` : fieldKey;
-
-    if (fieldConfig.type === 'nested' && fieldConfig.fields) {
-      collectAllowedParamKeys(fieldConfig.fields, accumulator, fullFieldKey);
+    if (
+      fieldConfig.fields &&
+      (fieldConfig.type === 'nested' || fieldConfig.type === 'object' || fieldConfig.type === undefined)
+    ) {
+      structure[fieldKey] = collectAllowedParamKeys(fieldConfig.fields);
       return;
     }
 
-    accumulator.add(fullFieldKey);
+    structure[fieldKey] = true;
   });
+
+  return structure;
+};
+
+const structureHasParams = (structure: ProviderParamStructure): boolean => {
+  return Object.values(structure).some((value) => {
+    if (value === true) {
+      return true;
+    }
+
+    if (value && typeof value === 'object') {
+      return structureHasParams(value as ProviderParamStructure);
+    }
+
+    return false;
+  });
+};
+
+const isPlainObject = (value: unknown): value is Record<string, any> => {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+};
+
+const isEmptyObject = (value: unknown): boolean => {
+  return isPlainObject(value) && Object.keys(value).length === 0;
+};
+
+const isEmptyValue = (value: any): boolean => {
+  if (value === undefined || value === null) {
+    return true;
+  }
+
+  if (typeof value === 'string') {
+    return value.trim() === '';
+  }
+
+  if (Array.isArray(value)) {
+    return value.length === 0;
+  }
+
+  if (isPlainObject(value)) {
+    return Object.keys(value).length === 0;
+  }
+
+  return false;
+};
+
+const getValueForPath = (
+  values: Record<string, any>,
+  path: string[],
+  formInstance: FormInstance
+) => {
+  let current: any = values;
+
+  for (const segment of path) {
+    if (isPlainObject(current) && segment in current) {
+      current = current[segment];
+    } else {
+      current = undefined;
+      break;
+    }
+  }
+
+  if (current !== undefined) {
+    return current;
+  }
+
+  const joinedPath = path.join('.');
+
+  if (joinedPath in values) {
+    return values[joinedPath];
+  }
+
+  const valueFromFormArray = formInstance.getFieldValue(path);
+
+  if (valueFromFormArray !== undefined) {
+    return valueFromFormArray;
+  }
+
+  return formInstance.getFieldValue(joinedPath);
+};
+
+const extractStructuredProviderValues = (
+  structure: ProviderParamStructure,
+  values: Record<string, any>,
+  formInstance: FormInstance
+): Record<string, any> => {
+  const traverse = (
+    node: ProviderParamStructure,
+    path: string[]
+  ): Record<string, any> => {
+    const result: Record<string, any> = {};
+
+    Object.entries(node).forEach(([key, child]) => {
+      const nextPath = [...path, key];
+
+      if (child === true) {
+        const fieldValue = getValueForPath(values, nextPath, formInstance);
+
+        if (!isEmptyValue(fieldValue)) {
+          result[key] = fieldValue;
+        }
+
+        return;
+      }
+
+      if (child && typeof child === 'object') {
+        const nestedValue = traverse(child as ProviderParamStructure, nextPath);
+
+        if (!isEmptyObject(nestedValue)) {
+          result[key] = nestedValue;
+          return;
+        }
+
+        const fallbackValue = getValueForPath(values, nextPath, formInstance);
+
+        if (!isEmptyValue(fallbackValue)) {
+          result[key] = fallbackValue;
+        }
+      }
+    });
+
+    return result;
+  };
+
+  return traverse(structure, []);
+};
+
+const deepMerge = (target: Record<string, any>, source: Record<string, any>) => {
+  const output: Record<string, any> = { ...target };
+
+  Object.entries(source).forEach(([key, sourceValue]) => {
+    if (isPlainObject(sourceValue)) {
+      const targetValue = output[key];
+
+      if (isPlainObject(targetValue)) {
+        output[key] = deepMerge(targetValue, sourceValue);
+      } else {
+        output[key] = deepMerge({}, sourceValue);
+      }
+    } else if (Array.isArray(sourceValue)) {
+      output[key] = [...sourceValue];
+    } else {
+      output[key] = sourceValue;
+    }
+  });
+
+  return output;
 };
 
 const EditGuardrailForm: React.FC<EditGuardrailFormProps> = ({
@@ -280,20 +429,19 @@ const EditGuardrailForm: React.FC<EditGuardrailFormProps> = ({
         const providerSpecificParams = providerParams[providerKey];
 
         if (providerSpecificParams) {
-          const allowedParams = new Set<string>();
-          collectAllowedParamKeys(providerSpecificParams, allowedParams);
+          const allowedParamStructure = collectAllowedParamKeys(providerSpecificParams);
+          const structuredProviderValues = extractStructuredProviderValues(
+            allowedParamStructure,
+            values,
+            form
+          );
 
-          allowedParams.forEach((paramName) => {
-            let paramValue = form.getFieldValue(paramName);
-
-            if (paramValue === undefined || paramValue === null || paramValue === '') {
-              paramValue = values.optional_params?.[paramName];
-            }
-
-            if (paramValue !== undefined && paramValue !== null && paramValue !== '') {
-              guardrailData.guardrail.litellm_params[paramName] = paramValue;
-            }
-          });
+          if (!isEmptyObject(structuredProviderValues)) {
+            guardrailData.guardrail.litellm_params = deepMerge(
+              guardrailData.guardrail.litellm_params,
+              structuredProviderValues
+            );
+          }
         }
       }
 
@@ -483,9 +631,8 @@ const EditGuardrailForm: React.FC<EditGuardrailFormProps> = ({
       if (!providerSpecificParams) {
         shouldRenderLegacyFields = true;
       } else {
-        const allowedParams = new Set<string>();
-        collectAllowedParamKeys(providerSpecificParams, allowedParams);
-        shouldRenderLegacyFields = allowedParams.size === 0;
+        const allowedParamStructure = collectAllowedParamKeys(providerSpecificParams);
+        shouldRenderLegacyFields = !structureHasParams(allowedParamStructure);
       }
     }
 
