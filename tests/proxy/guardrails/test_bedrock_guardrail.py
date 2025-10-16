@@ -2,7 +2,7 @@ import asyncio
 import json
 import sys
 from pathlib import Path
-from types import SimpleNamespace
+from types import ModuleType, SimpleNamespace
 from typing import Optional
 from unittest.mock import AsyncMock, MagicMock
 
@@ -64,6 +64,49 @@ def patched_guardrail(monkeypatch):
         aws_region_name="us-west-2",
     )
     return guardrail
+
+
+def test_prepare_request_respects_custom_runtime_endpoint(monkeypatch):
+    monkeypatch.setenv("AWS_ACCESS_KEY_ID", "test-access-key")
+    monkeypatch.setenv("AWS_SECRET_ACCESS_KEY", "test-secret-key")
+
+    guardrail = BedrockGuardrail(
+        guardrailIdentifier="guardrail-id",
+        guardrailVersion="1",
+        aws_region_name="us-west-2",
+    )
+
+    class DummyAWSRequest:
+        def __init__(self, *, method, url, data, headers):
+            self.method = method
+            self.url = url
+            self.data = data
+            self.headers = headers
+
+        def prepare(self):
+            return SimpleNamespace(url=self.url, headers=self.headers, body=self.data)
+
+    monkeypatch.setitem(
+        sys.modules,
+        "botocore.awsrequest",
+        ModuleType("botocore.awsrequest"),
+    )
+    sys.modules["botocore.awsrequest"].AWSRequest = DummyAWSRequest
+
+    custom_endpoint = "https://my-custom-runtime.amazonaws.com"
+    prepared = guardrail._prepare_request(
+        credentials=None,
+        data={"input": "hi"},
+        optional_params={"aws_bedrock_runtime_endpoint": custom_endpoint},
+        aws_region_name="us-west-2",
+        api_key="dummy-token",
+    )
+
+    expected_url = (
+        f"{custom_endpoint}/guardrail/{guardrail.guardrailIdentifier}/version/"
+        f"{guardrail.guardrailVersion}/apply"
+    )
+    assert prepared.url == expected_url
 
 
 def test_bedrock_guardrail_missing_required_fields(monkeypatch):
