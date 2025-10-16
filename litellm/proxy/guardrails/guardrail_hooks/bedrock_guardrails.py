@@ -555,13 +555,27 @@ class BedrockGuardrail(CustomGuardrail, BaseAWSLLM):
         Internal method to make the actual HTTP request with retry logic.
 
         This is separated to allow the retry decorator to work properly.
+
+        Note: We catch HTTPStatusError here and return the response object
+        instead of raising, so that enhanced error parsing can run in the
+        calling method (make_bedrock_api_request).
         """
-        response = await self.async_handler.post(
-            url=prepared_request.url,
-            data=prepared_request.body,  # type: ignore
-            headers=prepared_request.headers,  # type: ignore
-        )
-        return response
+        try:
+            response = await self.async_handler.post(
+                url=prepared_request.url,
+                data=prepared_request.body,  # type: ignore
+                headers=prepared_request.headers,  # type: ignore
+            )
+            return response
+        except httpx.HTTPStatusError as e:
+            # Extract response from exception so error parsing can run
+            # The httpx handler calls raise_for_status() automatically,
+            # but we need the response object to parse AWS error details
+            verbose_proxy_logger.debug(
+                "HTTPStatusError caught in retry handler: status=%s, extracting response for error parsing",
+                e.response.status_code
+            )
+            return e.response
 
     async def make_bedrock_api_request(
         self,

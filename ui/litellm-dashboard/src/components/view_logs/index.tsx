@@ -105,6 +105,9 @@ export default function SpendLogsTable({
     unit: "hours",
   })
 
+  const [lastUpdatedTime, setLastUpdatedTime] = useState<Date | null>(null)
+  const [showDebugPanel, setShowDebugPanel] = useState(false)
+
   const formattedStartTime = useMemo(
     () => moment(startTime).utc().format("YYYY-MM-DD HH:mm:ss"),
     [startTime],
@@ -149,6 +152,37 @@ export default function SpendLogsTable({
       setFilterByCurrentUser(true)
     }
   }, [userRole])
+
+  // Auto-disable Live Tail when custom date is selected
+  useEffect(() => {
+    if (isCustomDate && isLiveTail) {
+      console.log("[Request Logs] Auto-disabling Live Tail due to custom date range selection")
+      setIsLiveTail(false)
+    }
+  }, [isCustomDate])
+
+  // Log query state changes for debugging
+  useEffect(() => {
+    console.log("[Request Logs] Query state:", {
+      isLoading: logs.isLoading,
+      isFetching: logs.isFetching,
+      isError: logs.isError,
+      dataCount: logs.data?.data?.length || 0,
+      total: logs.data?.total || 0,
+      currentPage,
+      isLiveTail,
+      isCustomDate,
+      queryEnabled: !!accessToken && !!token && !!userRole && !!userID && activeTab === "request logs",
+    })
+  }, [logs.isLoading, logs.isFetching, logs.isError, logs.data, currentPage, isLiveTail, isCustomDate, activeTab, accessToken, token, userRole, userID])
+
+  // Update last updated time when data successfully loads
+  useEffect(() => {
+    if (logs.isSuccess && logs.data && !logs.isFetching) {
+      setLastUpdatedTime(new Date())
+      console.log("[Request Logs] Data updated successfully at", new Date().toLocaleTimeString())
+    }
+  }, [logs.isSuccess, logs.data, logs.isFetching])
 
   const LiveTailControls = () => {
     return (
@@ -646,6 +680,18 @@ export default function SpendLogsTable({
                             </svg>
                             <span>Refresh</span>
                           </button>
+                          <button
+                            onClick={() => setShowDebugPanel(!showDebugPanel)}
+                            className={`px-3 py-2 text-sm border rounded-md hover:bg-gray-50 flex items-center gap-2 ${
+                              showDebugPanel ? "bg-gray-100" : ""
+                            }`}
+                            title="Toggle debug panel"
+                          >
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
+                            </svg>
+                            <span>Debug</span>
+                          </button>
                         </div>
 
                         {isCustomDate && (
@@ -711,9 +757,22 @@ export default function SpendLogsTable({
                     </div>
                   </div>
                   {isLiveTail && currentPage === 1 && (
-                    <div className="mb-4 px-4 py-2 bg-green-50 border border-greem-200 rounded-md flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm text-green-700">Auto-refreshing every 15 seconds</span>
+                    <div className="mb-4 px-4 py-2 bg-green-50 border border-green-200 rounded-md flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className="flex items-center gap-2">
+                          <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                          <span className="text-sm text-green-700 font-medium">Live Tail Active</span>
+                        </div>
+                        <span className="text-xs text-green-600">•</span>
+                        <span className="text-xs text-green-600">Refreshing every 15s</span>
+                        {lastUpdatedTime && (
+                          <>
+                            <span className="text-xs text-green-600">•</span>
+                            <span className="text-xs text-green-600">
+                              Last updated: {moment(lastUpdatedTime).fromNow()}
+                            </span>
+                          </>
+                        )}
                       </div>
                       <button
                         onClick={() => setIsLiveTail(false)}
@@ -721,6 +780,128 @@ export default function SpendLogsTable({
                       >
                         Stop
                       </button>
+                    </div>
+                  )}
+                  {logs.isError && (
+                    <div className="mb-4 px-4 py-3 bg-red-50 border border-red-200 rounded-md">
+                      <div className="flex items-start justify-between">
+                        <div className="flex items-start gap-3">
+                          <svg className="w-5 h-5 text-red-600 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                          </svg>
+                          <div>
+                            <h4 className="text-sm font-medium text-red-800">Failed to load logs</h4>
+                            <p className="text-sm text-red-700 mt-1">
+                              {logs.error instanceof Error ? logs.error.message : "An unknown error occurred"}
+                            </p>
+                            {!accessToken && (
+                              <p className="text-xs text-red-600 mt-1">
+                                Possible cause: Missing or invalid access token
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => logs.refetch()}
+                            className="px-3 py-1.5 text-sm bg-red-100 text-red-700 hover:bg-red-200 rounded-md"
+                          >
+                            Retry
+                          </button>
+                          <button
+                            onClick={() => queryClient.resetQueries({ queryKey: ["logs"] })}
+                            className="text-red-600 hover:text-red-800"
+                          >
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                  {isCustomDate && isLiveTail && (
+                    <div className="mb-4 px-4 py-3 bg-yellow-50 border border-yellow-200 rounded-md flex items-start gap-3">
+                      <svg className="w-5 h-5 text-yellow-600 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                      </svg>
+                      <div>
+                        <h4 className="text-sm font-medium text-yellow-800">Live Tail with Custom Date Range</h4>
+                        <p className="text-sm text-yellow-700 mt-1">
+                          Auto-refresh is enabled, but you're viewing a custom time range. New logs created after{" "}
+                          <span className="font-mono">{moment(endTime).format("MMM D, YYYY HH:mm")}</span> won't appear.
+                          Consider using a preset time range for live updates.
+                        </p>
+                      </div>
+                    </div>
+                  )}
+                  {showDebugPanel && (
+                    <div className="mb-4 px-4 py-3 bg-gray-50 border border-gray-200 rounded-md">
+                      <div className="flex items-center justify-between mb-3">
+                        <h4 className="text-sm font-medium text-gray-900">Debug Information</h4>
+                        <button
+                          onClick={() => setShowDebugPanel(false)}
+                          className="text-gray-400 hover:text-gray-600"
+                        >
+                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                          </svg>
+                        </button>
+                      </div>
+                      <div className="grid grid-cols-2 gap-4 text-xs">
+                        <div>
+                          <span className="font-medium text-gray-700">Query Status:</span>
+                          <span className={`ml-2 px-2 py-0.5 rounded ${
+                            logs.isLoading ? "bg-blue-100 text-blue-700" :
+                            logs.isError ? "bg-red-100 text-red-700" :
+                            logs.isSuccess ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-700"
+                          }`}>
+                            {logs.isLoading ? "Loading" : logs.isError ? "Error" : logs.isSuccess ? "Success" : "Idle"}
+                          </span>
+                        </div>
+                        <div>
+                          <span className="font-medium text-gray-700">Is Fetching:</span>
+                          <span className="ml-2">{logs.isFetching ? "Yes" : "No"}</span>
+                        </div>
+                        <div>
+                          <span className="font-medium text-gray-700">Query Enabled:</span>
+                          <span className="ml-2">{!!accessToken && !!token && !!userRole && !!userID && activeTab === "request logs" ? "Yes" : "No"}</span>
+                        </div>
+                        <div>
+                          <span className="font-medium text-gray-700">Live Tail:</span>
+                          <span className="ml-2">{isLiveTail ? "ON" : "OFF"}</span>
+                        </div>
+                        <div>
+                          <span className="font-medium text-gray-700">Current Page:</span>
+                          <span className="ml-2">{currentPage}</span>
+                        </div>
+                        <div>
+                          <span className="font-medium text-gray-700">Custom Date:</span>
+                          <span className="ml-2">{isCustomDate ? "Yes" : "No"}</span>
+                        </div>
+                        <div>
+                          <span className="font-medium text-gray-700">Start Time:</span>
+                          <span className="ml-2 font-mono text-xs">{moment(startTime).format("MMM D, HH:mm")}</span>
+                        </div>
+                        <div>
+                          <span className="font-medium text-gray-700">End Time:</span>
+                          <span className="ml-2 font-mono text-xs">{moment(endTime).format("MMM D, HH:mm")}</span>
+                        </div>
+                        <div>
+                          <span className="font-medium text-gray-700">Results Count:</span>
+                          <span className="ml-2">{logs.data?.data?.length || 0} / {logs.data?.total || 0}</span>
+                        </div>
+                        <div>
+                          <span className="font-medium text-gray-700">Active Filters:</span>
+                          <span className="ml-2">{Object.keys(filters).filter(k => filters[k]).length}</span>
+                        </div>
+                        <div className="col-span-2">
+                          <span className="font-medium text-gray-700">API Endpoint:</span>
+                          <span className="ml-2 font-mono text-xs break-all">
+                            /spend/logs/ui?start_date={formattedStartTime}&end_date={isCustomDate ? moment(endTime).utc().format("YYYY-MM-DD HH:mm:ss") : moment().utc().format("YYYY-MM-DD HH:mm:ss")}
+                          </span>
+                        </div>
+                      </div>
                     </div>
                   )}
                   <DataTable

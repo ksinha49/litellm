@@ -287,8 +287,18 @@ def get_logging_payload(  # noqa: PLR0915
             additional_usage_values.update({k: v})
     clean_metadata["additional_usage_values"] = additional_usage_values
 
-    if litellm.cache is not None:
-        cache_key = litellm.cache.get_cache_key(**kwargs)
+    # Check if cache is properly configured (not None, not boolean)
+    # litellm.cache can be: None, True, False, or a Cache object
+    # Only Cache objects have get_cache_key() method
+    if litellm.cache is not None and not isinstance(litellm.cache, bool):
+        try:
+            from litellm.caching import Cache
+            if isinstance(litellm.cache, Cache) and hasattr(litellm.cache, "get_cache_key"):
+                cache_key = litellm.cache.get_cache_key(**kwargs)
+            else:
+                cache_key = "Cache OFF"
+        except ImportError:
+            cache_key = "Cache OFF"
     else:
         cache_key = "Cache OFF"
     if cache_hit is True:
