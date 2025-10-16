@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { Card, Title, Text, Badge } from "@tremor/react";
 import { Button, Select, Tabs, Table, Tag, Progress, Collapse, Alert, Spin } from "antd";
 import {
@@ -9,6 +9,7 @@ import {
   DownloadOutlined,
 } from "@ant-design/icons";
 import { getGuardrailTestScenariosCall, testGuardrailSuiteCall } from "@/components/networking";
+import { normalizeGuardrailType } from "@/utils/guardrails";
 import NotificationsManager from "../molecules/notifications_manager";
 
 const { Panel } = Collapse;
@@ -51,12 +52,17 @@ const ScenarioTestPanel: React.FC<ScenarioTestPanelProps> = ({ guardrailId, guar
   const [runningTest, setRunningTest] = useState(false);
   const [testResults, setTestResults] = useState<TestSuiteResult | null>(null);
 
+  const normalizedGuardrailType = useMemo(
+    () => normalizeGuardrailType(guardrailType) || guardrailType,
+    [guardrailType]
+  );
+
   const fetchScenarios = useCallback(async () => {
     if (!accessToken) return;
 
     setLoadingScenarios(true);
     try {
-      const response = await getGuardrailTestScenariosCall(accessToken, guardrailType);
+      const response = await getGuardrailTestScenariosCall(accessToken, normalizedGuardrailType);
       setScenarios(response.scenario_categories || {});
     } catch (error) {
       console.error("Failed to fetch scenarios:", error);
@@ -64,7 +70,7 @@ const ScenarioTestPanel: React.FC<ScenarioTestPanelProps> = ({ guardrailId, guar
     } finally {
       setLoadingScenarios(false);
     }
-  }, [accessToken, guardrailType]);
+  }, [accessToken, normalizedGuardrailType]);
 
   useEffect(() => {
     fetchScenarios();

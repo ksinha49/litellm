@@ -10,6 +10,7 @@ from typing import Any, Dict, List, Optional
 
 from litellm._logging import verbose_proxy_logger
 from litellm.proxy.guardrails.models import GuardrailTestResponse
+from litellm.proxy.guardrails.utils import normalize_guardrail_type
 from litellm.proxy.utils import PrismaClient
 
 
@@ -71,12 +72,14 @@ class GuardrailTestHistoryService:
             content_hash = self._hash_content(test_content)
 
             # Create the history record
+            normalized_guardrail_type = normalize_guardrail_type(guardrail_type) or guardrail_type
+
             history_record = await self.prisma_client.db.litellm_guardrailstesthistorytable.create(
                 data={
                     "test_id": test_result.test_id,
                     "guardrail_id": guardrail_id,
                     "guardrail_name": test_result.guardrail_name,
-                    "guardrail_type": guardrail_type,
+                    "guardrail_type": normalized_guardrail_type,
                     "test_scenario_name": test_result.test_scenario_name,
                     "content_source": test_result.content_source,
                     "test_content_hash": content_hash,
@@ -141,7 +144,8 @@ class GuardrailTestHistoryService:
                 where["guardrail_id"] = guardrail_id
 
             if guardrail_type:
-                where["guardrail_type"] = guardrail_type
+                normalized_type = normalize_guardrail_type(guardrail_type) or guardrail_type
+                where["guardrail_type"] = normalized_type
 
             if created_by:
                 where["created_by"] = created_by
@@ -232,7 +236,8 @@ class GuardrailTestHistoryService:
                 where["guardrail_id"] = guardrail_id
 
             if guardrail_type:
-                where["guardrail_type"] = guardrail_type
+                normalized_type = normalize_guardrail_type(guardrail_type) or guardrail_type
+                where["guardrail_type"] = normalized_type
 
             # Get all records in date range
             records = await self.prisma_client.db.litellm_guardrailstesthistorytable.find_many(
