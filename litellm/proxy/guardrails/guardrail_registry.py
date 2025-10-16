@@ -230,7 +230,8 @@ class GuardrailRegistry:
         """Access to the in-memory guardrail mapping"""
         return self._in_memory_handler.guardrail_id_to_custom_guardrail
 
-    def _encrypt_guardrail_params(self, litellm_params: Dict[str, Any]) -> Dict[str, Any]:
+    @staticmethod
+    def _encrypt_guardrail_params(litellm_params: Dict[str, Any]) -> Dict[str, Any]:
         """
         Encrypt sensitive fields in litellm_params before storing in database.
 
@@ -250,7 +251,8 @@ class GuardrailRegistry:
 
         return encrypted_params
 
-    def _decrypt_guardrail_params(self, litellm_params_data: Any) -> Dict[str, Any]:
+    @staticmethod
+    def _decrypt_guardrail_params(litellm_params_data: Any) -> Dict[str, Any]:
         """
         Decrypt litellm_params after loading from database.
 
@@ -312,7 +314,7 @@ class GuardrailRegistry:
 
             # Get litellm_params and encrypt sensitive fields
             raw_litellm_params = dict(guardrail.get("litellm_params", {}))
-            encrypted_litellm_params = self._encrypt_guardrail_params(raw_litellm_params)
+            encrypted_litellm_params = GuardrailRegistry._encrypt_guardrail_params(raw_litellm_params)
             litellm_params: str = safe_dumps(encrypted_litellm_params)
 
             guardrail_info: str = safe_dumps(guardrail.get("guardrail_info", {}))
@@ -363,7 +365,7 @@ class GuardrailRegistry:
 
             # Get litellm_params and encrypt sensitive fields
             raw_litellm_params = dict(guardrail.get("litellm_params", {}))
-            encrypted_litellm_params = self._encrypt_guardrail_params(raw_litellm_params)
+            encrypted_litellm_params = GuardrailRegistry._encrypt_guardrail_params(raw_litellm_params)
             litellm_params: str = safe_dumps(encrypted_litellm_params)
 
             guardrail_info: str = safe_dumps(guardrail.get("guardrail_info", {}))
@@ -384,8 +386,8 @@ class GuardrailRegistry:
         except Exception as e:
             raise Exception(f"Error updating guardrail in DB: {str(e)}")
 
+    @staticmethod
     async def get_all_guardrails_from_db(
-        self,
         prisma_client: PrismaClient,
     ) -> List[Guardrail]:
         """
@@ -405,7 +407,7 @@ class GuardrailRegistry:
 
                 # Decrypt litellm_params if present
                 if "litellm_params" in guardrail_dict:
-                    decrypted_params = self._decrypt_guardrail_params(
+                    decrypted_params = GuardrailRegistry._decrypt_guardrail_params(
                         guardrail_dict["litellm_params"]
                     )
                     guardrail_dict["litellm_params"] = decrypted_params
@@ -435,7 +437,7 @@ class GuardrailRegistry:
 
             # Decrypt litellm_params if present
             if "litellm_params" in guardrail_dict:
-                decrypted_params = self._decrypt_guardrail_params(
+                decrypted_params = GuardrailRegistry._decrypt_guardrail_params(
                     guardrail_dict["litellm_params"]
                 )
                 guardrail_dict["litellm_params"] = decrypted_params
@@ -463,7 +465,7 @@ class GuardrailRegistry:
 
             # Decrypt litellm_params if present
             if "litellm_params" in guardrail_dict:
-                decrypted_params = self._decrypt_guardrail_params(
+                decrypted_params = GuardrailRegistry._decrypt_guardrail_params(
                     guardrail_dict["litellm_params"]
                 )
                 guardrail_dict["litellm_params"] = decrypted_params
