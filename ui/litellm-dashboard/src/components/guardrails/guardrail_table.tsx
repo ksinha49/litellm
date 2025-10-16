@@ -106,7 +106,7 @@ const GuardrailTable: React.FC<GuardrailTableProps> = ({
       cell: ({ row }) => {
         const guardrail = row.original
         // Handle null litellm_params gracefully
-        const guardrailValue = guardrail.litellm_params?.guardrail || null
+        const guardrailValue = guardrail.litellm_params?.guardrail || ""
         const { logo, displayName } = getGuardrailLogoAndName(guardrailValue)
         return (
           <div className="flex items-center space-x-2">
