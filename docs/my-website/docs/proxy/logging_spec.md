@@ -61,7 +61,15 @@ Inherits from `StandardLoggingUserAPIKeyMetadata` and adds:
 | `requester_metadata` | `Optional[dict]` | Additional requester metadata |
 | `vector_store_request_metadata` | `Optional[List[StandardLoggingVectorStoreRequest]]` | Vector store request metadata |
 | `requester_custom_headers` | Dict[str, str] | Any custom (`x-`) headers sent by the client to the proxy. |
-| `guardrail_information` | `Optional[StandardLoggingGuardrailInformation]` | Guardrail information |
+| `standard_logging_guardrail_information` | `Optional[StandardLoggingGuardrailInformation]` | Guardrail information attached by guardrail hooks (replaces `guardrail_information`). |
+
+### Manual verification of guardrail metadata
+
+To manually confirm that guardrail details flow end-to-end:
+
+1. Configure a guardrail in the proxy (for example, enable an AWS Bedrock guardrail) and send a request that triggers the guardrail action.
+2. Inspect the emitted standard logging payload in the proxy logs or via any configured sink. The `metadata.standard_logging_guardrail_information` field should include the guardrail name, status, and any provider-specific assessment data.
+3. Open the LiteLLM dashboard "View Logs" page for the same request. The guardrail section should render even if the payload still uses the legacy `guardrail_information` field, ensuring backward compatibility while the new metadata rolls out.
 
 
 ## StandardLoggingVectorStoreRequest
