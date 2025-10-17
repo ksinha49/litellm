@@ -1009,15 +1009,30 @@ def _add_guardrails_from_key_or_team_or_org(
 
     """
     from litellm.proxy.auth.premium import _premium_user_check
+    from litellm._logging import verbose_proxy_logger
+
+    # Debug log the input values
+    verbose_proxy_logger.debug(
+        "[Guardrails] _add_guardrails_from_key_or_team_or_org called with: "
+        f"key_guardrails={user_api_key_dict.guardrails}, "
+        f"team_guardrails={user_api_key_dict.team_guardrails}, "
+        f"org_metadata={user_api_key_dict.organization_metadata}"
+    )
 
     # Check key-level guardrails (highest precedence)
     if user_api_key_dict.guardrails is not None and len(user_api_key_dict.guardrails) > 0:
+        verbose_proxy_logger.info(
+            f"[Guardrails] Adding key-level guardrails: {user_api_key_dict.guardrails}"
+        )
         _premium_user_check()
         data[metadata_variable_name]["guardrails"] = user_api_key_dict.guardrails
         return
 
     # Check team-level guardrails (medium precedence)
     if user_api_key_dict.team_guardrails is not None and len(user_api_key_dict.team_guardrails) > 0:
+        verbose_proxy_logger.info(
+            f"[Guardrails] Adding team-level guardrails: {user_api_key_dict.team_guardrails}"
+        )
         _premium_user_check()
         data[metadata_variable_name]["guardrails"] = user_api_key_dict.team_guardrails
         return
@@ -1029,8 +1044,14 @@ def _add_guardrails_from_key_or_team_or_org(
         and "guardrails" in user_api_key_dict.organization_metadata
         and len(user_api_key_dict.organization_metadata["guardrails"]) > 0
     ):
+        verbose_proxy_logger.info(
+            f"[Guardrails] Adding org-level guardrails: {user_api_key_dict.organization_metadata['guardrails']}"
+        )
         _premium_user_check()
         data[metadata_variable_name]["guardrails"] = user_api_key_dict.organization_metadata["guardrails"]
+        return
+
+    verbose_proxy_logger.debug("[Guardrails] No guardrails found in key/team/org")
 
 
 def move_guardrails_to_metadata(
@@ -1048,12 +1069,23 @@ def move_guardrails_to_metadata(
     """
     from litellm._logging import verbose_proxy_logger
 
+    verbose_proxy_logger.debug(
+        f"[Guardrails] move_guardrails_to_metadata CALLED - "
+        f"api_key={getattr(user_api_key_dict, 'api_key', None)}, "
+        f"team_id={getattr(user_api_key_dict, 'team_id', None)}, "
+        f"org_id={getattr(user_api_key_dict, 'organization_id', None)}"
+    )
+
     # Initialize metadata if not present
     if _metadata_variable_name not in data:
         data[_metadata_variable_name] = {}
 
     # Check key-level, team-level, and organization-level guardrails
     initial_guardrails = list(data[_metadata_variable_name].get("guardrails", []))
+
+    verbose_proxy_logger.debug(
+        f"[Guardrails] Initial guardrails in metadata: {initial_guardrails}"
+    )
 
     _add_guardrails_from_key_or_team_or_org(
         user_api_key_dict=user_api_key_dict,

@@ -22,17 +22,42 @@ async def create_missing_views(db: _db):  # noqa: PLR0915
         # Try to select one row from the view
         await db.query_raw("""SELECT 1 FROM "LiteLLM_VerificationTokenView" LIMIT 1""")
         print("LiteLLM_VerificationTokenView Exists!")  # noqa
+
+        # Check if the view includes the team_guardrails column (for existing views)
+        try:
+            await db.query_raw("""SELECT team_guardrails FROM "LiteLLM_VerificationTokenView" LIMIT 1""")
+            print("LiteLLM_VerificationTokenView includes team_guardrails column")  # noqa
+        except Exception:
+            # View exists but doesn't have team_guardrails, need to recreate it
+            print("LiteLLM_VerificationTokenView missing team_guardrails, recreating view...")  # noqa
+            await db.execute_raw("""DROP VIEW IF EXISTS "LiteLLM_VerificationTokenView" """)
+            await db.execute_raw(
+                """
+                    CREATE VIEW "LiteLLM_VerificationTokenView" AS
+                    SELECT
+                    v.*,
+                    t.spend AS team_spend,
+                    t.max_budget AS team_max_budget,
+                    t.tpm_limit AS team_tpm_limit,
+                    t.rpm_limit AS team_rpm_limit,
+                    t.guardrails AS team_guardrails
+                    FROM "LiteLLM_VerificationToken" v
+                    LEFT JOIN "LiteLLM_TeamTable" t ON v.team_id = t.team_id;
+                """
+            )
+            print("LiteLLM_VerificationTokenView Recreated with team_guardrails!")  # noqa
     except Exception:
         # If an error occurs, the view does not exist, so create it
         await db.execute_raw(
             """
                 CREATE VIEW "LiteLLM_VerificationTokenView" AS
-                SELECT 
-                v.*, 
-                t.spend AS team_spend, 
-                t.max_budget AS team_max_budget, 
-                t.tpm_limit AS team_tpm_limit, 
-                t.rpm_limit AS team_rpm_limit
+                SELECT
+                v.*,
+                t.spend AS team_spend,
+                t.max_budget AS team_max_budget,
+                t.tpm_limit AS team_tpm_limit,
+                t.rpm_limit AS team_rpm_limit,
+                t.guardrails AS team_guardrails
                 FROM "LiteLLM_VerificationToken" v
                 LEFT JOIN "LiteLLM_TeamTable" t ON v.team_id = t.team_id;
             """
