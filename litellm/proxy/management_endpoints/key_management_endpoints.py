@@ -30,6 +30,7 @@ from litellm.proxy._types import *
 from litellm.proxy.auth.auth_checks import (
     _cache_key_object,
     _delete_cache_key_object,
+    _delete_cache_user_object,
     can_team_access_model,
     get_key_object,
     get_team_object,
@@ -1114,6 +1115,45 @@ async def update_key_fn(
             user_api_key_cache=user_api_key_cache,
             proxy_logging_obj=proxy_logging_obj,
         )
+
+        # @modtag: AAK7S - Enhanced cache invalidation for budget updates
+        # Check if budget-related fields were updated and perform comprehensive invalidation
+        budget_fields_updated = any(
+            field in non_default_values
+            for field in ["max_budget", "budget_duration", "budget_reset_at", "budget_id"]
+        )
+
+        if budget_fields_updated:
+            verbose_proxy_logger.info(
+                f"Budget fields updated for key. Performing comprehensive cache invalidation."
+            )
+
+            # Invalidate user cache if key has user_id
+            if existing_key_row.user_id:
+                await _delete_cache_user_object(
+                    user_id=existing_key_row.user_id,
+                    user_api_key_cache=user_api_key_cache,
+                    proxy_logging_obj=proxy_logging_obj,
+                )
+                verbose_proxy_logger.debug(
+                    f"Invalidated user cache for user_id={existing_key_row.user_id}"
+                )
+
+            # Invalidate team cache if key has team_id
+            if existing_key_row.team_id:
+                team_cache_key = f"team_id:{existing_key_row.team_id}"
+                user_api_key_cache.delete_cache(key=team_cache_key)
+                if proxy_logging_obj is not None:
+                    await proxy_logging_obj.internal_usage_cache.dual_cache.async_delete_cache(
+                        key=team_cache_key
+                    )
+                verbose_proxy_logger.debug(
+                    f"Invalidated team cache for team_id={existing_key_row.team_id}"
+                )
+
+            # Small delay for Redis propagation in distributed deployments
+            await asyncio.sleep(0.05)
+            verbose_proxy_logger.info("Budget cache invalidation complete")
 
         asyncio.create_task(
             KeyManagementEventHooks.async_key_updated_hook(
