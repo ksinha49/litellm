@@ -1391,6 +1391,11 @@ def _can_object_call_model(
         all_model_access = True
 
     if model is not None and model not in filtered_models and all_model_access is False:
+        # @modtag: AAK7S - Log model access denial before raising exception
+        verbose_proxy_logger.error(
+            f"[Model Access Denied] {object_type} not allowed to access model. "
+            f"Model requested: {model}, Allowed models: {models}, Filtered models: {filtered_models}"
+        )
         raise ProxyException(
             message=f"{object_type} not allowed to access model. This {object_type} can only access models={models}. Tried to access {model}",
             type=ProxyErrorTypes.get_model_access_error_type_for_object(

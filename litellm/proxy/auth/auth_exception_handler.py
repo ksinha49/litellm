@@ -76,9 +76,11 @@ class UserAPIKeyAuthExceptionHandler:
                 request=request,
                 use_x_forwarded_for=general_settings.get("use_x_forwarded_for", False),
             )
+            # @modtag: AAK7S - Improve error message logging for ProxyException
+            error_message = getattr(e, "message", str(e)) if hasattr(e, "message") else str(e)
             verbose_proxy_logger.exception(
                 "litellm.proxy.proxy_server.user_api_key_auth(): Exception occured - {}\nRequester IP Address:{}".format(
-                    str(e),
+                    error_message,
                     requester_ip,
                 ),
                 extra={"requester_ip": requester_ip},
