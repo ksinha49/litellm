@@ -1095,6 +1095,11 @@ async def get_team_object(
         )
 
         if cached_team_obj is not None:
+            # @modtag: AAK7S - Log team object retrieved from cache
+            verbose_proxy_logger.debug(
+                f"[Cache Hit] Team object retrieved from cache - team_id={team_id}, cache_key={key}, "
+                f"max_budget={cached_team_obj.max_budget}, spend={cached_team_obj.spend}"
+            )
             return cached_team_obj
 
         if check_cache_only:
@@ -1104,7 +1109,7 @@ async def get_team_object(
 
     # else, check db
     try:
-        return await _get_team_object_from_user_api_key_cache(
+        team_obj = await _get_team_object_from_user_api_key_cache(
             team_id=team_id,
             prisma_client=prisma_client,
             user_api_key_cache=user_api_key_cache,
@@ -1114,6 +1119,12 @@ async def get_team_object(
             key=key,
             team_id_upsert=team_id_upsert,
         )
+        # @modtag: AAK7S - Log team object retrieved from database
+        verbose_proxy_logger.info(
+            f"[DB Fetch] Team object retrieved from database - team_id={team_id}, cache_key={key}, "
+            f"max_budget={team_obj.max_budget}, spend={team_obj.spend}"
+        )
+        return team_obj
     except Exception:
         raise Exception(
             f"Team doesn't exist in db. Team={team_id}. Create team via `/team/new` call."
@@ -1570,7 +1581,19 @@ async def _virtual_key_max_budget_check(
         # collect information for alerting #
         ####################################
 
+        # @modtag: AAK7S - Log API key budget check details for debugging
+        verbose_proxy_logger.info(
+            f"[Budget Check] API Key Budget - token={valid_token.token[:16] if valid_token.token else 'N/A'}..., "
+            f"key_alias={valid_token.key_alias}, user_id={valid_token.user_id}, team_id={valid_token.team_id}, "
+            f"current_spend={valid_token.spend}, max_budget={valid_token.max_budget}"
+        )
+
         if valid_token.spend >= valid_token.max_budget:
+            verbose_proxy_logger.error(
+                f"[Budget Exceeded] API Key Budget - token={valid_token.token[:16] if valid_token.token else 'N/A'}..., "
+                f"key_alias={valid_token.key_alias}, user_id={valid_token.user_id}, team_id={valid_token.team_id}, "
+                f"current_spend={valid_token.spend} >= max_budget={valid_token.max_budget}"
+            )
             raise litellm.BudgetExceededError(
                 current_cost=valid_token.spend,
                 max_budget=valid_token.max_budget,
@@ -1629,30 +1652,43 @@ async def _team_max_budget_check(
         team_object is not None
         and team_object.max_budget is not None
         and team_object.spend is not None
-        and team_object.spend > team_object.max_budget
     ):
-        if valid_token:
-            call_info = CallInfo(
-                token=valid_token.token,
-                spend=team_object.spend,
-                max_budget=team_object.max_budget,
-                user_id=valid_token.user_id,
-                team_id=valid_token.team_id,
-                team_alias=valid_token.team_alias,
-                event_group=Litellm_EntityType.TEAM,
-            )
-            asyncio.create_task(
-                proxy_logging_obj.budget_alerts(
-                    type="team_budget",
-                    user_info=call_info,
-                )
+        # @modtag: AAK7S - Log team budget check details for debugging
+        verbose_proxy_logger.info(
+            f"[Budget Check] Team Budget - team_id={team_object.team_id}, team_alias={team_object.team_alias}, "
+            f"budget_id={getattr(team_object, 'budget_id', 'N/A')}, "
+            f"current_spend={team_object.spend}, max_budget={team_object.max_budget}"
+        )
+
+        if team_object.spend > team_object.max_budget:
+            verbose_proxy_logger.error(
+                f"[Budget Exceeded] Team Budget - team_id={team_object.team_id}, team_alias={team_object.team_alias}, "
+                f"budget_id={getattr(team_object, 'budget_id', 'N/A')}, "
+                f"current_spend={team_object.spend} > max_budget={team_object.max_budget}"
             )
 
-        raise litellm.BudgetExceededError(
-            current_cost=team_object.spend,
-            max_budget=team_object.max_budget,
-            message=f"Budget has been exceeded! Team={team_object.team_id} Current cost: {team_object.spend}, Max budget: {team_object.max_budget}",
-        )
+            if valid_token:
+                call_info = CallInfo(
+                    token=valid_token.token,
+                    spend=team_object.spend,
+                    max_budget=team_object.max_budget,
+                    user_id=valid_token.user_id,
+                    team_id=valid_token.team_id,
+                    team_alias=valid_token.team_alias,
+                    event_group=Litellm_EntityType.TEAM,
+                )
+                asyncio.create_task(
+                    proxy_logging_obj.budget_alerts(
+                        type="team_budget",
+                        user_info=call_info,
+                    )
+                )
+
+            raise litellm.BudgetExceededError(
+                current_cost=team_object.spend,
+                max_budget=team_object.max_budget,
+                message=f"Budget has been exceeded! Team={team_object.team_id} Current cost: {team_object.spend}, Max budget: {team_object.max_budget}",
+            )
 
 
 def is_model_allowed_by_pattern(model: str, allowed_model_pattern: str) -> bool:

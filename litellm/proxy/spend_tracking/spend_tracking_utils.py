@@ -364,10 +364,10 @@ def get_logging_payload(  # noqa: PLR0915
         if guardrail_info_from_metadata is not None:
             try:
                 guardrail_log_data = {
-                    "request_id": payload.request_id,
-                    "model": payload.model,
-                    "user": payload.user,
-                    "team_id": payload.team_id,
+                    "request_id": payload["request_id"],
+                    "model": payload["model"],
+                    "user": payload["user"],
+                    "team_id": payload["team_id"],
                     "guardrail_information": guardrail_info_from_metadata,
                     "applied_guardrails": applied_guardrails_from_metadata,
                 }

@@ -924,6 +924,7 @@ async def _user_api_key_auth_builder(  # noqa: PLR0915
                     team_member_info = await user_api_key_cache.async_get_cache(
                         key=_cache_key
                     )
+                    _fetched_from = "cache"
                     if team_member_info is None:
                         # read from DB
                         _user_id = valid_token.user_id
@@ -937,6 +938,7 @@ async def _user_api_key_auth_builder(  # noqa: PLR0915
                                 },  # type: ignore
                                 include={"litellm_budget_table": True},
                             )
+                            _fetched_from = "database"
                             await user_api_key_cache.async_set_cache(
                                 key=_cache_key,
                                 value=team_member_info,
@@ -950,8 +952,19 @@ async def _user_api_key_auth_builder(  # noqa: PLR0915
                         team_member_budget = (
                             team_member_info.litellm_budget_table.max_budget
                         )
+                        # @modtag: AAK7S - Log budget check details for debugging
+                        verbose_proxy_logger.info(
+                            f"[Budget Check] Team Member Budget - user_id={valid_token.user_id}, team_id={valid_token.team_id}, "
+                            f"budget_id={team_member_info.budget_id}, cache_key={_cache_key}, fetched_from={_fetched_from}, "
+                            f"current_spend={valid_token.team_member_spend}, max_budget={team_member_budget}"
+                        )
                         if team_member_budget is not None and team_member_budget > 0:
                             if valid_token.team_member_spend > team_member_budget:
+                                verbose_proxy_logger.error(
+                                    f"[Budget Exceeded] Team Member Budget - user_id={valid_token.user_id}, team_id={valid_token.team_id}, "
+                                    f"budget_id={team_member_info.budget_id}, fetched_from={_fetched_from}, "
+                                    f"current_spend={valid_token.team_member_spend} > max_budget={team_member_budget}"
+                                )
                                 raise litellm.BudgetExceededError(
                                     current_cost=valid_token.team_member_spend,
                                     max_budget=team_member_budget,

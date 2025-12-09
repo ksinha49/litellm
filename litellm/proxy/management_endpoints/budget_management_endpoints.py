@@ -144,7 +144,7 @@ async def _invalidate_budget_related_caches(
                 )
 
         # 3. Invalidate team memberships with this budget_id
-        # Team memberships have their own cache: "team_membership:{user_id}:{team_id}"
+        # Team memberships cache key format: "{team_id}_{user_id}" (from user_api_key_auth.py:922)
         team_memberships_with_budget = await prisma_client.db.litellm_teammembership.find_many(
             where={"budget_id": budget_id},
             select={"user_id": True, "team_id": True}
@@ -152,7 +152,7 @@ async def _invalidate_budget_related_caches(
 
         for membership_row in team_memberships_with_budget:
             try:
-                cache_key = f"team_membership:{membership_row.user_id}:{membership_row.team_id}"
+                cache_key = f"{membership_row.team_id}_{membership_row.user_id}"
                 user_api_key_cache.delete_cache(key=cache_key)
                 if proxy_logging_obj is not None:
                     await proxy_logging_obj.internal_usage_cache.dual_cache.async_delete_cache(

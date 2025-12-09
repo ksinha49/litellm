@@ -1322,9 +1322,10 @@ class ProxyLogging:
                 start_time=datetime.now(),
                 **request_data,
             )
-            if "metadata" not in request_data:
+            if "metadata" not in request_data or request_data["metadata"] is None:
                 request_data["metadata"] = {}
-            request_data["metadata"].update(user_api_key_logged_metadata)
+            if user_api_key_logged_metadata is not None:
+                request_data["metadata"].update(user_api_key_logged_metadata)
 
         if litellm_logging_obj is not None:
             ## UPDATE LOGGING INPUT

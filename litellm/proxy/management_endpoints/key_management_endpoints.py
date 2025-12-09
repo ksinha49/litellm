@@ -1151,6 +1151,18 @@ async def update_key_fn(
                     f"Invalidated team cache for team_id={existing_key_row.team_id}"
                 )
 
+            # Invalidate team membership cache (team_id + user_id combination)
+            if existing_key_row.team_id and existing_key_row.user_id:
+                team_member_cache_key = f"{existing_key_row.team_id}_{existing_key_row.user_id}"
+                user_api_key_cache.delete_cache(key=team_member_cache_key)
+                if proxy_logging_obj is not None:
+                    await proxy_logging_obj.internal_usage_cache.dual_cache.async_delete_cache(
+                        key=team_member_cache_key
+                    )
+                verbose_proxy_logger.debug(
+                    f"Invalidated team membership cache for team_id={existing_key_row.team_id}, user_id={existing_key_row.user_id}"
+                )
+
             # Small delay for Redis propagation in distributed deployments
             await asyncio.sleep(0.05)
             verbose_proxy_logger.info("Budget cache invalidation complete")
