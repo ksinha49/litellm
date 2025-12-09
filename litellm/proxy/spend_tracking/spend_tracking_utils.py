@@ -357,6 +357,29 @@ def get_logging_payload(  # noqa: PLR0915
             ),
         )
 
+        # Log guardrails information at INFO level for monitoring (if present)
+        guardrail_info_from_metadata = clean_metadata.get("guardrail_information")
+        applied_guardrails_from_metadata = clean_metadata.get("applied_guardrails")
+
+        if guardrail_info_from_metadata is not None:
+            try:
+                guardrail_log_data = {
+                    "request_id": payload.request_id,
+                    "model": payload.model,
+                    "user": payload.user,
+                    "team_id": payload.team_id,
+                    "guardrail_information": guardrail_info_from_metadata,
+                    "applied_guardrails": applied_guardrails_from_metadata,
+                }
+                verbose_proxy_logger.info(
+                    "[Guardrails] Request processed with guardrails - Data: %s",
+                    json.dumps(guardrail_log_data, indent=2, default=str)
+                )
+            except Exception as e:
+                verbose_proxy_logger.warning(
+                    f"Failed to log guardrails information: {e}"
+                )
+
         verbose_proxy_logger.debug(
             "SpendTable: created payload - payload: %s\n\n",
             json.dumps(payload, indent=4, default=str),

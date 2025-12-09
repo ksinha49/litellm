@@ -24,6 +24,10 @@ from fastapi import APIRouter, Depends, Header, HTTPException, Request, status
 import litellm
 from litellm._logging import verbose_proxy_logger
 from litellm.proxy._types import *
+from litellm.proxy.auth.auth_checks import (
+    _cache_user_object,
+    _delete_cache_user_object,
+)
 from litellm.proxy.auth.user_api_key_auth import user_api_key_auth
 from litellm.proxy.hooks.user_management_event_hooks import UserManagementEventHooks
 from litellm.proxy.management_endpoints.common_daily_activity import (
@@ -898,6 +902,25 @@ async def _update_single_user_helper(
                 user_row_typed = LiteLLM_UserTable(
                     **updated_user_row.model_dump(exclude_none=True)
                 )
+
+                # CRITICAL: Invalidate user cache after budget update
+                # This ensures budget checks use the NEW budget values, not stale cached values
+                from litellm.proxy.proxy_server import user_api_key_cache, proxy_logging_obj
+
+                try:
+                    await _delete_cache_user_object(
+                        user_id=user_row_typed.user_id,
+                        user_api_key_cache=user_api_key_cache,
+                        proxy_logging_obj=proxy_logging_obj,
+                    )
+                    verbose_proxy_logger.debug(
+                        f"Successfully invalidated cache for user_id={user_row_typed.user_id} after budget update"
+                    )
+                except Exception as cache_error:
+                    # Log but don't fail the update if cache invalidation fails
+                    verbose_proxy_logger.warning(
+                        f"Failed to invalidate cache for user {user_row_typed.user_id}: {cache_error}"
+                    )
 
                 # Create audit log asynchronously
                 asyncio.create_task(

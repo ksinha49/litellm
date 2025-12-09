@@ -1126,6 +1126,14 @@ def move_guardrails_to_metadata(
         data[_metadata_variable_name]["guardrail_config"] = data["guardrail_config"]
         del data["guardrail_config"]
 
+    # Log summary of applied guardrails for monitoring
+    guardrails_list = data.get(_metadata_variable_name, {}).get("guardrails", [])
+    if len(guardrails_list) > 0:
+        guardrail_names = [g.get("guardrail_name") for g in guardrails_list if isinstance(g, dict)]
+        verbose_proxy_logger.info(
+            f"[Guardrails] Total guardrails for request: {len(guardrails_list)} - Names: {guardrail_names}"
+        )
+
 
 def add_provider_specific_headers_to_request(
     data: dict,

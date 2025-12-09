@@ -1,9 +1,9 @@
 """
 BUDGET MANAGEMENT
 
-All /budget management endpoints 
+All /budget management endpoints
 
-/budget/new   
+/budget/new
 /budget/info
 /budget/update
 /budget/delete
@@ -12,12 +12,15 @@ All /budget management endpoints
 """
 
 #### BUDGET TABLE MANAGEMENT ####
+import asyncio
 from datetime import timedelta
 
 from fastapi import APIRouter, Depends, HTTPException
 
+from litellm._logging import verbose_proxy_logger
 from litellm.litellm_core_utils.duration_parser import duration_in_seconds
 from litellm.proxy._types import *
+from litellm.proxy.auth.auth_checks import _delete_cache_key_object
 from litellm.proxy.auth.user_api_key_auth import user_api_key_auth
 from litellm.proxy.utils import jsonify_object
 
@@ -74,6 +77,111 @@ async def new_budget(
     return response
 
 
+async def _invalidate_budget_related_caches(
+    budget_id: str,
+    prisma_client: Any,
+    user_api_key_cache: Any,
+    proxy_logging_obj: Any,
+) -> Dict[str, int]:
+    """
+    Invalidate all caches for entities that reference a budget_id.
+
+    This is critical when budget limits are updated - all cached objects using that
+    budget must be invalidated so they fetch fresh budget data.
+
+    Args:
+        budget_id: The budget_id that was updated
+        prisma_client: Database client
+        user_api_key_cache: Cache instance
+        proxy_logging_obj: Logging object with Redis cache access
+
+    Returns:
+        Dict with counts of invalidated objects: {"keys": n, "end_users": n, "teams": n}
+    """
+    from litellm.proxy.utils import hash_token
+
+    counts = {"keys": 0, "end_users": 0, "teams": 0, "team_memberships": 0}
+
+    try:
+        # 1. Invalidate all keys with this budget_id
+        keys_with_budget = await prisma_client.db.litellm_verificationtoken.find_many(
+            where={"budget_id": budget_id},
+            select={"token": True}
+        )
+
+        for key_row in keys_with_budget:
+            try:
+                await _delete_cache_key_object(
+                    hashed_token=key_row.token,  # Token is already hashed in DB
+                    user_api_key_cache=user_api_key_cache,
+                    proxy_logging_obj=proxy_logging_obj,
+                )
+                counts["keys"] += 1
+            except Exception as e:
+                verbose_proxy_logger.warning(
+                    f"Failed to invalidate key cache for token={key_row.token}: {e}"
+                )
+
+        # 2. Invalidate all end users with this budget_id
+        end_users_with_budget = await prisma_client.db.litellm_endusertable.find_many(
+            where={"budget_id": budget_id},
+            select={"user_id": True}
+        )
+
+        for end_user_row in end_users_with_budget:
+            try:
+                # End users are cached as "end_user_id:{user_id}"
+                cache_key = f"end_user_id:{end_user_row.user_id}"
+                user_api_key_cache.delete_cache(key=cache_key)
+                if proxy_logging_obj is not None:
+                    await proxy_logging_obj.internal_usage_cache.dual_cache.async_delete_cache(
+                        key=cache_key
+                    )
+                counts["end_users"] += 1
+            except Exception as e:
+                verbose_proxy_logger.warning(
+                    f"Failed to invalidate end user cache for user_id={end_user_row.user_id}: {e}"
+                )
+
+        # 3. Invalidate team memberships with this budget_id
+        # Team memberships have their own cache: "team_membership:{user_id}:{team_id}"
+        team_memberships_with_budget = await prisma_client.db.litellm_teammembership.find_many(
+            where={"budget_id": budget_id},
+            select={"user_id": True, "team_id": True}
+        )
+
+        for membership_row in team_memberships_with_budget:
+            try:
+                cache_key = f"team_membership:{membership_row.user_id}:{membership_row.team_id}"
+                user_api_key_cache.delete_cache(key=cache_key)
+                if proxy_logging_obj is not None:
+                    await proxy_logging_obj.internal_usage_cache.dual_cache.async_delete_cache(
+                        key=cache_key
+                    )
+                counts["team_memberships"] += 1
+            except Exception as e:
+                verbose_proxy_logger.warning(
+                    f"Failed to invalidate team membership cache: {e}"
+                )
+
+        # 4. Note: Organizations reference budgets but are not cached currently
+        # If organization caching is added in the future, add invalidation here
+
+        verbose_proxy_logger.info(
+            f"Budget cache invalidation for budget_id={budget_id}: "
+            f"Invalidated {counts['keys']} keys, {counts['end_users']} end users, "
+            f"{counts['team_memberships']} team memberships"
+        )
+
+    except Exception as e:
+        verbose_proxy_logger.error(
+            f"Error during budget cache invalidation for budget_id={budget_id}: {e}"
+        )
+        # Don't raise - cache invalidation failure shouldn't break budget updates
+
+    return counts
+
+
 @router.post(
     "/budget/update",
     tags=["budget management"],
@@ -113,6 +221,19 @@ async def update_budget(
             **budget_obj.model_dump(exclude_none=True),  # type: ignore
             "updated_by": user_api_key_dict.user_id or litellm_proxy_admin_name,
         },  # type: ignore
+    )
+
+    # CRITICAL: Invalidate all caches for entities referencing this budget
+    # This ensures budget checks use the NEW budget limits immediately
+    from litellm.proxy.proxy_server import user_api_key_cache, proxy_logging_obj
+
+    asyncio.create_task(
+        _invalidate_budget_related_caches(
+            budget_id=budget_obj.budget_id,
+            prisma_client=prisma_client,
+            user_api_key_cache=user_api_key_cache,
+            proxy_logging_obj=proxy_logging_obj,
+        )
     )
 
     return response

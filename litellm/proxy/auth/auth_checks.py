@@ -878,6 +878,63 @@ async def _delete_cache_key_object(
         )
 
 
+async def _cache_user_object(
+    user_id: str,
+    user_table: LiteLLM_UserTable,
+    user_api_key_cache: DualCache,
+    proxy_logging_obj: Optional[ProxyLogging],
+):
+    """
+    Cache a user object in both in-memory and Redis cache.
+
+    Args:
+        user_id: The user_id to use as cache key
+        user_table: The user object to cache
+        user_api_key_cache: The DualCache instance
+        proxy_logging_obj: Optional proxy logging object for Redis cache access
+    """
+    key = user_id  # Users are cached directly by user_id (see get_user_object line 733)
+
+    # Note: LiteLLM_UserTable doesn't have last_refreshed_at attribute like team/key objects
+    # So we just cache the object as-is
+
+    await _cache_management_object(
+        key=key,
+        value=user_table,
+        user_api_key_cache=user_api_key_cache,
+        proxy_logging_obj=proxy_logging_obj,
+    )
+
+
+async def _delete_cache_user_object(
+    user_id: Optional[str],
+    user_api_key_cache: DualCache,
+    proxy_logging_obj: Optional[ProxyLogging],
+):
+    """
+    Delete a user object from both in-memory and Redis cache.
+
+    Args:
+        user_id: The user_id to delete from cache (can be None)
+        user_api_key_cache: The DualCache instance
+        proxy_logging_obj: Optional proxy logging object for Redis cache access
+    """
+    if user_id is None:
+        verbose_proxy_logger.debug("_delete_cache_user_object: user_id is None, skipping cache deletion")
+        return
+
+    key = user_id  # Users are cached directly by user_id
+
+    # Delete from in-memory cache
+    user_api_key_cache.delete_cache(key=key)
+
+    # Delete from Redis cache if available
+    if proxy_logging_obj is not None:
+        await proxy_logging_obj.internal_usage_cache.dual_cache.async_delete_cache(
+            key=key
+        )
+
+
 @log_db_metrics
 async def _get_team_db_check(
     team_id: str, prisma_client: PrismaClient, team_id_upsert: Optional[bool] = None
