@@ -14,6 +14,7 @@ All /budget management endpoints
 #### BUDGET TABLE MANAGEMENT ####
 import asyncio
 from datetime import timedelta
+from typing import List
 
 from fastapi import APIRouter, Depends, HTTPException
 
@@ -31,6 +32,7 @@ router = APIRouter()
     "/budget/new",
     tags=["budget management"],
     dependencies=[Depends(user_api_key_auth)],
+    response_model=LiteLLM_BudgetTable,
 )
 async def new_budget(
     budget_obj: BudgetNewRequest,
@@ -186,6 +188,7 @@ async def _invalidate_budget_related_caches(
     "/budget/update",
     tags=["budget management"],
     dependencies=[Depends(user_api_key_auth)],
+    response_model=LiteLLM_BudgetTable,
 )
 async def update_budget(
     budget_obj: BudgetNewRequest,
@@ -243,6 +246,7 @@ async def update_budget(
     "/budget/info",
     tags=["budget management"],
     dependencies=[Depends(user_api_key_auth)],
+    response_model=List[LiteLLM_BudgetTable],
 )
 async def info_budget(data: BudgetRequest):
     """
@@ -274,6 +278,7 @@ async def info_budget(data: BudgetRequest):
     "/budget/settings",
     tags=["budget management"],
     dependencies=[Depends(user_api_key_auth)],
+    response_model=List[ConfigList],
 )
 async def budget_settings(
     budget_id: str,
@@ -348,6 +353,7 @@ async def budget_settings(
     "/budget/list",
     tags=["budget management"],
     dependencies=[Depends(user_api_key_auth)],
+    response_model=List[LiteLLM_BudgetTable],
 )
 async def list_budget(
     user_api_key_dict: UserAPIKeyAuth = Depends(user_api_key_auth),
@@ -381,6 +387,7 @@ async def list_budget(
     "/budget/delete",
     tags=["budget management"],
     dependencies=[Depends(user_api_key_auth)],
+    response_model=LiteLLM_BudgetTable,
 )
 async def delete_budget(
     data: BudgetDeleteRequest,

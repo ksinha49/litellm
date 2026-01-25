@@ -2,7 +2,7 @@ import asyncio
 import json
 import time
 from datetime import datetime, timedelta, timezone
-from typing import List, Literal, Optional, Union
+from typing import TYPE_CHECKING, List, Literal, Optional, Union
 
 from litellm._logging import verbose_proxy_logger
 from litellm.proxy._types import (
@@ -15,15 +15,24 @@ from litellm.proxy._types import (
 from litellm.proxy.utils import PrismaClient, ProxyLogging
 from litellm.types.services import ServiceTypes
 
+if TYPE_CHECKING:
+    from litellm.caching.dual_cache import DualCache
+
 
 class ResetBudgetJob:
     """
     Resets the budget for all the keys, users, and teams that need it
     """
 
-    def __init__(self, proxy_logging_obj: ProxyLogging, prisma_client: PrismaClient):
+    def __init__(
+        self,
+        proxy_logging_obj: ProxyLogging,
+        prisma_client: PrismaClient,
+        user_api_key_cache: Optional["DualCache"] = None,
+    ):
         self.proxy_logging_obj: ProxyLogging = proxy_logging_obj
         self.prisma_client: PrismaClient = prisma_client
+        self.user_api_key_cache: Optional["DualCache"] = user_api_key_cache
 
     async def reset_budget(
         self,
@@ -258,6 +267,9 @@ class ResetBudgetJob:
                         table_name="key",
                     )
 
+                    # Invalidate cache for reset keys to ensure fresh data is fetched
+                    await self._invalidate_cache_for_keys(updated_keys)
+
             end_time = time.time()
             if len(failed_keys) > 0:  # If any keys failed to reset
                 raise Exception(
@@ -342,6 +354,9 @@ class ResetBudgetJob:
                         data_list=updated_users,
                         table_name="user",
                     )
+
+                    # Invalidate cache for reset users to ensure fresh data is fetched
+                    await self._invalidate_cache_for_users(updated_users)
 
             end_time = time.time()
             if len(failed_users) > 0:  # If any users failed to reset
@@ -434,6 +449,9 @@ class ResetBudgetJob:
                         table_name="team",
                     )
 
+                    # Invalidate cache for reset teams to ensure fresh data is fetched
+                    await self._invalidate_cache_for_teams(updated_teams)
+
             end_time = time.time()
             if len(failed_teams) > 0:  # If any teams failed to reset
                 raise Exception(
@@ -480,6 +498,92 @@ class ResetBudgetJob:
                 )
             )
             verbose_proxy_logger.exception("Failed to reset budget for teams: %s", e)
+
+    async def _invalidate_cache_for_keys(
+        self, keys: List[LiteLLM_VerificationToken]
+    ) -> None:
+        """
+        Invalidate cache entries for keys whose budgets have been reset.
+        This ensures that subsequent requests fetch fresh data from the database.
+        """
+        if self.user_api_key_cache is None:
+            verbose_proxy_logger.debug(
+                "Skipping key cache invalidation - user_api_key_cache not available"
+            )
+            return
+
+        invalidated_count = 0
+        for key in keys:
+            try:
+                if key.token:
+                    self.user_api_key_cache.delete_cache(key=key.token)
+                    invalidated_count += 1
+            except Exception as e:
+                verbose_proxy_logger.warning(
+                    f"Failed to invalidate cache for key {key.token[:16] if key.token else 'N/A'}...: {e}"
+                )
+
+        verbose_proxy_logger.info(
+            f"[Budget Reset] Invalidated cache for {invalidated_count} keys after budget reset"
+        )
+
+    async def _invalidate_cache_for_users(
+        self, users: List[LiteLLM_UserTable]
+    ) -> None:
+        """
+        Invalidate cache entries for users whose budgets have been reset.
+        This ensures that subsequent requests fetch fresh data from the database.
+        """
+        if self.user_api_key_cache is None:
+            verbose_proxy_logger.debug(
+                "Skipping user cache invalidation - user_api_key_cache not available"
+            )
+            return
+
+        invalidated_count = 0
+        for user in users:
+            try:
+                if user.user_id:
+                    self.user_api_key_cache.delete_cache(key=user.user_id)
+                    invalidated_count += 1
+            except Exception as e:
+                verbose_proxy_logger.warning(
+                    f"Failed to invalidate cache for user {user.user_id}: {e}"
+                )
+
+        verbose_proxy_logger.info(
+            f"[Budget Reset] Invalidated cache for {invalidated_count} users after budget reset"
+        )
+
+    async def _invalidate_cache_for_teams(
+        self, teams: List[LiteLLM_TeamTable]
+    ) -> None:
+        """
+        Invalidate cache entries for teams whose budgets have been reset.
+        This ensures that subsequent requests fetch fresh data from the database.
+        """
+        if self.user_api_key_cache is None:
+            verbose_proxy_logger.debug(
+                "Skipping team cache invalidation - user_api_key_cache not available"
+            )
+            return
+
+        invalidated_count = 0
+        for team in teams:
+            try:
+                if team.team_id:
+                    # Teams are cached with the key format "team_id:{team_id}"
+                    cache_key = f"team_id:{team.team_id}"
+                    self.user_api_key_cache.delete_cache(key=cache_key)
+                    invalidated_count += 1
+            except Exception as e:
+                verbose_proxy_logger.warning(
+                    f"Failed to invalidate cache for team {team.team_id}: {e}"
+                )
+
+        verbose_proxy_logger.info(
+            f"[Budget Reset] Invalidated cache for {invalidated_count} teams after budget reset"
+        )
 
     @staticmethod
     async def _reset_budget_common(

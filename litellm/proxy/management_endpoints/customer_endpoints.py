@@ -52,7 +52,7 @@ async def block_user(data: BlockUsers):
         }'
         ```
     """
-    from litellm.proxy.proxy_server import prisma_client
+    from litellm.proxy.proxy_server import prisma_client, user_api_key_cache
 
     try:
         records = []
@@ -66,6 +66,15 @@ async def block_user(data: BlockUsers):
                     },
                 )
                 records.append(record)
+
+            # Invalidate end-user cache for all blocked users
+            if user_api_key_cache is not None:
+                for user_id in data.user_ids:
+                    cache_key = f"end_user_id:{user_id}"
+                    user_api_key_cache.delete_cache(key=cache_key)
+                verbose_proxy_logger.debug(
+                    f"Invalidated end-user cache for blocked users: {data.user_ids}"
+                )
         else:
             raise HTTPException(
                 status_code=500,
@@ -417,7 +426,7 @@ async def update_end_user(
     ```
     """
 
-    from litellm.proxy.proxy_server import prisma_client
+    from litellm.proxy.proxy_server import prisma_client, user_api_key_cache
 
     try:
         data_json: dict = data.json()
@@ -502,6 +511,15 @@ async def update_end_user(
             verbose_proxy_logger.debug(
                 f"received response from updating prisma client. response={response}"
             )
+
+            # Invalidate end-user cache after update to ensure fresh data is used
+            if user_api_key_cache is not None:
+                cache_key = f"end_user_id:{data.user_id}"
+                user_api_key_cache.delete_cache(key=cache_key)
+                verbose_proxy_logger.debug(
+                    f"Invalidated end-user cache for key={cache_key}"
+                )
+
             return response
         else:
             raise ValueError(f"user_id is required, passed user_id = {data.user_id}")
@@ -565,7 +583,7 @@ async def delete_end_user(
     See below for all params 
     ```
     """
-    from litellm.proxy.proxy_server import prisma_client
+    from litellm.proxy.proxy_server import prisma_client, user_api_key_cache
 
     try:
         if prisma_client is None:
@@ -591,6 +609,16 @@ async def delete_end_user(
             verbose_proxy_logger.debug(
                 f"received response from updating prisma client. response={response}"
             )
+
+            # Invalidate end-user cache for all deleted users
+            if user_api_key_cache is not None:
+                for user_id in data.user_ids:
+                    cache_key = f"end_user_id:{user_id}"
+                    user_api_key_cache.delete_cache(key=cache_key)
+                verbose_proxy_logger.debug(
+                    f"Invalidated end-user cache for deleted users: {data.user_ids}"
+                )
+
             return {
                 "deleted_customers": response,
                 "message": "Successfully deleted customers with ids: "

@@ -3864,6 +3864,7 @@ class ProxyStartupEvent:
             budget_reset_job = ResetBudgetJob(
                 proxy_logging_obj=proxy_logging_obj,
                 prisma_client=prisma_client,
+                user_api_key_cache=user_api_key_cache,  # Pass cache for invalidation after budget reset
             )
 
             scheduler.add_job(

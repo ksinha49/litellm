@@ -2115,6 +2115,7 @@ class LiteLLM_SpendLogs(LiteLLMPydanticObjectBase):
     completion_tokens: Optional[int] = 0
     startTime: Union[str, datetime, None]
     endTime: Union[str, datetime, None]
+    completionStartTime: Optional[datetime] = None
     user: Optional[str] = ""
     metadata: Optional[Json] = {}
     cache_hit: Optional[str] = "False"
@@ -2123,6 +2124,16 @@ class LiteLLM_SpendLogs(LiteLLMPydanticObjectBase):
     requester_ip_address: Optional[str] = None
     messages: Optional[Union[str, list, dict]]
     response: Optional[Union[str, list, dict]]
+    # Fields from database schema that were previously missing
+    model_id: Optional[str] = ""
+    model_group: Optional[str] = ""
+    custom_llm_provider: Optional[str] = ""
+    team_id: Optional[str] = None
+    end_user: Optional[str] = None
+    session_id: Optional[str] = None
+    status: Optional[str] = None
+    mcp_namespaced_tool_name: Optional[str] = None
+    proxy_server_request: Optional[Json] = None
 
 
 class LiteLLM_ErrorLogs(LiteLLMPydanticObjectBase):

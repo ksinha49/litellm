@@ -254,7 +254,7 @@ async def update_organization(
     """
     Update an organization
     """
-    from litellm.proxy.proxy_server import prisma_client
+    from litellm.proxy.proxy_server import prisma_client, user_api_key_cache
 
     if prisma_client is None:
         raise HTTPException(
@@ -298,6 +298,27 @@ async def update_organization(
         data=updated_organization_row,
         include={"members": True, "teams": True, "litellm_budget_table": True},
     )
+
+    # Invalidate cache for organization and all associated teams
+    if user_api_key_cache is not None:
+        # Invalidate organization cache
+        org_cache_key = f"organization_id:{data.organization_id}"
+        user_api_key_cache.delete_cache(key=org_cache_key)
+        verbose_proxy_logger.debug(
+            f"Invalidated organization cache for key={org_cache_key}"
+        )
+
+        # Cascade invalidation to all teams in this organization
+        teams_in_org = await prisma_client.db.litellm_teamtable.find_many(
+            where={"organization_id": data.organization_id}
+        )
+        for team in teams_in_org:
+            team_cache_key = f"team_id:{team.team_id}"
+            user_api_key_cache.delete_cache(key=team_cache_key)
+        if teams_in_org:
+            verbose_proxy_logger.debug(
+                f"Invalidated cache for {len(teams_in_org)} teams in organization={data.organization_id}"
+            )
 
     return response
 
@@ -346,7 +367,7 @@ async def delete_organization(
 
     - organization_ids: List[str] - The organization ids to delete.
     """
-    from litellm.proxy.proxy_server import prisma_client
+    from litellm.proxy.proxy_server import prisma_client, user_api_key_cache
 
     if prisma_client is None:
         raise HTTPException(
@@ -362,6 +383,14 @@ async def delete_organization(
 
     deleted_orgs = []
     for organization_id in data.organization_ids:
+        # Get teams and keys before deletion for cache invalidation
+        teams_to_invalidate = await prisma_client.db.litellm_teamtable.find_many(
+            where={"organization_id": organization_id}
+        )
+        keys_to_invalidate = await prisma_client.db.litellm_verificationtoken.find_many(
+            where={"organization_id": organization_id}
+        )
+
         # delete all teams in the organization
         await prisma_client.db.litellm_teamtable.delete_many(
             where={"organization_id": organization_id}
@@ -384,6 +413,28 @@ async def delete_organization(
                 status_code=404,
                 detail={"error": f"Organization={organization_id} not found"},
             )
+
+        # Invalidate caches for deleted organization, teams, and keys
+        if user_api_key_cache is not None:
+            # Invalidate organization cache
+            org_cache_key = f"organization_id:{organization_id}"
+            user_api_key_cache.delete_cache(key=org_cache_key)
+
+            # Invalidate team caches
+            for team in teams_to_invalidate:
+                team_cache_key = f"team_id:{team.team_id}"
+                user_api_key_cache.delete_cache(key=team_cache_key)
+
+            # Invalidate key caches
+            for key in keys_to_invalidate:
+                if key.token:
+                    user_api_key_cache.delete_cache(key=key.token)
+
+            verbose_proxy_logger.debug(
+                f"Invalidated caches for organization={organization_id}, "
+                f"{len(teams_to_invalidate)} teams, {len(keys_to_invalidate)} keys"
+            )
+
         deleted_orgs.append(deleted_org)
 
     return deleted_orgs

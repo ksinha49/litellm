@@ -931,6 +931,31 @@ async def update_team(
         proxy_logging_obj=proxy_logging_obj,
     )
 
+    # Cascade cache invalidation to API keys and team memberships
+    # This ensures keys using cached team data get fresh limits after team update
+    if user_api_key_cache is not None:
+        # Invalidate all API keys belonging to this team
+        keys_in_team = await prisma_client.db.litellm_verificationtoken.find_many(
+            where={"team_id": data.team_id}
+        )
+        for key in keys_in_team:
+            if key.token:
+                user_api_key_cache.delete_cache(key=key.token)
+
+        # Invalidate all team membership entries
+        memberships = await prisma_client.db.litellm_teammembership.find_many(
+            where={"team_id": data.team_id}
+        )
+        for membership in memberships:
+            membership_cache_key = f"{data.team_id}_{membership.user_id}"
+            user_api_key_cache.delete_cache(key=membership_cache_key)
+
+        if keys_in_team or memberships:
+            verbose_proxy_logger.debug(
+                f"Cascade invalidated {len(keys_in_team)} key caches and "
+                f"{len(memberships)} membership caches for team={data.team_id}"
+            )
+
     # Enterprise Feature - Audit Logging. Enable with litellm.store_audit_logs = True
     if litellm.store_audit_logs is True:
         _before_value = existing_team_row.json(exclude_none=True)
@@ -1541,7 +1566,7 @@ async def team_member_update(
 
     Update team member budgets and team member role
     """
-    from litellm.proxy.proxy_server import premium_user, prisma_client
+    from litellm.proxy.proxy_server import premium_user, prisma_client, user_api_key_cache
 
     if prisma_client is None:
         raise HTTPException(status_code=500, detail={"error": "No db connected"})
@@ -1655,6 +1680,24 @@ async def team_member_update(
         await prisma_client.db.litellm_teamtable.update(
             where={"team_id": data.team_id},
             data={"members_with_roles": json.dumps(_db_team_members)},  # type: ignore
+        )
+
+    # Invalidate caches for team membership and user after update
+    if user_api_key_cache is not None:
+        # Invalidate team membership cache
+        membership_cache_key = f"{data.team_id}_{received_user_id}"
+        user_api_key_cache.delete_cache(key=membership_cache_key)
+
+        # Invalidate user cache
+        user_api_key_cache.delete_cache(key=received_user_id)
+
+        # Invalidate team cache as well since members_with_roles may have changed
+        team_cache_key = f"team_id:{data.team_id}"
+        user_api_key_cache.delete_cache(key=team_cache_key)
+
+        verbose_proxy_logger.debug(
+            f"Invalidated caches for team_member_update: membership={membership_cache_key}, "
+            f"user={received_user_id}, team={team_cache_key}"
         )
 
     return TeamMemberUpdateResponse(
