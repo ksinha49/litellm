@@ -27,6 +27,7 @@ from litellm.proxy.auth.auth_checks import (
     _cache_key_object,
     _get_user_role,
     _is_user_proxy_admin,
+    _should_reset_budget,
     _virtual_key_max_budget_check,
     _virtual_key_soft_budget_check,
     can_key_call_model,
@@ -959,14 +960,36 @@ async def _user_api_key_auth_builder(  # noqa: PLR0915
                             f"current_spend={valid_token.team_member_spend}, max_budget={team_member_budget}"
                         )
                         if team_member_budget is not None and team_member_budget > 0:
-                            if valid_token.team_member_spend > team_member_budget:
+                            ####################################
+                            # On-demand budget reset check     #
+                            ####################################
+                            # Check if budget_reset_at has passed - if so, treat spend as 0
+                            # This handles the case where the background job hasn't run yet
+                            # but the budget period has already passed
+                            effective_spend = valid_token.team_member_spend
+                            budget_reset_at = getattr(
+                                team_member_info.litellm_budget_table,
+                                "budget_reset_at",
+                                None,
+                            )
+                            if _should_reset_budget(budget_reset_at):
+                                verbose_proxy_logger.info(
+                                    f"[Budget Reset] On-demand reset detected for team member - "
+                                    f"user_id={valid_token.user_id}, team_id={valid_token.team_id}, "
+                                    f"budget_id={team_member_info.budget_id}, "
+                                    f"budget_reset_at={budget_reset_at} is in the past, "
+                                    f"treating spend as 0 instead of {valid_token.team_member_spend}"
+                                )
+                                effective_spend = 0.0
+
+                            if effective_spend > team_member_budget:
                                 verbose_proxy_logger.error(
                                     f"[Budget Exceeded] Team Member Budget - user_id={valid_token.user_id}, team_id={valid_token.team_id}, "
                                     f"budget_id={team_member_info.budget_id}, fetched_from={_fetched_from}, "
-                                    f"current_spend={valid_token.team_member_spend} > max_budget={team_member_budget}"
+                                    f"effective_spend={effective_spend} > max_budget={team_member_budget}"
                                 )
                                 raise litellm.BudgetExceededError(
-                                    current_cost=valid_token.team_member_spend,
+                                    current_cost=effective_spend,
                                     max_budget=team_member_budget,
                                 )
 
