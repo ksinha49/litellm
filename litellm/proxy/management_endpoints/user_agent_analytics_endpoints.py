@@ -118,12 +118,15 @@ async def get_distinct_user_agent_tags(
         )
     
     try:
+        # Only include tags that start with "User-Agent:" prefix
+        # The old filter `OR dts.tag NOT LIKE '%:%'` was too broad and included non-user-agent tags
+        # Also filter out NULL tags to prevent frontend errors
         sql_query = f"""
-        SELECT 
+        SELECT
             dts.tag,
             COUNT(*) as usage_count
         FROM "LiteLLM_DailyTagSpend" dts
-        WHERE dts.tag LIKE 'User-Agent:%' OR dts.tag NOT LIKE '%:%'
+        WHERE dts.tag IS NOT NULL AND dts.tag LIKE 'User-Agent:%'
         GROUP BY dts.tag
         ORDER BY usage_count DESC
         LIMIT {MAX_TAGS}
@@ -194,9 +197,11 @@ async def get_daily_active_users(
         start_date = start_dt.strftime("%Y-%m-%d")
         
         # Build SQL query with optional tag filter(s)
-        where_clause = "WHERE dts.date >= $1 AND dts.date <= $2 AND vt.user_id IS NOT NULL"
+        # Use LEFT JOIN and count api_keys as fallback when user_id is not available
+        # Filter out NULL tags to prevent frontend errors
+        where_clause = "WHERE dts.date >= $1 AND dts.date <= $2 AND dts.tag IS NOT NULL"
         params = [start_date, end_date]
-        
+
         # Handle multiple tag filters (takes precedence over single tag filter)
         if tag_filters and len(tag_filters) > 0:
             tag_conditions = []
@@ -208,14 +213,16 @@ async def get_daily_active_users(
         elif tag_filter:
             where_clause += " AND dts.tag ILIKE $3"
             params.append(f"%{tag_filter}%")
-        
+
+        # Use COALESCE to count user_id when available, otherwise count api_key
+        # This ensures we still get active user counts even when API keys don't have user_id set
         sql_query = f"""
-        SELECT 
+        SELECT
             dts.tag,
             dts.date,
-            COUNT(DISTINCT vt.user_id) as active_users
+            COUNT(DISTINCT COALESCE(vt.user_id, dts.api_key)) as active_users
         FROM "LiteLLM_DailyTagSpend" dts
-        INNER JOIN "LiteLLM_VerificationToken" vt ON dts.api_key = vt.token
+        LEFT JOIN "LiteLLM_VerificationToken" vt ON dts.api_key = vt.token
         {where_clause}
         GROUP BY dts.tag, dts.date
         ORDER BY dts.date DESC, active_users DESC
@@ -295,9 +302,11 @@ async def get_weekly_active_users(
         start_date = start_dt.strftime("%Y-%m-%d")
         
         # Build SQL query with optional tag filter(s)
-        where_clause = "WHERE dts.date >= $1 AND dts.date <= $2 AND vt.user_id IS NOT NULL"
+        # Use LEFT JOIN and count api_keys as fallback when user_id is not available
+        # Filter out NULL tags to prevent frontend errors
+        where_clause = "WHERE dts.date >= $1 AND dts.date <= $2 AND dts.tag IS NOT NULL"
         params = [start_date, end_date]
-        
+
         # Handle multiple tag filters (takes precedence over single tag filter)
         if tag_filters and len(tag_filters) > 0:
             tag_conditions = []
@@ -309,25 +318,26 @@ async def get_weekly_active_users(
         elif tag_filter:
             where_clause += " AND dts.tag ILIKE $3"
             params.append(f"%{tag_filter}%")
-        
+
         # Use window function to group by weeks with clear week numbering
+        # Use COALESCE to count user_id when available, otherwise count api_key
         sql_query = f"""
         WITH weekly_data AS (
-            SELECT 
+            SELECT
                 dts.tag,
                 dts.date,
-                vt.user_id,
+                COALESCE(vt.user_id, dts.api_key) as user_or_key,
                 -- Calculate week number (0 = Week 1 most recent, 1 = Week 2, etc.)
                 FLOOR((DATE '{end_date}' - dts.date::date) / 7) as week_offset
             FROM "LiteLLM_DailyTagSpend" dts
-            INNER JOIN "LiteLLM_VerificationToken" vt ON dts.api_key = vt.token
+            LEFT JOIN "LiteLLM_VerificationToken" vt ON dts.api_key = vt.token
             {where_clause}
         )
-        SELECT 
+        SELECT
             tag,
-            COUNT(DISTINCT user_id) as active_users,
+            COUNT(DISTINCT user_or_key) as active_users,
             -- Week identifier with month and day (Week 1 (earliest), Week 2, etc.)
-            'Week ' || ({MAX_WEEKS} - week_offset)::text || ' (' || 
+            'Week ' || ({MAX_WEEKS} - week_offset)::text || ' (' ||
             TO_CHAR(DATE '{end_date}' - (week_offset * 7 || ' days')::interval - '6 days'::interval, 'Mon DD') || ')' as date,
             -- Calculate week start and end dates for each week
             (DATE '{end_date}' - (week_offset * 7 || ' days')::interval - '6 days'::interval)::text as period_start,
@@ -415,9 +425,11 @@ async def get_monthly_active_users(
         start_date = start_dt.strftime("%Y-%m-%d")
         
         # Build SQL query with optional tag filter(s)
-        where_clause = "WHERE dts.date >= $1 AND dts.date <= $2 AND vt.user_id IS NOT NULL"
+        # Use LEFT JOIN and count api_keys as fallback when user_id is not available
+        # Filter out NULL tags to prevent frontend errors
+        where_clause = "WHERE dts.date >= $1 AND dts.date <= $2 AND dts.tag IS NOT NULL"
         params = [start_date, end_date]
-        
+
         # Handle multiple tag filters (takes precedence over single tag filter)
         if tag_filters and len(tag_filters) > 0:
             tag_conditions = []
@@ -429,25 +441,26 @@ async def get_monthly_active_users(
         elif tag_filter:
             where_clause += " AND dts.tag ILIKE $3"
             params.append(f"%{tag_filter}%")
-        
+
         # Use window function to group by months (30-day periods) with clear month numbering
+        # Use COALESCE to count user_id when available, otherwise count api_key
         sql_query = f"""
         WITH monthly_data AS (
-            SELECT 
+            SELECT
                 dts.tag,
                 dts.date,
-                vt.user_id,
+                COALESCE(vt.user_id, dts.api_key) as user_or_key,
                 -- Calculate month number (0 = Month 1 most recent, 1 = Month 2, etc.)
                 FLOOR((DATE '{end_date}' - dts.date::date) / 30) as month_offset
             FROM "LiteLLM_DailyTagSpend" dts
-            INNER JOIN "LiteLLM_VerificationToken" vt ON dts.api_key = vt.token
+            LEFT JOIN "LiteLLM_VerificationToken" vt ON dts.api_key = vt.token
             {where_clause}
         )
-        SELECT 
+        SELECT
             tag,
-            COUNT(DISTINCT user_id) as active_users,
+            COUNT(DISTINCT user_or_key) as active_users,
             -- Month identifier with month name (Month 1 (earliest), Month 2, etc.)
-            'Month ' || ({MAX_MONTHS} - month_offset)::text || ' (' || 
+            'Month ' || ({MAX_MONTHS} - month_offset)::text || ' (' ||
             TO_CHAR(DATE '{end_date}' - (month_offset * 30 || ' days')::interval - '29 days'::interval, 'Mon') || ')' as date,
             -- Calculate month start and end dates for each month
             (DATE '{end_date}' - (month_offset * 30 || ' days')::interval - '29 days'::interval)::text as period_start,
@@ -530,9 +543,10 @@ async def get_tag_summary(
         datetime.strptime(end_date, "%Y-%m-%d")
         
         # Build SQL query with optional tag filter(s)
-        where_clause = "WHERE dts.date >= $1 AND dts.date <= $2"
+        # Filter out NULL tags to prevent frontend errors
+        where_clause = "WHERE dts.date >= $1 AND dts.date <= $2 AND dts.tag IS NOT NULL"
         params = [start_date, end_date]
-        
+
         # Handle multiple tag filters (takes precedence over single tag filter)
         if tag_filters and len(tag_filters) > 0:
             tag_conditions = []
@@ -544,11 +558,13 @@ async def get_tag_summary(
         elif tag_filter:
             where_clause += " AND dts.tag ILIKE $3"
             params.append(f"%{tag_filter}%")
-        
+
+        # Use COALESCE to count user_id when available, otherwise count api_key
+        # This ensures we still get unique user counts even when API keys don't have user_id set
         sql_query = f"""
-        SELECT 
+        SELECT
             dts.tag,
-            COUNT(DISTINCT vt.user_id) as unique_users,
+            COUNT(DISTINCT COALESCE(vt.user_id, dts.api_key)) as unique_users,
             SUM(dts.api_requests) as total_requests,
             SUM(dts.successful_requests) as successful_requests,
             SUM(dts.failed_requests) as failed_requests,
