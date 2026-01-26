@@ -549,3 +549,25 @@ if MCP_AVAILABLE:
 
         return mcp_server_record_updated
 
+else:
+    # MCP module not available - provide helpful error responses instead of 404
+    # This prevents the UI from showing "Failed to get MCP tools" errors
+
+    @router.get("/tools", tags=["mcp"])
+    async def get_mcp_tools_unavailable():
+        """MCP tools endpoint fallback when MCP module is not installed"""
+        return {
+            "tools": [],
+            "warning": "MCP module is not installed. Install with: pip install mcp"
+        }
+
+    @router.get("/server", tags=["mcp"])
+    async def get_mcp_servers_unavailable():
+        """MCP servers endpoint fallback when MCP module is not installed"""
+        return []
+
+    @router.get("/access_groups", tags=["mcp"])
+    async def get_mcp_access_groups_unavailable():
+        """MCP access groups endpoint fallback when MCP module is not installed"""
+        return {"access_groups": []}
+
