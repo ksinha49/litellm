@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect } from "react";
+import React, { useState, useMemo, useEffect, useCallback } from "react";
 import { Button, Input, Select } from "antd";
 import { FilterIcon } from "@heroicons/react/outline";
 import debounce from "lodash/debounce";
@@ -47,8 +47,9 @@ const FilterComponent: React.FC<FilterComponentProps> = ({
     [key: string]: boolean;
   }>({});
 
-  const debouncedSearch = useCallback(
-    debounce(async (value: string, option: FilterOption) => {
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- debounce creates new function reference, dependencies tracked manually
+  const debouncedSearch = useMemo(
+    () => debounce(async (value: string, option: FilterOption) => {
       if (!option.isSearchable || !option.searchFn) return;
 
       setSearchLoadingMap((prev) => ({ ...prev, [option.name]: true }));
@@ -62,8 +63,15 @@ const FilterComponent: React.FC<FilterComponentProps> = ({
         setSearchLoadingMap((prev) => ({ ...prev, [option.name]: false }));
       }
     }, 300),
-    [setSearchLoadingMap, setSearchOptionsMap]
+    []
   );
+
+  // Cleanup debounce on unmount
+  useEffect(() => {
+    return () => {
+      debouncedSearch.cancel();
+    };
+  }, [debouncedSearch]);
 
   // Load initial options for searchable filters
   const loadInitialOptions = useCallback(async (option: FilterOption) => {

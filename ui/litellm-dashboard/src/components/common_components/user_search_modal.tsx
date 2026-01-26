@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { Modal, Form, Button, Select, Tooltip } from 'antd';
 import debounce from 'lodash/debounce';
 import { userFilterUICall } from "@/components/networking";
@@ -86,10 +86,18 @@ const UserSearchModal: React.FC<UserSearchModalProps> = ({
     }
   };
 
-  const debouncedSearch = useCallback(
-    debounce((text: string, fieldName: 'user_email' | 'user_id') => fetchUsers(text, fieldName), 300),
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- debounce creates new function reference, dependencies tracked manually
+  const debouncedSearch = useMemo(
+    () => debounce((text: string, fieldName: 'user_email' | 'user_id') => fetchUsers(text, fieldName), 300),
     [accessToken]
   );
+
+  // Cleanup debounce on unmount
+  useEffect(() => {
+    return () => {
+      debouncedSearch.cancel();
+    };
+  }, [debouncedSearch]);
 
   const handleSearch = (value: string, fieldName: 'user_email' | 'user_id'): void => {
     setSelectedField(fieldName);

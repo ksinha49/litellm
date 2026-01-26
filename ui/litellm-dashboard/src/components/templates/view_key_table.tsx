@@ -236,12 +236,12 @@ const ViewKeyTable: React.FC<ViewKeyTableProps> = ({
 
     // When a new duration is entered
     if (regenerateFormData?.duration) {
-      setNewExpiryTime(calculateNewExpiryTime(regenerateFormData.duration))
+      const calculatedTime = calculateNewExpiryTime(regenerateFormData.duration);
+      setNewExpiryTime(calculatedTime);
     } else {
-      setNewExpiryTime(null)
+      setNewExpiryTime(null);
     }
-
-    console.log("calculateNewExpiryTime:", newExpiryTime)
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- calculateNewExpiryTime is defined inside effect, newExpiryTime is only set not read
   }, [selectedToken, regenerateFormData?.duration])
 
   useEffect(() => {

@@ -1,5 +1,5 @@
 "use client"
-import React, { useState, useEffect, useRef, useCallback } from "react"
+import React, { useState, useEffect, useRef, useCallback, useMemo } from "react"
 import { Button, TextInput, Grid, Col, Select as TremorSelect, SelectItem } from "@tremor/react"
 import { Card, Metric, Text, Title, Subtitle, Accordion, AccordionHeader, AccordionBody } from "@tremor/react"
 import { CopyToClipboard } from "react-copy-to-clipboard"
@@ -442,10 +442,18 @@ const CreateKey: React.FC<CreateKeyProps> = ({
     }
   }, [accessToken]);
 
-  const debouncedSearch = useCallback(
-    debounce((text: string) => fetchUsers(text), 300),
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- debounce creates new function reference, fetchUsers is stable via useCallback
+  const debouncedSearch = useMemo(
+    () => debounce((text: string) => fetchUsers(text), 300),
     [fetchUsers]
   );
+
+  // Cleanup debounce on unmount
+  useEffect(() => {
+    return () => {
+      debouncedSearch.cancel();
+    };
+  }, [debouncedSearch]);
 
   const handleUserSearch = (value: string): void => {
     debouncedSearch(value);

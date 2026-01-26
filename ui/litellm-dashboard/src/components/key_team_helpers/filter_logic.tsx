@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, useRef } from "react";
+import { useCallback, useEffect, useState, useRef, useMemo } from "react";
 import { KeyResponse } from "../key_team_helpers/key_list";
 import { keyListCall, Organization } from "../networking";
 import { Team } from "../key_team_helpers/key_list";
@@ -44,8 +44,9 @@ export function useFilterLogic({
   const [allOrganizations, setAllOrganizations] = useState<Organization[]>(organizations || []);
   const [filteredKeys, setFilteredKeys] = useState<KeyResponse[]>(keys);
   const lastSearchTimestamp = useRef(0);
-  const debouncedSearch = useCallback(
-    debounce(async (filters: FilterState) => {
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- debounce creates new function reference, dependencies tracked manually
+  const debouncedSearch = useMemo(
+    () => debounce(async (filters: FilterState) => {
       if (!accessToken) {
         return;
       }
@@ -72,16 +73,21 @@ export function useFilterLogic({
         if (currentTimestamp === lastSearchTimestamp.current) {
           if (data) {
             setFilteredKeys(data.keys);
-            console.log("called from debouncedSearch filters:", JSON.stringify(filters));
-            console.log("called from debouncedSearch data:", JSON.stringify(data));
           }
         }
       } catch (error) {
         console.error("Error searching users:", error);
       }
     }, 300),
-    [accessToken, setFilteredKeys]
+    [accessToken]
   );
+
+  // Cleanup debounce on unmount
+  useEffect(() => {
+    return () => {
+      debouncedSearch.cancel();
+    };
+  }, [debouncedSearch]);
   // Apply filters to keys whenever keys or filters change
   useEffect(() => {
     if (!keys) {

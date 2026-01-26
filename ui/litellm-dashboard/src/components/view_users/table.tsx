@@ -66,10 +66,11 @@ export function UserDataTable({
   const [selectedUserId, setSelectedUserId] = React.useState<string | null>(null);
   const [openInEditMode, setOpenInEditMode] = React.useState<boolean>(false);
 
-  const handleUserClick = (userId: string, openInEditMode: boolean = false) => {
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- handleUserClick is stable with empty deps, ESLint false positive
+  const handleUserClick = React.useCallback((userId: string, openInEditMode: boolean = false) => {
     setSelectedUserId(userId);
     setOpenInEditMode(openInEditMode);
-  };
+  }, []);
 
   const handleCloseUserInfo = () => {
     setSelectedUserId(null);
