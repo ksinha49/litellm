@@ -957,16 +957,23 @@ async def _user_api_key_auth_builder(  # noqa: PLR0915
                         verbose_proxy_logger.info(
                             f"[Budget Check] Team Member Budget - user_id={valid_token.user_id}, team_id={valid_token.team_id}, "
                             f"budget_id={team_member_info.budget_id}, cache_key={_cache_key}, fetched_from={_fetched_from}, "
-                            f"current_spend={valid_token.team_member_spend}, max_budget={team_member_budget}"
+                            f"db_spend={team_member_info.spend}, cached_spend={valid_token.team_member_spend}, max_budget={team_member_budget}"
                         )
                         if team_member_budget is not None and team_member_budget > 0:
+                            ####################################
+                            # Use fresh spend from database    #
+                            ####################################
+                            # IMPORTANT: Use team_member_info.spend (fresh from DB) instead of
+                            # valid_token.team_member_spend (cached in API key) to ensure we
+                            # see the reset spend value after budget reset job runs.
+                            effective_spend = team_member_info.spend or 0.0
+
                             ####################################
                             # On-demand budget reset check     #
                             ####################################
                             # Check if budget_reset_at has passed - if so, treat spend as 0
                             # This handles the case where the background job hasn't run yet
                             # but the budget period has already passed
-                            effective_spend = valid_token.team_member_spend
                             budget_reset_at = getattr(
                                 team_member_info.litellm_budget_table,
                                 "budget_reset_at",
@@ -978,7 +985,7 @@ async def _user_api_key_auth_builder(  # noqa: PLR0915
                                     f"user_id={valid_token.user_id}, team_id={valid_token.team_id}, "
                                     f"budget_id={team_member_info.budget_id}, "
                                     f"budget_reset_at={budget_reset_at} is in the past, "
-                                    f"treating spend as 0 instead of {valid_token.team_member_spend}"
+                                    f"treating spend as 0 instead of {effective_spend}"
                                 )
                                 effective_spend = 0.0
 
