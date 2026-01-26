@@ -100,18 +100,17 @@ const UserAgentActivity: React.FC<UserAgentActivityProps> = ({
   
   const [isDateChanging, setIsDateChanging] = useState(false);
 
-  // Use today's date as the end date for all API calls
-  const today = new Date();
-
   const fetchAvailableTags = useCallback(async () => {
     if (!accessToken) return;
 
     setTagsLoading(true);
     try {
       const data = await tagDistinctCall(accessToken);
-      setAvailableTags(data.results.map((item: DistinctTagResponse) => item.tag));
+      const results = data?.results || [];
+      setAvailableTags(results.map((item: DistinctTagResponse) => item.tag));
     } catch (error) {
       console.error("Failed to fetch available tags:", error);
+      setAvailableTags([]);
     } finally {
       setTagsLoading(false);
     }
@@ -122,15 +121,18 @@ const UserAgentActivity: React.FC<UserAgentActivityProps> = ({
 
     setDauLoading(true);
     try {
+      // Use current date at time of fetch
+      const today = new Date();
       const data = await tagDauCall(
         accessToken,
         today,
         userAgentFilter || undefined,
         selectedTags.length > 0 ? selectedTags : undefined
       );
-      setDauData(data);
+      setDauData(data?.results ? data : { results: [] });
     } catch (error) {
       console.error("Failed to fetch DAU data:", error);
+      setDauData({ results: [] });
     } finally {
       setDauLoading(false);
     }
@@ -141,15 +143,18 @@ const UserAgentActivity: React.FC<UserAgentActivityProps> = ({
 
     setWauLoading(true);
     try {
+      // Use current date at time of fetch
+      const today = new Date();
       const data = await tagWauCall(
         accessToken,
         today,
         userAgentFilter || undefined,
         selectedTags.length > 0 ? selectedTags : undefined
       );
-      setWauData(data);
+      setWauData(data?.results ? data : { results: [] });
     } catch (error) {
       console.error("Failed to fetch WAU data:", error);
+      setWauData({ results: [] });
     } finally {
       setWauLoading(false);
     }
@@ -160,15 +165,18 @@ const UserAgentActivity: React.FC<UserAgentActivityProps> = ({
 
     setMauLoading(true);
     try {
+      // Use current date at time of fetch
+      const today = new Date();
       const data = await tagMauCall(
         accessToken,
         today,
         userAgentFilter || undefined,
         selectedTags.length > 0 ? selectedTags : undefined
       );
-      setMauData(data);
+      setMauData(data?.results ? data : { results: [] });
     } catch (error) {
       console.error("Failed to fetch MAU data:", error);
+      setMauData({ results: [] });
     } finally {
       setMauLoading(false);
     }
@@ -185,9 +193,10 @@ const UserAgentActivity: React.FC<UserAgentActivityProps> = ({
         dateValue.to,
         selectedTags.length > 0 ? selectedTags : undefined
       );
-      setSummaryData(summary);
+      setSummaryData(summary?.results ? summary : { results: [] });
     } catch (error) {
       console.error("Failed to fetch user agent summary data:", error);
+      setSummaryData({ results: [] });
     } finally {
       setSummaryLoading(false);
       setIsDateChanging(false);

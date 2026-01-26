@@ -73,9 +73,22 @@ const PerUserUsage: React.FC<PerUserUsageProps> = ({
         50,
         selectedTags.length > 0 ? selectedTags : undefined
       );
-      setPerUserData(response);
+      setPerUserData(response?.results ? response : {
+        results: [],
+        total_count: 0,
+        page: 1,
+        page_size: 50,
+        total_pages: 0,
+      });
     } catch (error) {
       console.error("Failed to fetch per-user data:", error);
+      setPerUserData({
+        results: [],
+        total_count: 0,
+        page: 1,
+        page_size: 50,
+        total_pages: 0,
+      });
     } finally {
       setLoading(false);
     }

@@ -76,7 +76,7 @@ const ModelFilters: React.FC<ModelFiltersProps> = ({
   const filteredData = useMemo(() => {
     return modelHubData?.filter(model => {
       const matchesSearch = model.model_group.toLowerCase().includes(searchTerm.toLowerCase());
-      const matchesProvider = selectedProvider === "" || model.providers.includes(selectedProvider);
+      const matchesProvider = selectedProvider === "" || model.providers?.includes(selectedProvider);
       const matchesMode = selectedMode === "" || model.mode === selectedMode;
       
       // Check if model has the selected feature
