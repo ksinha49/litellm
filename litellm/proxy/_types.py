@@ -369,6 +369,7 @@ class LiteLLMRoutes(enum.Enum):
         "/organization/list",
         "/team/available",
         "/user/info",
+        "/user/list",
         "/model/info",
         "/v1/model/info",
         "/v2/model/info",
@@ -379,6 +380,7 @@ class LiteLLMRoutes(enum.Enum):
         "/user/filter/ui",
         "/models",
         "/v1/models",
+        "/v1/mcp/tools",
     ]
 
     # NOTE: ROUTES ONLY FOR MASTER KEY - only the Master Key should be able to Reset Spend
@@ -530,8 +532,7 @@ class LiteLLMRoutes(enum.Enum):
 
     # Routes accessible by Admin Viewer (read-only admin access)
     admin_viewer_routes = [
-        "/user/list",
-        "/user/available_users", 
+        "/user/available_users",
         "/user/available_roles",
         "/user/daily/activity",
         "/team/daily/activity",
