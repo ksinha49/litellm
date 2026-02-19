@@ -13,6 +13,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
 const appName = process.env.NEXT_PUBLIC_APP_NAME || "Ameritas LiteLLM";
+const rootPath = process.env.NEXT_PUBLIC_SERVER_ROOT_PATH || "";
 
 function LoginPageContent() {
   const [username, setUsername] = useState("");
@@ -74,7 +75,8 @@ function LoginPageContent() {
         <Card className="w-full max-w-lg shadow-md">
           <Space direction="vertical" size="middle" className="w-full">
             <div className="text-center">
-              <Title level={2}>🚅 {appName}</Title>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={`${rootPath}/assets/logos/ameritas_logo.png`} alt={`${appName} logo`} style={{ height: 48, width: "auto", margin: "0 auto" }} />
             </div>
 
             <Alert

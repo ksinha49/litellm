@@ -53,13 +53,8 @@ const Navbar: React.FC<NavbarProps> = ({
   const version = healthData?.litellm_version;
 
   const rootPath = process.env.NEXT_PUBLIC_SERVER_ROOT_PATH || "";
-  const defaultLogoUrl = `${rootPath}/favicon.png`;
+  const defaultLogoUrl = `${rootPath}/assets/logos/ameritas_logo.png`;
   const imageUrl = logoUrl || defaultLogoUrl;
-
-  // Split appName into two display lines (e.g. "Ameritas" / "LiteLLM")
-  const labelParts = appName.split(" ");
-  const topLabel = labelParts[0] || "";
-  const bottomLabel = labelParts.slice(1).join(" ") || labelParts[0] || "";
 
   useEffect(() => {
     const initializeProxySettings = async () => {
@@ -105,14 +100,9 @@ const Navbar: React.FC<NavbarProps> = ({
                 <img
                   src={imageUrl}
                   alt={`${appName} logo`}
-                  className="h-8 w-8 object-contain"
-                  width={32}
-                  height={32}
+                  className="h-8 object-contain"
+                  style={{ width: "auto", maxWidth: "160px" }}
                 />
-                <span className="ml-2 flex flex-col leading-tight" aria-hidden="true">
-                  <span className="text-base font-medium text-gray-900">{topLabel}</span>
-                  <span className="text-lg font-bold text-gray-900">{bottomLabel}</span>
-                </span>
               </Link>
               {version && (
                 <Tag className="text-xs font-medium cursor-pointer">
