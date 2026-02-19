@@ -12,6 +12,8 @@ import { Alert, Button, Card, Form, Input, Popover, Space, Typography } from "an
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
+const appName = process.env.NEXT_PUBLIC_APP_NAME || "Ameritas LiteLLM";
+
 function LoginPageContent() {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
@@ -72,7 +74,7 @@ function LoginPageContent() {
         <Card className="w-full max-w-lg shadow-md">
           <Space direction="vertical" size="middle" className="w-full">
             <div className="text-center">
-              <Title level={2}>🚅 LiteLLM</Title>
+              <Title level={2}>🚅 {appName}</Title>
             </div>
 
             <Alert
@@ -102,12 +104,12 @@ function LoginPageContent() {
       <Card className="w-full max-w-lg shadow-md">
         <Space direction="vertical" size="middle" className="w-full">
           <div className="text-center">
-            <Title level={2}>🚅 LiteLLM</Title>
+            <Title level={2}>🚅 {appName}</Title>
           </div>
 
           <div className="text-center">
             <Title level={3}>Login</Title>
-            <Text type="secondary">Access your LiteLLM Admin UI.</Text>
+            <Text type="secondary">Access your {appName} Admin UI.</Text>
           </div>
 
           <Alert
@@ -116,7 +118,7 @@ function LoginPageContent() {
               <>
                 <Paragraph className="text-sm">
                   By default, Username is <code className="bg-gray-100 px-1 py-0.5 rounded text-xs">admin</code> and
-                  Password is your set LiteLLM Proxy
+                  Password is your set {appName} Proxy
                   <code className="bg-gray-100 px-1 py-0.5 rounded text-xs">MASTER_KEY</code>.
                 </Paragraph>
                 <Paragraph className="text-sm">

@@ -12,6 +12,8 @@ import {
 import { Switch, Tag } from "antd";
 import Link from "next/link";
 import React, { useEffect, useState } from "react";
+
+const appName = process.env.NEXT_PUBLIC_APP_NAME || "Ameritas LiteLLM";
 import { CommunityEngagementButtons } from "./Navbar/CommunityEngagementButtons/CommunityEngagementButtons";
 import UserDropdown from "./Navbar/UserDropdown/UserDropdown";
 
@@ -97,7 +99,7 @@ const Navbar: React.FC<NavbarProps> = ({
                   <div className="h-10 max-w-48 flex items-center justify-center overflow-hidden">
                     <img
                       src={imageUrl}
-                      alt="LiteLLM Brand"
+                      alt={`${appName} Brand`}
                       className="max-w-full max-h-full w-auto h-auto object-contain"
                     />
                   </div>
@@ -108,7 +110,7 @@ const Navbar: React.FC<NavbarProps> = ({
                   <span
                     className="absolute -top-1 -left-2 text-lg animate-bounce"
                     style={{ animationDuration: "2s" }}
-                    title="Thanks for using LiteLLM!"
+                    title={`Thanks for using ${appName}!`}
                   >
                     ❄️
                   </span>

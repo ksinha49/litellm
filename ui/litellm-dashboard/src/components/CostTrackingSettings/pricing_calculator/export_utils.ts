@@ -1,6 +1,8 @@
 import { CostEstimateResponse } from "../types";
 import { formatNumberWithCommas } from "@/utils/dataUtils";
 
+const appName = process.env.NEXT_PUBLIC_APP_NAME || "Ameritas LiteLLM";
+
 const formatCostForExport = (value: number | null | undefined): string => {
   if (value === null || value === undefined) return "-";
   if (value === 0) return "$0.00";
@@ -89,7 +91,7 @@ export const exportToPDF = (result: CostEstimateResponse): void => {
       </style>
     </head>
     <body>
-      <h1>🚅 LiteLLM Cost Estimate Report</h1>
+      <h1>🚅 ${appName} Cost Estimate Report</h1>
       
       <div class="meta">
         <p><strong>Model:</strong> ${result.model}</p>
@@ -214,7 +216,7 @@ export const exportToPDF = (result: CostEstimateResponse): void => {
 
 export const exportToCSV = (result: CostEstimateResponse): void => {
   const rows = [
-    ["🚅 LiteLLM Cost Estimate Report"],
+    ["🚅 ${appName} Cost Estimate Report"],
     [""],
     ["Configuration"],
     ["Model", result.model],
