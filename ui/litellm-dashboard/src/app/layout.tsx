@@ -6,9 +6,11 @@ import AntdGlobalProvider from "@/contexts/AntdGlobalProvider";
 
 const inter = Inter({ subsets: ["latin"] });
 
+const appName = process.env.NEXT_PUBLIC_APP_NAME || "Ameritas LiteLLM";
+
 export const metadata: Metadata = {
-  title: "LiteLLM Dashboard",
-  description: "LiteLLM Proxy Admin UI",
+  title: `${appName} Dashboard`,
+  description: `${appName} Proxy Admin UI`,
   icons: { icon: "./favicon.ico" },
 };
 
