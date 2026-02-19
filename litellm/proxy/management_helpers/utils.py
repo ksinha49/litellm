@@ -1,6 +1,6 @@
 # What is this?
 ## Helper utils for the management endpoints (keys/users/teams)
-from datetime import datetime
+from datetime import datetime, timedelta
 from functools import wraps
 from typing import Optional, Tuple
 
@@ -28,6 +28,7 @@ from litellm.proxy._types import (  # key request types; user request types; tea
     UserAPIKeyAuth,
     VirtualKeyEvent,
 )
+from litellm.litellm_core_utils.duration_parser import duration_in_seconds
 from litellm.proxy.common_utils.http_parsing_utils import _read_request_body
 from litellm.proxy.utils import PrismaClient
 
@@ -146,6 +147,7 @@ async def add_new_member(
     user_api_key_dict: UserAPIKeyAuth,
     litellm_proxy_admin_name: str,
     default_team_budget_id: Optional[str] = None,
+    budget_duration: Optional[str] = None,
 ) -> Tuple[LiteLLM_UserTable, Optional[LiteLLM_TeamMembership]]:
     """
     Add a new member to a team
@@ -208,13 +210,20 @@ async def add_new_member(
 
     if max_budget_in_team is not None:
         # create a new budget item for this member
-        response = await prisma_client.db.litellm_budgettable.create(
-            data={
-                "max_budget": max_budget_in_team,
-                "created_by": user_api_key_dict.user_id or litellm_proxy_admin_name,
-                "updated_by": user_api_key_dict.user_id or litellm_proxy_admin_name,
-            }
-        )
+        budget_data: dict = {
+            "max_budget": max_budget_in_team,
+            "created_by": user_api_key_dict.user_id or litellm_proxy_admin_name,
+            "updated_by": user_api_key_dict.user_id or litellm_proxy_admin_name,
+        }
+
+        # Include budget_duration and budget_reset_at so the reset job can find this budget
+        if budget_duration is not None:
+            budget_data["budget_duration"] = budget_duration
+            budget_data["budget_reset_at"] = datetime.utcnow() + timedelta(
+                seconds=duration_in_seconds(duration=budget_duration)
+            )
+
+        response = await prisma_client.db.litellm_budgettable.create(data=budget_data)
 
         _budget_id = response.budget_id
     else:

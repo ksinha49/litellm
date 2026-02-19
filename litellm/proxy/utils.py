@@ -97,10 +97,7 @@ from litellm.proxy._types import (
     UserAPIKeyAuth,
 )
 from litellm.proxy.auth.route_checks import RouteChecks
-from litellm.proxy.db.create_views import (
-    create_missing_views,
-    should_create_missing_views,
-)
+from litellm.proxy.db.create_views import create_missing_views
 from litellm.proxy.db.db_spend_update_writer import DBSpendUpdateWriter
 from litellm.proxy.db.log_db_metrics import log_db_metrics
 from litellm.proxy.db.prisma_client import PrismaWrapper
@@ -1810,9 +1807,10 @@ class ProxyLogging:
                 start_time=datetime.now(),
                 **request_data,
             )
-            if "metadata" not in request_data:
+            if "metadata" not in request_data or request_data["metadata"] is None:
                 request_data["metadata"] = {}
-            request_data["metadata"].update(user_api_key_logged_metadata)
+            if user_api_key_logged_metadata is not None:
+                request_data["metadata"].update(user_api_key_logged_metadata)
 
         if litellm_logging_obj is not None:
             ## UPDATE LOGGING INPUT
@@ -2394,24 +2392,8 @@ class PrismaClient:
                         "LiteLLM_VerificationTokenView Created in DB!"
                     )
                 else:
-                    should_create_views = await should_create_missing_views(db=self.db)
-                    if should_create_views:
-                        await create_missing_views(db=self.db)
-                    else:
-                        # don't block execution if these views are missing
-                        # Convert lists to sets for efficient difference calculation
-                        ret_view_names_set = (
-                            set(ret[0]["view_names"]) if ret[0]["view_names"] else set()
-                        )
-                        expected_views_set = set(expected_views)
-                        # Find missing views
-                        missing_views = expected_views_set - ret_view_names_set
-
-                        verbose_proxy_logger.warning(
-                            "\n\n\033[93mNot all views exist in db, needed for UI 'Usage' tab. Missing={}.\nRun 'create_views.py' from https://github.com/BerriAI/litellm/tree/main/db_scripts to create missing views.\033[0m\n".format(
-                                missing_views
-                            )
-                        )
+                    # Always create missing views regardless of SpendLogs table state
+                    await create_missing_views(db=self.db)
 
         except Exception:
             raise

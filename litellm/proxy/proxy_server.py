@@ -1699,6 +1699,19 @@ async def update_cache(  # noqa: PLR0915
 
         # Update the cost column for the given token
         existing_spend_obj.spend = new_spend
+
+        # @modtag: AAK7S - Budget cache invalidation fix
+        # Check if cache was invalidated during request processing
+        # Prevents race condition where stale budget data gets re-cached after invalidation
+        current_cached_obj = await user_api_key_cache.async_get_cache(key=hashed_token)
+        if current_cached_obj is None:
+            # Cache was deleted (likely due to budget update) - don't re-cache stale data
+            verbose_proxy_logger.info(
+                f"Skipping re-cache for key {hashed_token[:16]}... - cache was invalidated during request processing"
+            )
+            return
+
+        # Cache still exists, safe to update
         values_to_update_in_cache.append((hashed_token, existing_spend_obj))
 
     ### UPDATE USER SPEND ###
@@ -5401,6 +5414,7 @@ class ProxyStartupEvent:
             budget_reset_job = ResetBudgetJob(
                 proxy_logging_obj=proxy_logging_obj,
                 prisma_client=prisma_client,
+                user_api_key_cache=user_api_key_cache,  # Pass cache for invalidation after budget reset
             )
 
             scheduler.add_job(

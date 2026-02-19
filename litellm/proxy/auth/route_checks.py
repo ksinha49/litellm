@@ -85,6 +85,13 @@ class RouteChecks:
                         ):
                             return True
 
+        # info routes are read-only and access-controlled by their own handlers,
+        # so always allow them for authenticated virtual keys
+        if RouteChecks.check_route_access(
+            route=route, allowed_routes=LiteLLMRoutes.info_routes.value
+        ):
+            return True
+
         # check if wildcard pattern is allowed
         for allowed_route in valid_token.allowed_routes:
             if RouteChecks._route_matches_wildcard_pattern(
@@ -182,6 +189,17 @@ class RouteChecks:
                         status_code=status.HTTP_403_FORBIDDEN,
                         detail="key not allowed to access this user's info. user_id={}, key's user_id={}".format(
                             user_id, valid_token.user_id
+                        ),
+                    )
+            elif route == "/user/list":
+                # non-admin users can only list their own user info
+                query_params = request.query_params
+                user_ids = query_params.get("user_ids")
+                if user_ids and user_ids != valid_token.user_id:
+                    raise HTTPException(
+                        status_code=status.HTTP_403_FORBIDDEN,
+                        detail="key not allowed to list other users' info. user_ids={}, key's user_id={}".format(
+                            user_ids, valid_token.user_id
                         ),
                     )
             elif route == "/model/info":

@@ -11,6 +11,7 @@ Run checks for:
 import asyncio
 import re
 import time
+from datetime import datetime, timezone
 from typing import (TYPE_CHECKING, Any, Dict, List, Literal, Optional, Union,
                     cast)
 
@@ -261,11 +262,23 @@ async def common_checks(
             and user_object.max_budget is not None
         ):
             user_budget = user_object.max_budget
-            if user_budget < user_object.spend:
+            # On-demand budget reset check for user
+            user_effective_spend = user_object.spend
+            user_budget_reset_at = getattr(user_object, "budget_reset_at", None)
+            if _should_reset_budget(user_budget_reset_at):
+                verbose_proxy_logger.info(
+                    f"[Budget Reset] On-demand reset detected for user - "
+                    f"user_id={user_object.user_id}, "
+                    f"budget_reset_at={user_budget_reset_at} is in the past, "
+                    f"treating spend as 0 instead of {user_object.spend}"
+                )
+                user_effective_spend = 0.0
+
+            if user_budget < user_effective_spend:
                 raise litellm.BudgetExceededError(
-                    current_cost=user_object.spend,
+                    current_cost=user_effective_spend,
                     max_budget=user_budget,
-                    message=f"ExceededBudget: User={user_object.user_id} over budget. Spend={user_object.spend}, Budget={user_budget}",
+                    message=f"ExceededBudget: User={user_object.user_id} over budget. Spend={user_effective_spend}, Budget={user_budget}",
                 )
 
         ## 4.2 check team member budget, if team key
@@ -281,11 +294,25 @@ async def common_checks(
         # 5. If end_user ('user' passed to /chat/completions, /embeddings endpoint) is in budget
         if end_user_object is not None and end_user_object.litellm_budget_table is not None:
             end_user_budget = end_user_object.litellm_budget_table.max_budget
-            if end_user_budget is not None and end_user_object.spend > end_user_budget:
+            # On-demand budget reset check for end_user (using budget table's reset_at)
+            end_user_effective_spend = end_user_object.spend
+            end_user_budget_reset_at = getattr(
+                end_user_object.litellm_budget_table, "budget_reset_at", None
+            )
+            if _should_reset_budget(end_user_budget_reset_at):
+                verbose_proxy_logger.info(
+                    f"[Budget Reset] On-demand reset detected for end_user - "
+                    f"user_id={end_user_object.user_id}, "
+                    f"budget_reset_at={end_user_budget_reset_at} is in the past, "
+                    f"treating spend as 0 instead of {end_user_object.spend}"
+                )
+                end_user_effective_spend = 0.0
+
+            if end_user_budget is not None and end_user_effective_spend > end_user_budget:
                 raise litellm.BudgetExceededError(
-                    current_cost=end_user_object.spend,
+                    current_cost=end_user_effective_spend,
                     max_budget=end_user_budget,
-                    message=f"ExceededBudget: End User={end_user_object.user_id} over budget. Spend={end_user_object.spend}, Budget={end_user_budget}",
+                    message=f"ExceededBudget: End User={end_user_object.user_id} over budget. Spend={end_user_effective_spend}, Budget={end_user_budget}",
                 )
 
     # 6. [OPTIONAL] If 'enforce_user_param' enabled - did developer pass in 'user' param for openai endpoints
@@ -757,6 +784,31 @@ async def get_end_user_object(
         return None
 
     _key = "end_user_id:{}".format(end_user_id)
+
+    def check_in_budget(end_user_obj: LiteLLM_EndUserTable):
+        if route in LiteLLMRoutes.info_routes.value:  # allow calling info routes
+            return
+        if end_user_obj.litellm_budget_table is None:
+            return
+        end_user_budget = end_user_obj.litellm_budget_table.max_budget
+        # On-demand budget reset check
+        end_user_effective_spend = end_user_obj.spend
+        end_user_budget_reset_at = getattr(
+            end_user_obj.litellm_budget_table, "budget_reset_at", None
+        )
+        if _should_reset_budget(end_user_budget_reset_at):
+            verbose_proxy_logger.info(
+                f"[Budget Reset] On-demand reset detected for end_user in check_in_budget - "
+                f"user_id={end_user_obj.user_id}, "
+                f"budget_reset_at={end_user_budget_reset_at} is in the past, "
+                f"treating spend as 0 instead of {end_user_obj.spend}"
+            )
+            end_user_effective_spend = 0.0
+
+        if end_user_budget is not None and end_user_effective_spend > end_user_budget:
+            raise litellm.BudgetExceededError(
+                current_cost=end_user_effective_spend, max_budget=end_user_budget
+            )
 
     # Check cache first
     cached_user_obj = await user_api_key_cache.async_get_cache(key=_key)
@@ -1300,6 +1352,63 @@ async def _delete_cache_key_object(
         )
 
 
+async def _cache_user_object(
+    user_id: str,
+    user_table: LiteLLM_UserTable,
+    user_api_key_cache: DualCache,
+    proxy_logging_obj: Optional[ProxyLogging],
+):
+    """
+    Cache a user object in both in-memory and Redis cache.
+
+    Args:
+        user_id: The user_id to use as cache key
+        user_table: The user object to cache
+        user_api_key_cache: The DualCache instance
+        proxy_logging_obj: Optional proxy logging object for Redis cache access
+    """
+    key = user_id  # Users are cached directly by user_id (see get_user_object line 733)
+
+    # Note: LiteLLM_UserTable doesn't have last_refreshed_at attribute like team/key objects
+    # So we just cache the object as-is
+
+    await _cache_management_object(
+        key=key,
+        value=user_table,
+        user_api_key_cache=user_api_key_cache,
+        proxy_logging_obj=proxy_logging_obj,
+    )
+
+
+async def _delete_cache_user_object(
+    user_id: Optional[str],
+    user_api_key_cache: DualCache,
+    proxy_logging_obj: Optional[ProxyLogging],
+):
+    """
+    Delete a user object from both in-memory and Redis cache.
+
+    Args:
+        user_id: The user_id to delete from cache (can be None)
+        user_api_key_cache: The DualCache instance
+        proxy_logging_obj: Optional proxy logging object for Redis cache access
+    """
+    if user_id is None:
+        verbose_proxy_logger.debug("_delete_cache_user_object: user_id is None, skipping cache deletion")
+        return
+
+    key = user_id  # Users are cached directly by user_id
+
+    # Delete from in-memory cache
+    user_api_key_cache.delete_cache(key=key)
+
+    # Delete from Redis cache if available
+    if proxy_logging_obj is not None:
+        await proxy_logging_obj.internal_usage_cache.dual_cache.async_delete_cache(
+            key=key
+        )
+
+
 @log_db_metrics
 async def _get_team_db_check(
     team_id: str, prisma_client: PrismaClient, team_id_upsert: Optional[bool] = None
@@ -1458,6 +1567,11 @@ async def get_team_object(
         )
 
         if cached_team_obj is not None:
+            # @modtag: AAK7S - Log team object retrieved from cache
+            verbose_proxy_logger.debug(
+                f"[Cache Hit] Team object retrieved from cache - team_id={team_id}, cache_key={key}, "
+                f"max_budget={cached_team_obj.max_budget}, spend={cached_team_obj.spend}"
+            )
             return cached_team_obj
 
         if check_cache_only:
@@ -1470,7 +1584,7 @@ async def get_team_object(
 
     # else, check db
     try:
-        return await _get_team_object_from_user_api_key_cache(
+        team_obj = await _get_team_object_from_user_api_key_cache(
             team_id=team_id,
             prisma_client=prisma_client,
             user_api_key_cache=user_api_key_cache,
@@ -1480,6 +1594,12 @@ async def get_team_object(
             key=key,
             team_id_upsert=team_id_upsert,
         )
+        # @modtag: AAK7S - Log team object retrieved from database
+        verbose_proxy_logger.info(
+            f"[DB Fetch] Team object retrieved from database - team_id={team_id}, cache_key={key}, "
+            f"max_budget={team_obj.max_budget}, spend={team_obj.spend}"
+        )
+        return team_obj
     except Exception:
         raise HTTPException(
             status_code=404,
@@ -2337,6 +2457,12 @@ def _can_object_call_model(
         ):
             return True
 
+    # @modtag: AAK7S - Log model access denial before raising exception
+    verbose_proxy_logger.error(
+        f"[Model Access Denied] {object_type} not allowed to access model. "
+        f"Model requested: {model}, Allowed models: {models}"
+    )
+
     raise ProxyException(
         message=f"{object_type} not allowed to access model. This {object_type} can only access models={models}. Tried to access {model}",
         type=ProxyErrorTypes.get_model_access_error_type_for_object(
@@ -2523,6 +2649,30 @@ async def is_valid_fallback_model(
     return True
 
 
+def _should_reset_budget(budget_reset_at: Optional[datetime]) -> bool:
+    """
+    Check if the budget should have been reset based on budget_reset_at timestamp.
+
+    This is an on-demand check that handles the case where:
+    - The budget period has passed (budget_reset_at < current_time)
+    - But the background reset job hasn't run yet
+
+    Returns:
+        True if budget_reset_at is set and is in the past, indicating the budget
+        should be treated as reset (spend = 0) for this check.
+    """
+    if budget_reset_at is None:
+        return False
+
+    current_time = datetime.now(timezone.utc)
+
+    # Handle naive datetime (no timezone info) by assuming UTC
+    if budget_reset_at.tzinfo is None:
+        budget_reset_at = budget_reset_at.replace(tzinfo=timezone.utc)
+
+    return budget_reset_at < current_time
+
+
 async def _virtual_key_max_budget_check(
     valid_token: UserAPIKeyAuth,
     proxy_logging_obj: ProxyLogging,
@@ -2564,12 +2714,40 @@ async def _virtual_key_max_budget_check(
         )
 
         ####################################
+        # On-demand budget reset check     #
+        ####################################
+        # Check if budget_reset_at has passed - if so, treat spend as 0
+        # This handles the case where the background job hasn't run yet
+        # but the budget period has already passed
+        effective_spend = valid_token.spend
+        if _should_reset_budget(valid_token.budget_reset_at):
+            verbose_proxy_logger.info(
+                f"[Budget Reset] On-demand reset detected for API key - "
+                f"token={valid_token.token[:16] if valid_token.token else 'N/A'}..., "
+                f"budget_reset_at={valid_token.budget_reset_at} is in the past, "
+                f"treating spend as 0 instead of {valid_token.spend}"
+            )
+            effective_spend = 0.0
+
+        ####################################
         # collect information for alerting #
         ####################################
 
-        if valid_token.spend >= valid_token.max_budget:
+        # @modtag: AAK7S - Log API key budget check details for debugging
+        verbose_proxy_logger.info(
+            f"[Budget Check] API Key Budget - token={valid_token.token[:16] if valid_token.token else 'N/A'}..., "
+            f"key_alias={valid_token.key_alias}, user_id={valid_token.user_id}, team_id={valid_token.team_id}, "
+            f"current_spend={valid_token.spend}, effective_spend={effective_spend}, max_budget={valid_token.max_budget}"
+        )
+
+        if effective_spend >= valid_token.max_budget:
+            verbose_proxy_logger.error(
+                f"[Budget Exceeded] API Key Budget - token={valid_token.token[:16] if valid_token.token else 'N/A'}..., "
+                f"key_alias={valid_token.key_alias}, user_id={valid_token.user_id}, team_id={valid_token.team_id}, "
+                f"effective_spend={effective_spend} >= max_budget={valid_token.max_budget}"
+            )
             raise litellm.BudgetExceededError(
-                current_cost=valid_token.spend,
+                current_cost=effective_spend,
                 max_budget=valid_token.max_budget,
             )
 
@@ -2724,31 +2902,58 @@ async def _team_max_budget_check(
         team_object is not None
         and team_object.max_budget is not None
         and team_object.spend is not None
-        and team_object.spend > team_object.max_budget
     ):
-        if valid_token:
-            call_info = CallInfo(
-                token=valid_token.token,
-                spend=team_object.spend,
-                max_budget=team_object.max_budget,
-                user_id=valid_token.user_id,
-                team_id=valid_token.team_id,
-                team_alias=valid_token.team_alias,
-                organization_id=valid_token.org_id,
-                event_group=Litellm_EntityType.TEAM,
+        ####################################
+        # On-demand budget reset check     #
+        ####################################
+        # Check if budget_reset_at has passed - if so, treat spend as 0
+        effective_spend = team_object.spend
+        team_budget_reset_at = getattr(team_object, "budget_reset_at", None)
+        if _should_reset_budget(team_budget_reset_at):
+            verbose_proxy_logger.info(
+                f"[Budget Reset] On-demand reset detected for team - "
+                f"team_id={team_object.team_id}, "
+                f"budget_reset_at={team_budget_reset_at} is in the past, "
+                f"treating spend as 0 instead of {team_object.spend}"
             )
-            asyncio.create_task(
-                proxy_logging_obj.budget_alerts(
-                    type="team_budget",
-                    user_info=call_info,
-                )
+            effective_spend = 0.0
+
+        # @modtag: AAK7S - Log team budget check details for debugging
+        verbose_proxy_logger.info(
+            f"[Budget Check] Team Budget - team_id={team_object.team_id}, team_alias={team_object.team_alias}, "
+            f"budget_id={getattr(team_object, 'budget_id', 'N/A')}, "
+            f"current_spend={team_object.spend}, effective_spend={effective_spend}, max_budget={team_object.max_budget}"
+        )
+
+        if effective_spend > team_object.max_budget:
+            verbose_proxy_logger.error(
+                f"[Budget Exceeded] Team Budget - team_id={team_object.team_id}, team_alias={team_object.team_alias}, "
+                f"budget_id={getattr(team_object, 'budget_id', 'N/A')}, "
+                f"effective_spend={effective_spend} > max_budget={team_object.max_budget}"
             )
 
-        raise litellm.BudgetExceededError(
-            current_cost=team_object.spend,
-            max_budget=team_object.max_budget,
-            message=f"Budget has been exceeded! Team={team_object.team_id} Current cost: {team_object.spend}, Max budget: {team_object.max_budget}",
-        )
+            if valid_token:
+                call_info = CallInfo(
+                    token=valid_token.token,
+                    spend=effective_spend,
+                    max_budget=team_object.max_budget,
+                    user_id=valid_token.user_id,
+                    team_id=valid_token.team_id,
+                    team_alias=valid_token.team_alias,
+                    event_group=Litellm_EntityType.TEAM,
+                )
+                asyncio.create_task(
+                    proxy_logging_obj.budget_alerts(
+                        type="team_budget",
+                        user_info=call_info,
+                    )
+                )
+
+            raise litellm.BudgetExceededError(
+                current_cost=effective_spend,
+                max_budget=team_object.max_budget,
+                message=f"Budget has been exceeded! Team={team_object.team_id} Current cost: {effective_spend}, Max budget: {team_object.max_budget}",
+            )
 
 
 async def _team_soft_budget_check(
