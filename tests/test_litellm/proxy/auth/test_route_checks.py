@@ -340,10 +340,13 @@ def test_virtual_key_allowed_routes_with_no_member_names_only_explicit():
     assert result1 is True
     assert result2 is True
 
-    # Test that non-allowed route raises HTTPException
+    # Test that non-allowed route raises HTTPException.
+    # Note: /user/info is in LiteLLMRoutes.info_routes and is unconditionally allowed
+    # for authenticated virtual keys (upstream v1.81.13 behaviour), so use a
+    # management route that is not in info_routes.
     with pytest.raises(HTTPException) as exc_info:
         RouteChecks.is_virtual_key_allowed_to_call_route(
-            route="/user/info",
+            route="/model/delete",
             valid_token=valid_token,  # Not in allowed routes
         )
 

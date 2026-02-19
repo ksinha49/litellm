@@ -66,9 +66,17 @@ mock_prisma_client.db.litellm_teamtable = MagicMock()
 mock_prisma_client.db.litellm_teamtable.update = AsyncMock()
 
 
+def _setup_cascade_async_mocks(db_mock: MagicMock) -> None:
+    """Set AsyncMock on the two DB tables that update_team() awaits for cache invalidation."""
+    db_mock.litellm_verificationtoken.find_many = AsyncMock(return_value=[])
+    db_mock.litellm_teammembership.find_many = AsyncMock(return_value=[])
+
+
 # Fixture to provide the mock prisma client
 @pytest.fixture(autouse=True)
 def mock_db_client():
+    # Cascade cache invalidation in update_team() awaits find_many on these tables
+    _setup_cascade_async_mocks(mock_prisma_client.db)
     with patch(
         "litellm.proxy.proxy_server.prisma_client", mock_prisma_client
     ):  # Mock in both places if necessary
