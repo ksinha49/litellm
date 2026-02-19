@@ -92,12 +92,25 @@ interface PublicModelHubProps {
   isEmbedded?: boolean; // When true, hides navbar and adjusts layout for embedding in dashboard
 }
 
+const appName = process.env.NEXT_PUBLIC_APP_NAME || "Ameritas LiteLLM";
+
+const defaultDocsDescription =
+  `${appName} has deployed a centralized AI Services Hub built on LiteLLM to give every team ` +
+  `consistent, secure, and scalable access to generative AI. The hub abstracts multiple language ` +
+  `models behind a unified API, automatically handling authentication, budget controls, rate limits, ` +
+  `and observability so developers can focus on building features rather than managing infrastructure.\n\n` +
+  `Across the enterprise, the hub is used for document summarization, customer-service automation, ` +
+  `knowledge retrieval, and bespoke model experimentation. Business units can onboard new models ` +
+  `without modifying existing code, while governance teams maintain full visibility into usage and cost. ` +
+  `This shared platform has turned AI from a niche experiment into an enterprise-wide capability—` +
+  `accelerating innovation while preserving compliance and operational control.`;
+
 const PublicModelHub: React.FC<PublicModelHubProps> = ({ accessToken, isEmbedded = false }) => {
   const [modelHubData, setModelHubData] = useState<ModelGroupInfo[] | null>(null);
   const [agentHubData, setAgentHubData] = useState<AgentCard[] | null>(null);
   const [mcpHubData, setMcpHubData] = useState<MCPServerData[] | null>(null);
-  const [pageTitle, setPageTitle] = useState<string>(`${process.env.NEXT_PUBLIC_APP_NAME || "Ameritas LiteLLM"} Gateway`);
-  const [customDocsDescription, setCustomDocsDescription] = useState<string | null>(null);
+  const [pageTitle, setPageTitle] = useState<string>(`${appName} Gateway`);
+  const [customDocsDescription, setCustomDocsDescription] = useState<string>(defaultDocsDescription);
   const [litellmVersion, setLitellmVersion] = useState<string>("");
   const [usefulLinks, setUsefulLinks] = useState<Record<string, string | { url: string; index: number }>>({});
   const [loading, setLoading] = useState<boolean>(true);
@@ -175,7 +188,7 @@ const PublicModelHub: React.FC<PublicModelHubProps> = ({ accessToken, isEmbedded
         const publicModelHubInfo = await getPublicModelHubInfo();
         console.log("Public Model Hub Info:", publicModelHubInfo);
         setPageTitle(publicModelHubInfo.docs_title);
-        setCustomDocsDescription(publicModelHubInfo.custom_docs_description);
+        setCustomDocsDescription(publicModelHubInfo.custom_docs_description || defaultDocsDescription);
         setLitellmVersion(publicModelHubInfo.litellm_version);
         setUsefulLinks(publicModelHubInfo.useful_links || {});
       };
@@ -992,13 +1005,13 @@ const PublicModelHub: React.FC<PublicModelHubProps> = ({ accessToken, isEmbedded
           {!isEmbedded && (
             <Card className="mb-10 p-8 bg-white border border-gray-200 rounded-lg shadow-sm">
               <Title className="text-2xl font-semibold mb-6 text-gray-900">About</Title>
-              <p className="text-gray-700 mb-6 text-base leading-relaxed">
-                {customDocsDescription ? customDocsDescription : "Proxy Server to call 100+ LLMs in the OpenAI format."}
+              <p className="text-gray-700 mb-6 text-base leading-relaxed whitespace-pre-line">
+                {customDocsDescription}
               </p>
               <div className="flex items-center space-x-3 text-sm text-gray-600">
                 <span className="flex items-center">
                   <span className="w-4 h-4 mr-2">🔧</span>
-                  Built with litellm: v{litellmVersion}
+                  Built with {appName}: v{litellmVersion}
                 </span>
               </div>
             </Card>
