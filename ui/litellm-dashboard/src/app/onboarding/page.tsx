@@ -12,6 +12,9 @@ import {
 import { jwtDecode } from "jwt-decode";
 import { Form, Button as Button2 } from "antd";
 import { getCookie } from "@/utils/cookieUtils";
+import { createLogger } from "@/utils/logger";
+
+const log = createLogger("Onboarding");
 
 function OnboardingContent() {
   const [form] = Form.useForm();
@@ -30,7 +33,7 @@ function OnboardingContent() {
   useEffect(() => {
     getUiConfig().then((data) => {
       // get the information for constructing the proxy base url, and then set the token and auth loading
-      console.log("ui config in onboarding.tsx:", data);
+      log.debug("UI config loaded");
       setGetUiConfigLoading(false);
     });
   }, []);
@@ -43,27 +46,25 @@ function OnboardingContent() {
 
     getOnboardingCredentials(inviteID).then((data) => {
       const login_url = data.login_url;
-      console.log("login_url:", login_url);
       setLoginUrl(login_url);
 
       const token = data.token;
       const decoded = jwtDecode(token) as { [key: string]: any };
       setJwtToken(token);
 
-      console.log("decoded:", decoded);
       setAccessToken(decoded.key);
 
-      console.log("decoded user email:", decoded.user_email);
       const user_email = decoded.user_email;
       setUserEmail(user_email);
 
       const user_id = decoded.user_id;
       setUserID(user_id);
+
+      log.debug("Onboarding credentials loaded");
     });
   }, [inviteID, getUiConfigLoading]);
 
   const handleSubmit = (formValues: Record<string, any>) => {
-    console.log("in handle submit. accessToken:", accessToken, "token:", jwtToken, "formValues:", formValues);
     if (!accessToken || !jwtToken) {
       return;
     }
@@ -78,11 +79,9 @@ function OnboardingContent() {
       document.cookie = "token=" + jwtToken;
       
       const proxyBaseUrl = getProxyBaseUrl();
-      console.log("proxyBaseUrl:", proxyBaseUrl);
-      
+
       // Construct the full redirect URL using the proxyBaseUrl which includes the server root path
       let redirectUrl = proxyBaseUrl ? `${proxyBaseUrl}/ui/?login=success` : "/ui/?login=success";
-      console.log("redirecting to:", redirectUrl);
 
       window.location.href = redirectUrl;
     });

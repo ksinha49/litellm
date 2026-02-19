@@ -82,8 +82,17 @@ export const defaultProxyBaseUrl = isLocal ? "http://localhost:4000" : null;
 const defaultServerRootPath = "/";
 export let serverRootPath = defaultServerRootPath;
 export let proxyBaseUrl = defaultProxyBaseUrl;
-if (isLocal != true) {
+/**
+ * Production logging suppression
+ *
+ * In production, we suppress console.log and console.debug to reduce noise.
+ * IMPORTANT: console.warn and console.error are NOT suppressed - errors must remain visible.
+ *
+ * For new code, prefer using the logger utility: import { logger } from '@/utils/logger';
+ */
+if (!isLocal) {
   console.log = function () { };
+  console.debug = function () {};
 }
 
 const getWindowLocation = () => {
