@@ -12,10 +12,10 @@ import {
 import { Switch, Tag } from "antd";
 import Link from "next/link";
 import React, { useEffect, useState } from "react";
-
-const appName = process.env.NEXT_PUBLIC_APP_NAME || "Ameritas LiteLLM";
 import { CommunityEngagementButtons } from "./Navbar/CommunityEngagementButtons/CommunityEngagementButtons";
 import UserDropdown from "./Navbar/UserDropdown/UserDropdown";
+
+const appName = process.env.NEXT_PUBLIC_APP_NAME || "Ameritas LiteLLM";
 
 interface NavbarProps {
   userID: string | null;
@@ -52,8 +52,14 @@ const Navbar: React.FC<NavbarProps> = ({
   const { data: healthData } = useHealthReadiness();
   const version = healthData?.litellm_version;
 
-  // Simple logo URL: use custom logo if available, otherwise default
-  const imageUrl = logoUrl || `${baseUrl}/get_image`;
+  const rootPath = process.env.NEXT_PUBLIC_SERVER_ROOT_PATH || "";
+  const defaultLogoUrl = `${rootPath}/favicon.png`;
+  const imageUrl = logoUrl || defaultLogoUrl;
+
+  // Split appName into two display lines (e.g. "Ameritas" / "LiteLLM")
+  const labelParts = appName.split(" ");
+  const topLabel = labelParts[0] || "";
+  const bottomLabel = labelParts.slice(1).join(" ") || labelParts[0] || "";
 
   useEffect(() => {
     const initializeProxySettings = async () => {
@@ -94,37 +100,30 @@ const Navbar: React.FC<NavbarProps> = ({
             )}
 
             <div className="flex items-center gap-2">
-              <Link href={baseUrl ? baseUrl : "/"} className="flex items-center">
-                <div className="relative">
-                  <div className="h-10 max-w-48 flex items-center justify-center overflow-hidden">
-                    <img
-                      src={imageUrl}
-                      alt={`${appName} Brand`}
-                      className="max-w-full max-h-full w-auto h-auto object-contain"
-                    />
-                  </div>
-                </div>
+              <Link href="/" className="flex items-center" aria-label={`${appName} Home`}>
+                {/* eslint-disable-next-line @next/next/no-img-element -- Logo URL can be external/dynamic */}
+                <img
+                  src={imageUrl}
+                  alt={`${appName} logo`}
+                  className="h-8 w-8 object-contain"
+                  width={32}
+                  height={32}
+                />
+                <span className="ml-2 flex flex-col leading-tight" aria-hidden="true">
+                  <span className="text-base font-medium text-gray-900">{topLabel}</span>
+                  <span className="text-lg font-bold text-gray-900">{bottomLabel}</span>
+                </span>
               </Link>
               {version && (
-                <div className="relative">
-                  <span
-                    className="absolute -top-1 -left-2 text-lg animate-bounce"
-                    style={{ animationDuration: "2s" }}
-                    title={`Thanks for using ${appName}!`}
+                <Tag className="text-xs font-medium cursor-pointer">
+                  <a
+                    href="https://docs.litellm.ai/release_notes"
+                    target="_blank"
+                    rel="noopener noreferrer"
                   >
-                    ❄️
-                  </span>
-                  <Tag className="relative text-xs font-medium cursor-pointer z-10">
-                    <a
-                      href="https://docs.litellm.ai/release_notes"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="flex-shrink-0"
-                    >
-                      v{version}
-                    </a>
-                  </Tag>
-                </div>
+                    v{version}
+                  </a>
+                </Tag>
               )}
             </div>
           </div>
