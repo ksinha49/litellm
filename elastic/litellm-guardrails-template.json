@@ -1,0 +1,194 @@
+{
+  "index_patterns": ["litellm-guardrails-*"],
+  "settings": {
+    "number_of_shards": 3,
+    "number_of_replicas": 1,
+    "index.refresh_interval": "30s",
+    "index.codec": "best_compression"
+  },
+  "mappings": {
+    "dynamic": "strict",
+    "properties": {
+      "@timestamp": {
+        "type": "date"
+      },
+      "request_id": {
+        "type": "keyword"
+      },
+      "start_time": {
+        "type": "date"
+      },
+      "model": {
+        "type": "keyword"
+      },
+      "request_user": {
+        "type": "keyword"
+      },
+      "api_base": {
+        "type": "keyword"
+      },
+
+      "_comment_guardrail_info": "Guardrail identification fields",
+      "guardrail_name": {
+        "type": "keyword"
+      },
+      "guardrail_mode": {
+        "type": "keyword"
+      },
+      "guardrail_status": {
+        "type": "keyword"
+      },
+
+      "_comment_detection": "Detection and action fields",
+      "detected": {
+        "type": "boolean"
+      },
+      "action_reason": {
+        "type": "text",
+        "fields": {
+          "keyword": {
+            "type": "keyword",
+            "ignore_above": 256
+          }
+        }
+      },
+
+      "_comment_timing": "Performance timing fields",
+      "guardrail_start_time": {
+        "type": "double"
+      },
+      "guardrail_end_time": {
+        "type": "double"
+      },
+      "guardrail_start_datetime": {
+        "type": "date"
+      },
+      "guardrail_end_datetime": {
+        "type": "date"
+      },
+      "guardrail_duration_seconds": {
+        "type": "float"
+      },
+
+      "_comment_masked_entities": "Masked entity information",
+      "masked_entity_count": {
+        "type": "object",
+        "enabled": true
+      },
+      "masked_entity_total": {
+        "type": "integer"
+      },
+
+      "_comment_policy_violations": "Extracted policy violation counts",
+      "policy_violations_topic_count": {
+        "type": "integer"
+      },
+      "policy_violations_topic_blocked": {
+        "type": "integer"
+      },
+      "policy_violations_content_count": {
+        "type": "integer"
+      },
+      "policy_content_hate_count": {
+        "type": "integer"
+      },
+      "policy_content_insults_count": {
+        "type": "integer"
+      },
+      "policy_content_sexual_count": {
+        "type": "integer"
+      },
+      "policy_content_violence_count": {
+        "type": "integer"
+      },
+      "policy_content_misconduct_count": {
+        "type": "integer"
+      },
+      "policy_violations_word_count": {
+        "type": "integer"
+      },
+      "policy_violations_pii_count": {
+        "type": "integer"
+      },
+      "pii_types_detected": {
+        "type": "keyword"
+      },
+      "policy_violations_grounding_count": {
+        "type": "integer"
+      },
+
+      "_comment_coverage": "Coverage metrics",
+      "coverage_text_guarded": {
+        "type": "integer"
+      },
+      "coverage_text_total": {
+        "type": "integer"
+      },
+      "coverage_images_guarded": {
+        "type": "integer"
+      },
+      "coverage_images_total": {
+        "type": "integer"
+      },
+
+      "_comment_usage": "Guardrail usage metrics for cost tracking",
+      "usage_content_policy_units": {
+        "type": "integer"
+      },
+      "usage_word_policy_units": {
+        "type": "integer"
+      },
+      "usage_sensitive_info_policy_units": {
+        "type": "integer"
+      },
+      "usage_topic_policy_units": {
+        "type": "integer"
+      },
+      "usage_grounding_policy_units": {
+        "type": "integer"
+      },
+      "usage_total_policy_units": {
+        "type": "integer"
+      },
+
+      "_comment_nested_objects": "Complex nested objects",
+      "assessment_details": {
+        "type": "object",
+        "enabled": true,
+        "dynamic": true
+      },
+      "guardrail_coverage": {
+        "type": "object",
+        "enabled": true
+      },
+      "guardrail_outputs": {
+        "type": "object",
+        "enabled": true,
+        "dynamic": true
+      },
+      "guardrail_usage": {
+        "type": "object",
+        "enabled": true
+      },
+      "guardrail_request": {
+        "type": "object",
+        "enabled": false
+      },
+      "guardrail_response": {
+        "type": "object",
+        "enabled": false
+      },
+      "applied_guardrails": {
+        "type": "keyword"
+      },
+
+      "_comment_metadata": "Pipeline metadata",
+      "pipeline_version": {
+        "type": "keyword"
+      },
+      "data_source": {
+        "type": "keyword"
+      }
+    }
+  }
+}
