@@ -302,7 +302,7 @@ const PublicModelHub: React.FC<PublicModelHubProps> = ({ accessToken, isEmbedded
     // Apply other filters
     return searchResults.filter((model) => {
       const matchesProvider =
-        selectedProviders.length === 0 || selectedProviders.some((provider) => model.providers.includes(provider));
+        selectedProviders.length === 0 || selectedProviders.some((provider) => model.providers?.includes(provider));
       const matchesMode = selectedModes.length === 0 || selectedModes.includes(model.mode || "");
 
       // Check if model has any of the selected features
