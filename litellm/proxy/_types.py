@@ -658,10 +658,7 @@ class LiteLLMRoutes(enum.Enum):
 
     # Routes accessible by Admin Viewer (read-only admin access)
     admin_viewer_routes = [
-<<<<<<< ours
         "/user/list",
-=======
->>>>>>> theirs
         "/user/available_users",
         "/user/available_roles",
         "/user/daily/activity",
