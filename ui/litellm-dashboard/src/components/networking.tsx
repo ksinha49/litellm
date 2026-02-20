@@ -1,3 +1,283 @@
+// ─── Application Management API calls ────────────────────────────────────────
+
+export type ApplicationType = "platform" | "dev_tool" | "custom_integration";
+
+export interface Application {
+  application_id: string;
+  application_name: string;
+  application_type: ApplicationType;
+  department: string;
+  lob: string;
+  team_id?: string | null;
+  description?: string | null;
+  labels?: Record<string, string> | null;
+  created_at: string;
+  updated_at: string;
+  created_by?: string | null;
+  updated_by?: string | null;
+}
+
+export interface NewApplicationRequest {
+  application_name: string;
+  application_type: ApplicationType;
+  department: string;
+  lob: string;
+  team_id?: string;
+  description?: string;
+  labels?: Record<string, string>;
+}
+
+export interface UpdateApplicationRequest {
+  application_id: string;
+  application_name?: string;
+  application_type?: ApplicationType;
+  department?: string;
+  lob?: string;
+  team_id?: string;
+  description?: string;
+  labels?: Record<string, string>;
+}
+
+export interface ApplicationMetrics {
+  application_id: string;
+  application_name: string;
+  application_type: string;
+  department: string;
+  lob: string;
+  team_id?: string | null;
+  total_tokens: number;
+  total_cost: number;
+  avg_latency_ms: number;
+  error_rate: number;
+  is_active: boolean;
+  key_count: number;
+}
+
+export interface ApplicationHealthResponse {
+  applications: ApplicationMetrics[];
+  total_apps: number;
+  active_apps: number;
+  time_window_start: string;
+  time_window_end: string;
+}
+
+export interface ApplicationListResponse {
+  applications: Application[];
+  total: number;
+  page: number;
+  page_size: number;
+}
+
+export interface ApplicationConfig {
+  departments: string[];
+  lines_of_business: string[];
+}
+
+export interface ApplicationFilters {
+  application_type?: string;
+  department?: string;
+  lob?: string;
+  team_id?: string;
+  page?: number;
+  page_size?: number;
+  sort_by?: string;
+  sort_order?: "asc" | "desc";
+}
+
+export interface MetricsParams {
+  start_date?: string;
+  end_date?: string;
+}
+
+const _applicationBase = () =>
+  proxyBaseUrl ? `${proxyBaseUrl}/application` : `/application`;
+
+export const applicationListCall = async (
+  accessToken: string,
+  filters: ApplicationFilters = {},
+): Promise<ApplicationListResponse> => {
+  const url = new URL(_applicationBase() + "/list", window.location.origin);
+  Object.entries(filters).forEach(([k, v]) => {
+    if (v !== undefined && v !== null) url.searchParams.set(k, String(v));
+  });
+  const response = await fetch(url.toString(), {
+    method: "GET",
+    headers: { [globalLitellmHeaderName]: `Bearer ${accessToken}` },
+  });
+  if (!response.ok) {
+    const err = await response.json();
+    throw new Error(deriveErrorMessage(err));
+  }
+  return response.json();
+};
+
+export const applicationCreateCall = async (
+  accessToken: string,
+  payload: NewApplicationRequest,
+): Promise<Application> => {
+  const response = await fetch(_applicationBase() + "/new", {
+    method: "POST",
+    headers: {
+      [globalLitellmHeaderName]: `Bearer ${accessToken}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(payload),
+  });
+  if (!response.ok) {
+    const err = await response.json();
+    handleError(deriveErrorMessage(err));
+    throw new Error(deriveErrorMessage(err));
+  }
+  return response.json();
+};
+
+export const applicationUpdateCall = async (
+  accessToken: string,
+  payload: UpdateApplicationRequest,
+): Promise<Application> => {
+  const response = await fetch(_applicationBase() + "/update", {
+    method: "PATCH",
+    headers: {
+      [globalLitellmHeaderName]: `Bearer ${accessToken}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(payload),
+  });
+  if (!response.ok) {
+    const err = await response.json();
+    handleError(deriveErrorMessage(err));
+    throw new Error(deriveErrorMessage(err));
+  }
+  return response.json();
+};
+
+export const applicationDeleteCall = async (
+  accessToken: string,
+  application_id: string,
+): Promise<void> => {
+  const url = _applicationBase() + `/delete?application_id=${encodeURIComponent(application_id)}`;
+  const response = await fetch(url, {
+    method: "DELETE",
+    headers: { [globalLitellmHeaderName]: `Bearer ${accessToken}` },
+  });
+  if (!response.ok) {
+    const err = await response.json();
+    handleError(deriveErrorMessage(err));
+    throw new Error(deriveErrorMessage(err));
+  }
+};
+
+export const applicationMetricsCall = async (
+  accessToken: string,
+  app_id: string,
+  params: MetricsParams = {},
+): Promise<ApplicationMetrics> => {
+  const url = new URL(
+    _applicationBase() + `/${encodeURIComponent(app_id)}/metrics`,
+    window.location.origin,
+  );
+  if (params.start_date) url.searchParams.set("start_date", params.start_date);
+  if (params.end_date) url.searchParams.set("end_date", params.end_date);
+  const response = await fetch(url.toString(), {
+    method: "GET",
+    headers: { [globalLitellmHeaderName]: `Bearer ${accessToken}` },
+  });
+  if (!response.ok) {
+    const err = await response.json();
+    throw new Error(deriveErrorMessage(err));
+  }
+  return response.json();
+};
+
+export const applicationHealthCall = async (
+  accessToken: string,
+  params: MetricsParams & ApplicationFilters = {},
+): Promise<ApplicationHealthResponse> => {
+  const url = new URL(_applicationBase() + "/health", window.location.origin);
+  Object.entries(params).forEach(([k, v]) => {
+    if (v !== undefined && v !== null) url.searchParams.set(k, String(v));
+  });
+  const response = await fetch(url.toString(), {
+    method: "GET",
+    headers: { [globalLitellmHeaderName]: `Bearer ${accessToken}` },
+  });
+  if (!response.ok) {
+    const err = await response.json();
+    throw new Error(deriveErrorMessage(err));
+  }
+  return response.json();
+};
+
+export const applicationConfigCall = async (
+  accessToken: string,
+): Promise<ApplicationConfig> => {
+  const response = await fetch(_applicationBase() + "/config", {
+    method: "GET",
+    headers: { [globalLitellmHeaderName]: `Bearer ${accessToken}` },
+  });
+  if (!response.ok) {
+    const err = await response.json();
+    throw new Error(deriveErrorMessage(err));
+  }
+  return response.json();
+};
+
+export const applicationConfigUpdateCall = async (
+  accessToken: string,
+  config: ApplicationConfig,
+): Promise<void> => {
+  const response = await fetch(_applicationBase() + "/config/update", {
+    method: "POST",
+    headers: {
+      [globalLitellmHeaderName]: `Bearer ${accessToken}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(config),
+  });
+  if (!response.ok) {
+    const err = await response.json();
+    throw new Error(deriveErrorMessage(err));
+  }
+};
+
+export const applicationAssignKeyCall = async (
+  accessToken: string,
+  app_id: string,
+  key_token: string,
+): Promise<void> => {
+  const url =
+    _applicationBase() +
+    `/${encodeURIComponent(app_id)}/keys/assign?key_token=${encodeURIComponent(key_token)}`;
+  const response = await fetch(url, {
+    method: "POST",
+    headers: { [globalLitellmHeaderName]: `Bearer ${accessToken}` },
+  });
+  if (!response.ok) {
+    const err = await response.json();
+    throw new Error(deriveErrorMessage(err));
+  }
+};
+
+export const applicationUnassignKeyCall = async (
+  accessToken: string,
+  app_id: string,
+  key_token: string,
+): Promise<void> => {
+  const url =
+    _applicationBase() +
+    `/${encodeURIComponent(app_id)}/keys/unassign?key_token=${encodeURIComponent(key_token)}`;
+  const response = await fetch(url, {
+    method: "POST",
+    headers: { [globalLitellmHeaderName]: `Bearer ${accessToken}` },
+  });
+  if (!response.ok) {
+    const err = await response.json();
+    throw new Error(deriveErrorMessage(err));
+  }
+};
+
+// ─── End Application Management API calls ─────────────────────────────────
+
 // Shared date formatter for daily activity endpoints
 export const formatDate = (date: Date) => {
   const year = date.getFullYear();

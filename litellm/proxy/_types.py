@@ -4087,3 +4087,56 @@ class CostEstimateResponse(LiteLLMPydanticObjectBase):
     input_cost_per_token: Optional[float] = None
     output_cost_per_token: Optional[float] = None
     provider: Optional[str] = None
+
+
+#### APPLICATION MANAGEMENT ####
+
+
+class ApplicationType(str, enum.Enum):
+    PLATFORM = "platform"
+    DEV_TOOL = "dev_tool"
+    CUSTOM_INTEGRATION = "custom_integration"
+
+
+class NewApplicationRequest(LiteLLMPydanticObjectBase):
+    application_name: str
+    application_type: ApplicationType
+    department: str
+    lob: str
+    team_id: Optional[str] = None
+    description: Optional[str] = None
+    labels: Optional[dict] = None
+
+
+class UpdateApplicationRequest(LiteLLMPydanticObjectBase):
+    application_id: str
+    application_name: Optional[str] = None
+    application_type: Optional[ApplicationType] = None
+    department: Optional[str] = None
+    lob: Optional[str] = None
+    team_id: Optional[str] = None
+    description: Optional[str] = None
+    labels: Optional[dict] = None
+
+
+class ApplicationMetrics(LiteLLMPydanticObjectBase):
+    application_id: str
+    application_name: str
+    application_type: str
+    department: str
+    lob: str
+    team_id: Optional[str] = None
+    total_tokens: int = 0
+    total_cost: float = 0.0
+    avg_latency_ms: float = 0.0
+    error_rate: float = 0.0  # 0.0 to 1.0
+    is_active: bool = False
+    key_count: int = 0
+
+
+class ApplicationHealthResponse(LiteLLMPydanticObjectBase):
+    applications: List[ApplicationMetrics]
+    total_apps: int
+    active_apps: int
+    time_window_start: str
+    time_window_end: str

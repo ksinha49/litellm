@@ -16,6 +16,7 @@ export interface FilterState {
   "User ID": string;
   "Sort By": string;
   "Sort Order": string;
+  "Application ID": string;
 }
 
 export function useFilterLogic({
@@ -34,6 +35,7 @@ export function useFilterLogic({
     "User ID": "",
     "Sort By": "created_at",
     "Sort Order": "desc",
+    "Application ID": "",
   };
   const { accessToken } = useAuthorized();
   const [filters, setFilters] = useState<FilterState>(defaultFilters);
@@ -98,6 +100,11 @@ export function useFilterLogic({
       result = result.filter((key) => key.organization_id === filters["Organization ID"]);
     }
 
+    // Apply Application ID filter
+    if (filters["Application ID"]) {
+      result = result.filter((key) => (key as any).application_id === filters["Application ID"]);
+    }
+
     setFilteredKeys(result);
   }, [keys, filters]);
 
@@ -160,6 +167,7 @@ export function useFilterLogic({
       "User ID": newFilters["User ID"] || "",
       "Sort By": newFilters["Sort By"] || "created_at",
       "Sort Order": newFilters["Sort Order"] || "desc",
+      "Application ID": newFilters["Application ID"] || "",
     });
 
     // Only trigger debouncedSearch if skipDebounce is false

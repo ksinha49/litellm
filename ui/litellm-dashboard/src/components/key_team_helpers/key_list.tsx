@@ -97,6 +97,7 @@ export interface KeyResponse {
     user_id: string;
     user_email: string;
   };
+  application_id?: string | null;
 }
 
 interface KeyListResponse {

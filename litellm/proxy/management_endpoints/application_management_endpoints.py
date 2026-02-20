@@ -1,0 +1,785 @@
+"""
+APPLICATION MANAGEMENT
+
+All /application management endpoints
+
+/application/new
+/application/info
+/application/update
+/application/delete
+/application/list
+/application/{app_id}/keys
+/application/{app_id}/keys/assign
+/application/{app_id}/keys/unassign
+/application/{app_id}/metrics
+/application/health
+/application/config
+/application/config/update
+"""
+
+import json
+import traceback
+from datetime import datetime, timedelta, timezone
+from typing import Any, Dict, List, Optional
+
+from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request
+
+import litellm
+from litellm._logging import verbose_proxy_logger
+from litellm._uuid import uuid
+from litellm.proxy._types import (
+    ApplicationHealthResponse,
+    ApplicationMetrics,
+    ApplicationType,
+    CommonProxyErrors,
+    LitellmUserRoles,
+    NewApplicationRequest,
+    ProxyException,
+    UpdateApplicationRequest,
+    UserAPIKeyAuth,
+)
+from litellm.proxy.auth.user_api_key_auth import user_api_key_auth
+from litellm.proxy.management_helpers.utils import management_endpoint_wrapper
+from litellm.proxy.utils import PrismaClient
+
+router = APIRouter()
+
+# ─── helpers ────────────────────────────────────────────────────────────────
+
+
+def _require_admin(user_api_key_dict: UserAPIKeyAuth) -> None:
+    """Raise 403 if the caller is not a proxy admin."""
+    if user_api_key_dict.user_role != LitellmUserRoles.PROXY_ADMIN:
+        raise HTTPException(
+            status_code=403,
+            detail={
+                "error": "Only proxy admins can perform this action. "
+                f"Your role: {user_api_key_dict.user_role}"
+            },
+        )
+
+
+async def _get_prisma() -> PrismaClient:
+    from litellm.proxy.proxy_server import prisma_client
+
+    if prisma_client is None:
+        raise HTTPException(
+            status_code=500, detail={"error": "No database connected"}
+        )
+    return prisma_client
+
+
+async def _get_app_or_404(prisma_client: PrismaClient, application_id: str) -> Any:
+    app = await prisma_client.db.litellm_applicationtable.find_unique(
+        where={"application_id": application_id}
+    )
+    if app is None:
+        raise HTTPException(
+            status_code=404,
+            detail={"error": f"Application {application_id} not found"},
+        )
+    return app
+
+
+# ─── config helpers ─────────────────────────────────────────────────────────
+
+_APP_CONFIG_KEY = "application_registry_config"
+_DEFAULT_APP_CONFIG = {
+    "departments": [],
+    "lines_of_business": [],
+}
+
+
+async def _read_app_config(prisma_client: PrismaClient) -> Dict[str, Any]:
+    row = await prisma_client.db.litellm_config.find_first(
+        where={"param_name": _APP_CONFIG_KEY}
+    )
+    if row is None:
+        return dict(_DEFAULT_APP_CONFIG)
+    val = row.param_value
+    if isinstance(val, str):
+        return json.loads(val)
+    return dict(val) if val else dict(_DEFAULT_APP_CONFIG)
+
+
+async def _write_app_config(
+    prisma_client: PrismaClient, config: Dict[str, Any]
+) -> None:
+    await prisma_client.db.litellm_config.upsert(
+        where={"param_name": _APP_CONFIG_KEY},
+        data={
+            "create": {"param_name": _APP_CONFIG_KEY, "param_value": json.dumps(config)},
+            "update": {"param_value": json.dumps(config)},
+        },
+    )
+
+
+# ─── metrics helpers ────────────────────────────────────────────────────────
+
+
+async def _compute_app_metrics(
+    prisma_client: PrismaClient,
+    app: Any,
+    start_dt: datetime,
+    end_dt: datetime,
+    active_since: datetime,
+) -> ApplicationMetrics:
+    """Return ApplicationMetrics for a single application row."""
+    # Fetch keys belonging to this app
+    keys = await prisma_client.db.litellm_verificationtoken.find_many(
+        where={"application_id": app.application_id},
+        include={},
+    )
+    key_tokens = [k.token for k in keys]
+    key_count = len(key_tokens)
+
+    total_tokens = 0
+    total_cost = 0.0
+    avg_latency_ms = 0.0
+    error_rate = 0.0
+    is_active = False
+
+    if key_tokens:
+        # Spend logs for the window
+        spend_rows = await prisma_client.db.litellm_spendlogs.find_many(
+            where={
+                "api_key": {"in": key_tokens},
+                "startTime": {"gte": start_dt, "lte": end_dt},
+            }
+        )
+
+        if spend_rows:
+            for row in spend_rows:
+                total_tokens += row.total_tokens or 0
+                total_cost += row.spend or 0.0
+
+            # Latency: difference between completionStartTime and startTime in ms
+            latencies = []
+            errors = 0
+            for row in spend_rows:
+                if row.completionStartTime and row.startTime:
+                    delta = (
+                        row.completionStartTime - row.startTime
+                    ).total_seconds() * 1000
+                    if delta >= 0:
+                        latencies.append(delta)
+                if row.status_code is not None and int(row.status_code) >= 400:
+                    errors += 1
+
+            avg_latency_ms = (
+                sum(latencies) / len(latencies) if latencies else 0.0
+            )
+            error_rate = errors / len(spend_rows)
+
+        # Active check: any request in last 24h
+        active_rows = await prisma_client.db.litellm_spendlogs.count(
+            where={
+                "api_key": {"in": key_tokens},
+                "startTime": {"gte": active_since},
+            }
+        )
+        is_active = active_rows > 0
+
+    return ApplicationMetrics(
+        application_id=app.application_id,
+        application_name=app.application_name,
+        application_type=app.application_type,
+        department=app.department,
+        lob=app.lob,
+        team_id=app.team_id,
+        total_tokens=total_tokens,
+        total_cost=total_cost,
+        avg_latency_ms=avg_latency_ms,
+        error_rate=error_rate,
+        is_active=is_active,
+        key_count=key_count,
+    )
+
+
+# ─── CRUD endpoints ─────────────────────────────────────────────────────────
+
+
+@router.post(
+    "/application/new",
+    tags=["application management"],
+    dependencies=[Depends(user_api_key_auth)],
+)
+@management_endpoint_wrapper
+async def new_application(
+    data: NewApplicationRequest,
+    http_request: Request,
+    user_api_key_dict: UserAPIKeyAuth = Depends(user_api_key_auth),
+):
+    """
+    Create a new application.  Admin only.
+
+    Parameters:
+    - application_name: str - Unique name for the application
+    - application_type: str - "platform" | "dev_tool" | "custom_integration"
+    - department: str - Department owning the application
+    - lob: str - Line of Business
+    - team_id: Optional[str] - Associated team ID
+    - description: Optional[str] - Description of the application
+    - labels: Optional[dict] - Arbitrary key/value metadata labels
+    """
+    try:
+        _require_admin(user_api_key_dict)
+        prisma_client = await _get_prisma()
+
+        create_data: Dict[str, Any] = {
+            "application_name": data.application_name,
+            "application_type": data.application_type.value,
+            "department": data.department,
+            "lob": data.lob,
+            "created_by": user_api_key_dict.user_id or "admin",
+            "updated_by": user_api_key_dict.user_id or "admin",
+        }
+        if data.team_id is not None:
+            create_data["team_id"] = data.team_id
+        if data.description is not None:
+            create_data["description"] = data.description
+        if data.labels is not None:
+            create_data["labels"] = json.dumps(data.labels)
+
+        app = await prisma_client.db.litellm_applicationtable.create(data=create_data)
+        return app.model_dump()
+    except HTTPException:
+        raise
+    except Exception as e:
+        verbose_proxy_logger.exception(f"new_application error: {e}")
+        raise ProxyException(
+            message=str(e),
+            type="internal_server_error",
+            param=None,
+            code=500,
+        )
+
+
+@router.get(
+    "/application/list",
+    tags=["application management"],
+    dependencies=[Depends(user_api_key_auth)],
+)
+@management_endpoint_wrapper
+async def list_applications(
+    http_request: Request,
+    user_api_key_dict: UserAPIKeyAuth = Depends(user_api_key_auth),
+    application_type: Optional[str] = Query(default=None),
+    department: Optional[str] = Query(default=None),
+    lob: Optional[str] = Query(default=None),
+    team_id: Optional[str] = Query(default=None),
+    page: int = Query(default=1, ge=1),
+    page_size: int = Query(default=25, ge=1, le=500),
+    sort_by: Optional[str] = Query(default="created_at"),
+    sort_order: Optional[str] = Query(default="desc"),
+):
+    """
+    List applications with optional filters.
+
+    - Admin: sees all applications
+    - Team lead: sees only applications belonging to their team
+    """
+    try:
+        prisma_client = await _get_prisma()
+
+        where: Dict[str, Any] = {}
+        if application_type is not None:
+            where["application_type"] = application_type
+        if department is not None:
+            where["department"] = department
+        if lob is not None:
+            where["lob"] = lob
+        if team_id is not None:
+            where["team_id"] = team_id
+
+        # Non-admins can only see their team's apps
+        if user_api_key_dict.user_role != LitellmUserRoles.PROXY_ADMIN:
+            if user_api_key_dict.team_id is not None:
+                where["team_id"] = user_api_key_dict.team_id
+            else:
+                return {"applications": [], "total": 0, "page": page, "page_size": page_size}
+
+        skip = (page - 1) * page_size
+
+        valid_sort = {"created_at", "updated_at", "application_name"}
+        order_field = sort_by if sort_by in valid_sort else "created_at"
+        order_dir = "desc" if sort_order == "desc" else "asc"
+
+        apps = await prisma_client.db.litellm_applicationtable.find_many(
+            where=where,
+            skip=skip,
+            take=page_size,
+            order={order_field: order_dir},
+        )
+        total = await prisma_client.db.litellm_applicationtable.count(where=where)
+
+        return {
+            "applications": [a.model_dump() for a in apps],
+            "total": total,
+            "page": page,
+            "page_size": page_size,
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        verbose_proxy_logger.exception(f"list_applications error: {e}")
+        raise ProxyException(
+            message=str(e),
+            type="internal_server_error",
+            param=None,
+            code=500,
+        )
+
+
+@router.get(
+    "/application/info",
+    tags=["application management"],
+    dependencies=[Depends(user_api_key_auth)],
+)
+@management_endpoint_wrapper
+async def application_info(
+    http_request: Request,
+    application_id: str = Query(...),
+    user_api_key_dict: UserAPIKeyAuth = Depends(user_api_key_auth),
+):
+    """Get details for a single application by application_id."""
+    try:
+        prisma_client = await _get_prisma()
+        app = await _get_app_or_404(prisma_client, application_id)
+        return app.model_dump()
+    except HTTPException:
+        raise
+    except Exception as e:
+        verbose_proxy_logger.exception(f"application_info error: {e}")
+        raise ProxyException(
+            message=str(e),
+            type="internal_server_error",
+            param=None,
+            code=500,
+        )
+
+
+@router.patch(
+    "/application/update",
+    tags=["application management"],
+    dependencies=[Depends(user_api_key_auth)],
+)
+@management_endpoint_wrapper
+async def update_application(
+    data: UpdateApplicationRequest,
+    http_request: Request,
+    user_api_key_dict: UserAPIKeyAuth = Depends(user_api_key_auth),
+):
+    """Update application metadata. Admin only."""
+    try:
+        _require_admin(user_api_key_dict)
+        prisma_client = await _get_prisma()
+        await _get_app_or_404(prisma_client, data.application_id)
+
+        update_data: Dict[str, Any] = {
+            "updated_by": user_api_key_dict.user_id or "admin"
+        }
+        if data.application_name is not None:
+            update_data["application_name"] = data.application_name
+        if data.application_type is not None:
+            update_data["application_type"] = data.application_type.value
+        if data.department is not None:
+            update_data["department"] = data.department
+        if data.lob is not None:
+            update_data["lob"] = data.lob
+        if data.team_id is not None:
+            update_data["team_id"] = data.team_id
+        if data.description is not None:
+            update_data["description"] = data.description
+        if data.labels is not None:
+            update_data["labels"] = json.dumps(data.labels)
+
+        app = await prisma_client.db.litellm_applicationtable.update(
+            where={"application_id": data.application_id},
+            data=update_data,
+        )
+        return app.model_dump()
+    except HTTPException:
+        raise
+    except Exception as e:
+        verbose_proxy_logger.exception(f"update_application error: {e}")
+        raise ProxyException(
+            message=str(e),
+            type="internal_server_error",
+            param=None,
+            code=500,
+        )
+
+
+@router.delete(
+    "/application/delete",
+    tags=["application management"],
+    dependencies=[Depends(user_api_key_auth)],
+)
+@management_endpoint_wrapper
+async def delete_application(
+    http_request: Request,
+    application_id: str = Query(...),
+    user_api_key_dict: UserAPIKeyAuth = Depends(user_api_key_auth),
+):
+    """Delete an application by application_id. Admin only."""
+    try:
+        _require_admin(user_api_key_dict)
+        prisma_client = await _get_prisma()
+        await _get_app_or_404(prisma_client, application_id)
+
+        # Unlink any keys pointing to this app
+        await prisma_client.db.litellm_verificationtoken.update_many(
+            where={"application_id": application_id},
+            data={"application_id": None},
+        )
+
+        await prisma_client.db.litellm_applicationtable.delete(
+            where={"application_id": application_id}
+        )
+        return {"deleted": True, "application_id": application_id}
+    except HTTPException:
+        raise
+    except Exception as e:
+        verbose_proxy_logger.exception(f"delete_application error: {e}")
+        raise ProxyException(
+            message=str(e),
+            type="internal_server_error",
+            param=None,
+            code=500,
+        )
+
+
+# ─── Key assign / unassign ──────────────────────────────────────────────────
+
+
+@router.get(
+    "/application/{app_id}/keys",
+    tags=["application management"],
+    dependencies=[Depends(user_api_key_auth)],
+)
+@management_endpoint_wrapper
+async def application_keys(
+    app_id: str,
+    http_request: Request,
+    user_api_key_dict: UserAPIKeyAuth = Depends(user_api_key_auth),
+):
+    """List all virtual keys belonging to an application."""
+    try:
+        prisma_client = await _get_prisma()
+        await _get_app_or_404(prisma_client, app_id)
+
+        keys = await prisma_client.db.litellm_verificationtoken.find_many(
+            where={"application_id": app_id}
+        )
+        return {"application_id": app_id, "keys": [k.model_dump() for k in keys]}
+    except HTTPException:
+        raise
+    except Exception as e:
+        verbose_proxy_logger.exception(f"application_keys error: {e}")
+        raise ProxyException(
+            message=str(e),
+            type="internal_server_error",
+            param=None,
+            code=500,
+        )
+
+
+@router.post(
+    "/application/{app_id}/keys/assign",
+    tags=["application management"],
+    dependencies=[Depends(user_api_key_auth)],
+)
+@management_endpoint_wrapper
+async def assign_key_to_application(
+    app_id: str,
+    http_request: Request,
+    user_api_key_dict: UserAPIKeyAuth = Depends(user_api_key_auth),
+    key_token: str = Query(..., description="Hashed token of the virtual key to assign"),
+):
+    """Assign an existing virtual key to this application. Admin only."""
+    try:
+        _require_admin(user_api_key_dict)
+        prisma_client = await _get_prisma()
+        await _get_app_or_404(prisma_client, app_id)
+
+        key = await prisma_client.db.litellm_verificationtoken.find_unique(
+            where={"token": key_token}
+        )
+        if key is None:
+            raise HTTPException(
+                status_code=404,
+                detail={"error": f"Key {key_token} not found"},
+            )
+
+        await prisma_client.db.litellm_verificationtoken.update(
+            where={"token": key_token},
+            data={"application_id": app_id},
+        )
+        return {"application_id": app_id, "key_token": key_token, "assigned": True}
+    except HTTPException:
+        raise
+    except Exception as e:
+        verbose_proxy_logger.exception(f"assign_key_to_application error: {e}")
+        raise ProxyException(
+            message=str(e),
+            type="internal_server_error",
+            param=None,
+            code=500,
+        )
+
+
+@router.post(
+    "/application/{app_id}/keys/unassign",
+    tags=["application management"],
+    dependencies=[Depends(user_api_key_auth)],
+)
+@management_endpoint_wrapper
+async def unassign_key_from_application(
+    app_id: str,
+    http_request: Request,
+    user_api_key_dict: UserAPIKeyAuth = Depends(user_api_key_auth),
+    key_token: str = Query(..., description="Hashed token of the virtual key to unassign"),
+):
+    """Remove a virtual key from this application. Admin only."""
+    try:
+        _require_admin(user_api_key_dict)
+        prisma_client = await _get_prisma()
+
+        key = await prisma_client.db.litellm_verificationtoken.find_unique(
+            where={"token": key_token}
+        )
+        if key is None or key.application_id != app_id:
+            raise HTTPException(
+                status_code=404,
+                detail={"error": f"Key {key_token} not assigned to application {app_id}"},
+            )
+
+        await prisma_client.db.litellm_verificationtoken.update(
+            where={"token": key_token},
+            data={"application_id": None},
+        )
+        return {"application_id": app_id, "key_token": key_token, "unassigned": True}
+    except HTTPException:
+        raise
+    except Exception as e:
+        verbose_proxy_logger.exception(f"unassign_key_from_application error: {e}")
+        raise ProxyException(
+            message=str(e),
+            type="internal_server_error",
+            param=None,
+            code=500,
+        )
+
+
+# ─── Metrics endpoints ──────────────────────────────────────────────────────
+
+
+@router.get(
+    "/application/{app_id}/metrics",
+    tags=["application management"],
+    dependencies=[Depends(user_api_key_auth)],
+    response_model=ApplicationMetrics,
+)
+@management_endpoint_wrapper
+async def application_metrics(
+    app_id: str,
+    http_request: Request,
+    user_api_key_dict: UserAPIKeyAuth = Depends(user_api_key_auth),
+    start_date: Optional[str] = Query(default=None, description="ISO 8601 start date"),
+    end_date: Optional[str] = Query(default=None, description="ISO 8601 end date"),
+):
+    """
+    Per-application observability metrics.
+
+    Metrics window defaults to the last 30 days if not specified.
+    Active status is always evaluated against the last 24 hours.
+    """
+    try:
+        prisma_client = await _get_prisma()
+        app = await _get_app_or_404(prisma_client, app_id)
+
+        now = datetime.now(tz=timezone.utc)
+        end_dt = datetime.fromisoformat(end_date) if end_date else now
+        start_dt = (
+            datetime.fromisoformat(start_date)
+            if start_date
+            else end_dt - timedelta(days=30)
+        )
+        active_since = now - timedelta(hours=24)
+
+        metrics = await _compute_app_metrics(
+            prisma_client, app, start_dt, end_dt, active_since
+        )
+        return metrics
+    except HTTPException:
+        raise
+    except Exception as e:
+        verbose_proxy_logger.exception(f"application_metrics error: {e}")
+        raise ProxyException(
+            message=str(e),
+            type="internal_server_error",
+            param=None,
+            code=500,
+        )
+
+
+@router.get(
+    "/application/health",
+    tags=["application management"],
+    dependencies=[Depends(user_api_key_auth)],
+    response_model=ApplicationHealthResponse,
+)
+@management_endpoint_wrapper
+async def application_health(
+    http_request: Request,
+    user_api_key_dict: UserAPIKeyAuth = Depends(user_api_key_auth),
+    start_date: Optional[str] = Query(default=None, description="ISO 8601 start date"),
+    end_date: Optional[str] = Query(default=None, description="ISO 8601 end date"),
+    application_type: Optional[str] = Query(default=None),
+    department: Optional[str] = Query(default=None),
+    lob: Optional[str] = Query(default=None),
+):
+    """
+    All-apps health dashboard aggregate.
+
+    Returns per-app metrics + totals for active apps, total apps, etc.
+    Default window: last 30 days.
+    """
+    try:
+        prisma_client = await _get_prisma()
+
+        now = datetime.now(tz=timezone.utc)
+        end_dt = datetime.fromisoformat(end_date) if end_date else now
+        start_dt = (
+            datetime.fromisoformat(start_date)
+            if start_date
+            else end_dt - timedelta(days=30)
+        )
+        active_since = now - timedelta(hours=24)
+
+        where: Dict[str, Any] = {}
+        if application_type:
+            where["application_type"] = application_type
+        if department:
+            where["department"] = department
+        if lob:
+            where["lob"] = lob
+
+        # Non-admins restricted to their team
+        if user_api_key_dict.user_role != LitellmUserRoles.PROXY_ADMIN:
+            if user_api_key_dict.team_id:
+                where["team_id"] = user_api_key_dict.team_id
+            else:
+                return ApplicationHealthResponse(
+                    applications=[],
+                    total_apps=0,
+                    active_apps=0,
+                    time_window_start=start_dt.isoformat(),
+                    time_window_end=end_dt.isoformat(),
+                )
+
+        apps = await prisma_client.db.litellm_applicationtable.find_many(where=where)
+
+        app_metrics: List[ApplicationMetrics] = []
+        for app in apps:
+            m = await _compute_app_metrics(
+                prisma_client, app, start_dt, end_dt, active_since
+            )
+            app_metrics.append(m)
+
+        active_count = sum(1 for m in app_metrics if m.is_active)
+
+        return ApplicationHealthResponse(
+            applications=app_metrics,
+            total_apps=len(app_metrics),
+            active_apps=active_count,
+            time_window_start=start_dt.isoformat(),
+            time_window_end=end_dt.isoformat(),
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        verbose_proxy_logger.exception(f"application_health error: {e}")
+        raise ProxyException(
+            message=str(e),
+            type="internal_server_error",
+            param=None,
+            code=500,
+        )
+
+
+# ─── Config endpoints ────────────────────────────────────────────────────────
+
+
+@router.get(
+    "/application/config",
+    tags=["application management"],
+    dependencies=[Depends(user_api_key_auth)],
+)
+@management_endpoint_wrapper
+async def get_application_config(
+    http_request: Request,
+    user_api_key_dict: UserAPIKeyAuth = Depends(user_api_key_auth),
+):
+    """Get configured department and line-of-business lists."""
+    try:
+        prisma_client = await _get_prisma()
+        config = await _read_app_config(prisma_client)
+        return config
+    except HTTPException:
+        raise
+    except Exception as e:
+        verbose_proxy_logger.exception(f"get_application_config error: {e}")
+        raise ProxyException(
+            message=str(e),
+            type="internal_server_error",
+            param=None,
+            code=500,
+        )
+
+
+@router.post(
+    "/application/config/update",
+    tags=["application management"],
+    dependencies=[Depends(user_api_key_auth)],
+)
+@management_endpoint_wrapper
+async def update_application_config(
+    http_request: Request,
+    user_api_key_dict: UserAPIKeyAuth = Depends(user_api_key_auth),
+):
+    """
+    Update department / line-of-business lists. Admin only.
+
+    Request body (JSON):
+    {
+        "departments": ["Engineering", "Finance", ...],
+        "lines_of_business": ["Retail", "Commercial", ...]
+    }
+    """
+    try:
+        _require_admin(user_api_key_dict)
+        prisma_client = await _get_prisma()
+
+        body = await http_request.json()
+        config: Dict[str, Any] = {}
+        if "departments" in body:
+            config["departments"] = body["departments"]
+        if "lines_of_business" in body:
+            config["lines_of_business"] = body["lines_of_business"]
+
+        existing = await _read_app_config(prisma_client)
+        existing.update(config)
+        await _write_app_config(prisma_client, existing)
+        return existing
+    except HTTPException:
+        raise
+    except Exception as e:
+        verbose_proxy_logger.exception(f"update_application_config error: {e}")
+        raise ProxyException(
+            message=str(e),
+            type="internal_server_error",
+            param=None,
+            code=500,
+        )

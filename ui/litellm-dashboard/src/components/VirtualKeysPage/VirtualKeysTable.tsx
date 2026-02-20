@@ -206,6 +206,25 @@ export function VirtualKeysTable({ teams, organizations, onSortChange, currentSo
       },
     },
     {
+      id: "application_id",
+      accessorKey: "application_id",
+      header: "Application",
+      size: 120,
+      enableSorting: false,
+      cell: (info) => {
+        const value = info.getValue() as string | null | undefined;
+        return value ? (
+          <Tooltip title={value}>
+            <span className="font-mono text-xs truncate block" style={{ maxWidth: 120, overflow: "hidden" }}>
+              {value}
+            </span>
+          </Tooltip>
+        ) : (
+          <span className="text-gray-400">—</span>
+        );
+      },
+    },
+    {
       id: "organization_id",
       accessorKey: "organization_id",
       header: "Organization ID",
@@ -503,6 +522,11 @@ export function VirtualKeysTable({ teams, organizations, onSortChange, currentSo
     {
       name: "Key Hash",
       label: "Key Hash",
+      isSearchable: false,
+    },
+    {
+      name: "Application ID",
+      label: "Application ID",
       isSearchable: false,
     },
   ];

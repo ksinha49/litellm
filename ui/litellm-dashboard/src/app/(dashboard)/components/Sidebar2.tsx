@@ -20,6 +20,7 @@ import {
   ToolOutlined,
   TagsOutlined,
   AuditOutlined,
+  RocketOutlined,
 } from "@ant-design/icons";
 // import {
 //   all_admin_roles,
@@ -92,6 +93,8 @@ const routeFor = (slug: string): string => {
       return "teams";
     case "organizations":
       return "organizations";
+    case "applications":
+      return "applications";
     case "users":
       return "users";
     case "api_ref":
@@ -181,6 +184,13 @@ const menuItems: MenuItemCfg[] = [
     page: "organizations",
     label: "Organizations",
     icon: <BankOutlined style={{ fontSize: 18 }} />,
+    roles: all_admin_roles,
+  },
+  {
+    key: "29",
+    page: "applications",
+    label: "Applications",
+    icon: <RocketOutlined style={{ fontSize: 18 }} />,
     roles: all_admin_roles,
   },
   {
