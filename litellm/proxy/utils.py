@@ -4367,7 +4367,7 @@ def _get_docs_url() -> Optional[str]:
     if str_to_bool(os.getenv("NO_DOCS")) is True:
         return None
 
-    return "/"
+    return "/docs"
 
 
 def handle_exception_on_proxy(e: Exception) -> ProxyException:

@@ -119,27 +119,51 @@ const Navbar: React.FC<NavbarProps> = ({
           </div>
           {/* Right side nav items */}
           <div className="flex items-center space-x-5 ml-auto">
-            <CommunityEngagementButtons />
-            {/* Dark mode is currently a work in progress. To test, you can change 'false' to 'true' below.
-            Do not set this to true by default until all components are confirmed to support dark mode styles. */}
-            {false && <Switch
-              data-testid="dark-mode-toggle"
-              checked={isDarkMode}
-              onChange={toggleDarkMode}
-              checkedChildren={<MoonOutlined />}
-              unCheckedChildren={<SunOutlined />}
-            />}
-            <a
-              href="https://docs.litellm.ai/docs/"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-sm text-gray-600 hover:text-gray-900 transition-colors"
-            >
-              Docs
-            </a>
-
-            {!isPublicPage && (
-              <UserDropdown onLogout={handleLogout} />
+            {isPublicPage ? (
+              <>
+                <a
+                  href="/docs"
+                  className="text-sm font-medium transition-colors"
+                  style={{ color: "#377dd0" }}
+                >
+                  API Docs
+                </a>
+                <a
+                  href="/ui"
+                  className="text-sm font-medium px-4 py-2 transition-colors"
+                  style={{
+                    backgroundColor: "#377dd0",
+                    color: "#ffffff",
+                    borderRadius: "9999px",
+                  }}
+                  onMouseEnter={e => { (e.currentTarget as HTMLAnchorElement).style.backgroundColor = "#0758ac"; }}
+                  onMouseLeave={e => { (e.currentTarget as HTMLAnchorElement).style.backgroundColor = "#377dd0"; }}
+                >
+                  Console
+                </a>
+              </>
+            ) : (
+              <>
+                <CommunityEngagementButtons />
+                {/* Dark mode is currently a work in progress. To test, you can change 'false' to 'true' below.
+                Do not set this to true by default until all components are confirmed to support dark mode styles. */}
+                {false && <Switch
+                  data-testid="dark-mode-toggle"
+                  checked={isDarkMode}
+                  onChange={toggleDarkMode}
+                  checkedChildren={<MoonOutlined />}
+                  unCheckedChildren={<SunOutlined />}
+                />}
+                <a
+                  href="https://docs.litellm.ai/docs/"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-sm text-gray-600 hover:text-gray-900 transition-colors"
+                >
+                  Docs
+                </a>
+                <UserDropdown onLogout={handleLogout} />
+              </>
             )}
           </div>
         </div>

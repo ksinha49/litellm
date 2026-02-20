@@ -1003,26 +1003,140 @@ const PublicModelHub: React.FC<PublicModelHubProps> = ({ accessToken, isEmbedded
 
           {/* Hero Banner - only shown when not embedded */}
           {!isEmbedded && (
-            <div
-              className="mb-8 px-8 py-10"
-              style={{
-                background: "linear-gradient(135deg, #377dd0 0%, #0758ac 100%)",
-                borderRadius: "4px",
-              }}
-            >
-              <h1
-                className="text-white font-semibold mb-2"
-                style={{ fontSize: "40px", lineHeight: "54px", fontFamily: "'Source Sans Pro', 'Helvetica Neue', Arial, sans-serif" }}
+            <>
+              <style>{`
+                @keyframes gradientShift {
+                  0%   { background-position: 0% 50%; }
+                  50%  { background-position: 100% 50%; }
+                  100% { background-position: 0% 50%; }
+                }
+              `}</style>
+              <div
+                className="mb-8 px-8 py-12"
+                style={{
+                  background: "linear-gradient(135deg, #377dd0 0%, #0758ac 50%, #1a5fa8 100%)",
+                  backgroundSize: "200% 200%",
+                  animation: "gradientShift 8s ease infinite",
+                  borderRadius: "0px",
+                }}
               >
-                AI Services Hub
-              </h1>
-              <p
-                className="text-white"
-                style={{ fontSize: "20px", lineHeight: "30px", opacity: 0.88, fontFamily: "'Source Sans Pro', 'Helvetica Neue', Arial, sans-serif" }}
-              >
-                Enterprise-wide access to generative AI — secure, observable, and built to scale.
-              </p>
-            </div>
+                <h1
+                  className="text-white font-semibold mb-3"
+                  style={{ fontSize: "40px", lineHeight: "54px", fontFamily: "'Source Sans Pro', 'Helvetica Neue', Arial, sans-serif" }}
+                >
+                  AI Services Hub
+                </h1>
+                <p
+                  className="text-white mb-6"
+                  style={{ fontSize: "20px", lineHeight: "30px", opacity: 0.88, fontFamily: "'Source Sans Pro', 'Helvetica Neue', Arial, sans-serif" }}
+                >
+                  Enterprise-wide access to generative AI — secure, observable, and built to scale.
+                </p>
+
+                {/* Live stats chips */}
+                <div className="flex flex-wrap gap-3 mb-8">
+                  {[
+                    { label: "Models", count: modelHubData?.length ?? "—" },
+                    { label: "Agents", count: agentHubData?.length ?? "—" },
+                    { label: "MCP Servers", count: mcpHubData?.length ?? "—" },
+                  ].map(({ label, count }) => (
+                    <span
+                      key={label}
+                      className="text-white text-sm font-medium px-4 py-1"
+                      style={{
+                        backgroundColor: "rgba(255,255,255,0.15)",
+                        borderRadius: "9999px",
+                        fontFamily: "'Source Sans Pro', 'Helvetica Neue', Arial, sans-serif",
+                      }}
+                    >
+                      {count} {label}
+                    </span>
+                  ))}
+                </div>
+
+                {/* CTA buttons */}
+                <div className="flex flex-wrap gap-4">
+                  <a
+                    href="/docs"
+                    className="text-sm font-medium px-6 py-2 transition-colors"
+                    style={{
+                      border: "2px solid #ffffff",
+                      color: "#ffffff",
+                      borderRadius: "9999px",
+                      fontFamily: "'Source Sans Pro', 'Helvetica Neue', Arial, sans-serif",
+                      textDecoration: "none",
+                    }}
+                    onMouseEnter={e => {
+                      (e.currentTarget as HTMLAnchorElement).style.backgroundColor = "#ffffff";
+                      (e.currentTarget as HTMLAnchorElement).style.color = "#377dd0";
+                    }}
+                    onMouseLeave={e => {
+                      (e.currentTarget as HTMLAnchorElement).style.backgroundColor = "transparent";
+                      (e.currentTarget as HTMLAnchorElement).style.color = "#ffffff";
+                    }}
+                  >
+                    View API Docs
+                  </a>
+                  <a
+                    href="/ui"
+                    className="text-sm font-medium px-6 py-2 transition-colors"
+                    style={{
+                      backgroundColor: "#ffffff",
+                      color: "#377dd0",
+                      borderRadius: "9999px",
+                      fontFamily: "'Source Sans Pro', 'Helvetica Neue', Arial, sans-serif",
+                      textDecoration: "none",
+                    }}
+                    onMouseEnter={e => { (e.currentTarget as HTMLAnchorElement).style.backgroundColor = "#ededed"; }}
+                    onMouseLeave={e => { (e.currentTarget as HTMLAnchorElement).style.backgroundColor = "#ffffff"; }}
+                  >
+                    Open Console
+                  </a>
+                </div>
+              </div>
+
+              {/* Feature highlights grid */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                {[
+                  {
+                    icon: "🔌",
+                    title: "Unified API",
+                    body: "One endpoint for any model — no per-team integration work.",
+                  },
+                  {
+                    icon: "🔒",
+                    title: "Governance & Compliance",
+                    body: "Budget controls, SSO, and full audit logs built in.",
+                  },
+                  {
+                    icon: "📊",
+                    title: "Full Observability",
+                    body: "Real-time usage, cost, and latency across every team.",
+                  },
+                ].map(({ icon, title, body }) => (
+                  <div
+                    key={title}
+                    className="bg-white p-6"
+                    style={{
+                      borderRadius: "0px",
+                      boxShadow: "0 3px 4px 1px rgba(0,0,0,.1)",
+                      borderLeft: "4px solid #377dd0",
+                    }}
+                  >
+                    <div className="text-2xl mb-3">{icon}</div>
+                    <h5
+                      className="font-semibold mb-2"
+                      style={{ fontSize: "20px", lineHeight: "30px", color: "#333333", fontFamily: "'Source Sans Pro', 'Helvetica Neue', Arial, sans-serif" }}
+                    >
+                      {title}
+                    </h5>
+                    <p style={{ fontSize: "16px", lineHeight: "24px", color: "#595959", fontFamily: "'Source Sans Pro', 'Helvetica Neue', Arial, sans-serif" }}>
+                      {body}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </>
           )}
 
           {/* About Section - only shown when not embedded */}
@@ -1030,7 +1144,7 @@ const PublicModelHub: React.FC<PublicModelHubProps> = ({ accessToken, isEmbedded
             <div
               className="mb-8 bg-white p-8"
               style={{
-                borderRadius: "4px",
+                borderRadius: "0px",
                 boxShadow: "0 3px 4px 1px rgba(0,0,0,.1)",
                 borderLeft: "4px solid #377dd0",
               }}
@@ -1051,7 +1165,7 @@ const PublicModelHub: React.FC<PublicModelHubProps> = ({ accessToken, isEmbedded
                 <div className="flex items-center space-x-2">
                   <span
                     className="inline-flex items-center px-3 py-1 text-sm font-medium text-white"
-                    style={{ backgroundColor: "#377dd0", borderRadius: "4px", fontFamily: "'Source Sans Pro', 'Helvetica Neue', Arial, sans-serif" }}
+                    style={{ backgroundColor: "#377dd0", borderRadius: "9999px", fontFamily: "'Source Sans Pro', 'Helvetica Neue', Arial, sans-serif" }}
                   >
                     v{litellmVersion}
                   </span>
@@ -1067,7 +1181,7 @@ const PublicModelHub: React.FC<PublicModelHubProps> = ({ accessToken, isEmbedded
           {usefulLinks && Object.keys(usefulLinks).length > 0 && (
             <div
               className="mb-8 bg-white p-8"
-              style={{ borderRadius: "4px", boxShadow: "0 3px 4px 1px rgba(0,0,0,.1)" }}
+              style={{ borderRadius: "0px", boxShadow: "0 3px 4px 1px rgba(0,0,0,.1)" }}
             >
               <h2
                 className="font-semibold mb-5"
@@ -1090,7 +1204,7 @@ const PublicModelHub: React.FC<PublicModelHubProps> = ({ accessToken, isEmbedded
                       onClick={() => window.open(url, "_blank")}
                       className="flex items-center space-x-3 transition-colors p-3 border"
                       style={{
-                        borderRadius: "4px",
+                        borderRadius: "9999px",
                         borderColor: "#cccccc",
                         color: "#377dd0",
                         fontFamily: "'Source Sans Pro', 'Helvetica Neue', Arial, sans-serif",
