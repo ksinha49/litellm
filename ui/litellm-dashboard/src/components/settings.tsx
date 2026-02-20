@@ -712,7 +712,7 @@ const Settings: React.FC<SettingsPageProps> = ({ accessToken, userRole, userID, 
           style={{ color: "blue" }}
         >
           {" "}
-          LiteLLM Docs: Logging
+          Ameritas LLM Docs: Logging
         </a>
 
         <Form

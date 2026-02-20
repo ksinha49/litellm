@@ -101,8 +101,8 @@ const LiteLLMModelNameField: React.FC<LiteLLMModelNameFieldProps> = ({
   return (
     <>
       <Form.Item
-        label="LiteLLM Model Name(s)"
-        tooltip="The model name LiteLLM will send to the LLM API"
+        label="Proxy Model Name(s)"
+        tooltip="The model name Ameritas LLM will send to the LLM API"
         className="mb-0"
       >
         <Form.Item
@@ -183,8 +183,8 @@ const LiteLLMModelNameField: React.FC<LiteLLMModelNameFieldProps> = ({
         <Col span={14}>
           <Text className="mb-3 mt-1">
             {selectedProvider === Providers.Azure
-              ? "Your deployment name will be saved as the public model name, and LiteLLM will use 'azure/deployment-name' internally"
-              : "The model name LiteLLM will send to the LLM API"}
+              ? "Your deployment name will be saved as the public model name, and Ameritas LLM will use 'azure/deployment-name' internally"
+              : "The model name Ameritas LLM will send to the LLM API"}
           </Text>
         </Col>
       </Row>

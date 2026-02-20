@@ -15,7 +15,7 @@ import React, { useEffect, useState } from "react";
 import { CommunityEngagementButtons } from "./Navbar/CommunityEngagementButtons/CommunityEngagementButtons";
 import UserDropdown from "./Navbar/UserDropdown/UserDropdown";
 
-const appName = process.env.NEXT_PUBLIC_APP_NAME || "Ameritas LiteLLM";
+const appName = process.env.NEXT_PUBLIC_APP_NAME || "Ameritas LLM";
 
 interface NavbarProps {
   userID: string | null;

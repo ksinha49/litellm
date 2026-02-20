@@ -12,7 +12,7 @@ import { Alert, Button, Card, Form, Input, Popover, Space, Typography } from "an
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
-const appName = process.env.NEXT_PUBLIC_APP_NAME || "Ameritas LiteLLM";
+const appName = process.env.NEXT_PUBLIC_APP_NAME || "Ameritas LLM";
 const rootPath = process.env.NEXT_PUBLIC_SERVER_ROOT_PATH || "";
 
 function LoginPageContent() {
@@ -213,7 +213,7 @@ function LoginPageContent() {
             type="info"
             showIcon
             closable
-            message={<Text>Single Sign-On (SSO) is enabled. LiteLLM no longer automatically redirects to the SSO login flow upon loading this page. To re-enable auto-redirect-to-SSO, set <Text code>AUTO_REDIRECT_UI_LOGIN_TO_SSO=true</Text> in your environment configuration.</Text>}
+            message={<Text>Single Sign-On (SSO) is enabled. Ameritas LLM no longer automatically redirects to the SSO login flow upon loading this page. To re-enable auto-redirect-to-SSO, set <Text code>AUTO_REDIRECT_UI_LOGIN_TO_SSO=true</Text> in your environment configuration.</Text>}
           />
         )}
       </Card>

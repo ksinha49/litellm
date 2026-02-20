@@ -92,10 +92,10 @@ interface PublicModelHubProps {
   isEmbedded?: boolean; // When true, hides navbar and adjusts layout for embedding in dashboard
 }
 
-const appName = process.env.NEXT_PUBLIC_APP_NAME || "Ameritas LiteLLM";
+const appName = process.env.NEXT_PUBLIC_APP_NAME || "Ameritas LLM";
 
 const defaultDocsDescription =
-  `${appName} has deployed a centralized AI Services Hub built on LiteLLM to give every team ` +
+  `${appName} has deployed a centralized AI Services Hub built on Ameritas LLM to give every team ` +
   `consistent, secure, and scalable access to generative AI. The hub abstracts multiple language ` +
   `models behind a unified API, automatically handling authentication, budget controls, rate limits, ` +
   `and observability so developers can focus on building features rather than managing infrastructure.\n\n` +

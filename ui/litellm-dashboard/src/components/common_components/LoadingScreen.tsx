@@ -1,7 +1,7 @@
 import { cx } from "@/lib/cva.config";
 import { UiLoadingSpinner } from "../ui/ui-loading-spinner";
 
-const appName = process.env.NEXT_PUBLIC_APP_NAME || "Ameritas LiteLLM";
+const appName = process.env.NEXT_PUBLIC_APP_NAME || "Ameritas LLM";
 
 export default function LoadingScreen() {
   return (

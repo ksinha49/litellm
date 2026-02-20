@@ -16,7 +16,7 @@ import { createLogger } from "@/utils/logger";
 
 const log = createLogger("Onboarding");
 
-const appName = process.env.NEXT_PUBLIC_APP_NAME || "Ameritas LiteLLM";
+const appName = process.env.NEXT_PUBLIC_APP_NAME || "Ameritas LLM";
 
 function OnboardingContent() {
   const [form] = Form.useForm();

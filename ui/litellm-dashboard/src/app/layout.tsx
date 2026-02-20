@@ -6,7 +6,7 @@ import AntdGlobalProvider from "@/contexts/AntdGlobalProvider";
 
 const inter = Inter({ subsets: ["latin"] });
 
-const appName = process.env.NEXT_PUBLIC_APP_NAME || "Ameritas LiteLLM";
+const appName = process.env.NEXT_PUBLIC_APP_NAME || "Ameritas LLM";
 
 export const metadata: Metadata = {
   title: `${appName} Dashboard`,

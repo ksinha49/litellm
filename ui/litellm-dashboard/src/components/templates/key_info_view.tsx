@@ -394,7 +394,7 @@ export default function KeyInfoView({
         {canModifyKey && (
           <div className="flex gap-2">
             <Tooltip
-              title={!premiumUser ? "This is a LiteLLM Enterprise feature, and requires a valid key to use." : ""}
+              title={!premiumUser ? "This is an Ameritas LLM Enterprise feature, and requires a valid key to use." : ""}
             >
               <span className="inline-block">
                 <Button
