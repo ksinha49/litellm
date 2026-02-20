@@ -95,15 +95,15 @@ interface PublicModelHubProps {
 const appName = process.env.NEXT_PUBLIC_APP_NAME || "Ameritas LLM";
 
 const defaultDocsDescription =
-  `${appName} has deployed a centralized AI Services Hub built on Ameritas LLM to give every team ` +
-  `consistent, secure, and scalable access to generative AI. The hub abstracts multiple language ` +
-  `models behind a unified API, automatically handling authentication, budget controls, rate limits, ` +
-  `and observability so developers can focus on building features rather than managing infrastructure.\n\n` +
-  `Across the enterprise, the hub is used for document summarization, customer-service automation, ` +
-  `knowledge retrieval, and bespoke model experimentation. Business units can onboard new models ` +
-  `without modifying existing code, while governance teams maintain full visibility into usage and cost. ` +
-  `This shared platform has turned AI from a niche experiment into an enterprise-wide capability—` +
-  `accelerating innovation while preserving compliance and operational control.`;
+  `Ameritas has built a centralized AI Services Hub providing every team with consistent, secure, ` +
+  `and scalable access to generative AI. A unified API abstracts multiple language models while ` +
+  `automatically managing authentication, budget controls, rate limits, and observability — so ` +
+  `developers focus on building features, not managing infrastructure.\n\n` +
+  `Across the enterprise, the hub powers document summarization, customer-service automation, ` +
+  `knowledge retrieval, and model experimentation. Teams onboard new models without modifying ` +
+  `existing code, while governance teams maintain full visibility into usage and cost. This shared ` +
+  `platform transforms AI into an enterprise-wide capability — accelerating innovation while ` +
+  `preserving compliance and operational control.`;
 
 const PublicModelHub: React.FC<PublicModelHubProps> = ({ accessToken, isEmbedded = false }) => {
   const [modelHubData, setModelHubData] = useState<ModelGroupInfo[] | null>(null);
@@ -1001,26 +1001,80 @@ const PublicModelHub: React.FC<PublicModelHubProps> = ({ accessToken, isEmbedded
             </div>
           )}
 
+          {/* Hero Banner - only shown when not embedded */}
+          {!isEmbedded && (
+            <div
+              className="mb-8 px-8 py-10"
+              style={{
+                background: "linear-gradient(135deg, #377dd0 0%, #0758ac 100%)",
+                borderRadius: "4px",
+              }}
+            >
+              <h1
+                className="text-white font-semibold mb-2"
+                style={{ fontSize: "40px", lineHeight: "54px", fontFamily: "'Source Sans Pro', 'Helvetica Neue', Arial, sans-serif" }}
+              >
+                AI Services Hub
+              </h1>
+              <p
+                className="text-white"
+                style={{ fontSize: "20px", lineHeight: "30px", opacity: 0.88, fontFamily: "'Source Sans Pro', 'Helvetica Neue', Arial, sans-serif" }}
+              >
+                Enterprise-wide access to generative AI — secure, observable, and built to scale.
+              </p>
+            </div>
+          )}
+
           {/* About Section - only shown when not embedded */}
           {!isEmbedded && (
-            <Card className="mb-10 p-8 bg-white border border-gray-200 rounded-lg shadow-sm">
-              <Title className="text-2xl font-semibold mb-6 text-gray-900">About</Title>
-              <p className="text-gray-700 mb-6 text-base leading-relaxed whitespace-pre-line">
+            <div
+              className="mb-8 bg-white p-8"
+              style={{
+                borderRadius: "4px",
+                boxShadow: "0 3px 4px 1px rgba(0,0,0,.1)",
+                borderLeft: "4px solid #377dd0",
+              }}
+            >
+              <h2
+                className="font-semibold mb-5"
+                style={{ fontSize: "32px", lineHeight: "46px", color: "#363636", fontFamily: "'Source Sans Pro', 'Helvetica Neue', Arial, sans-serif" }}
+              >
+                About
+              </h2>
+              <p
+                className="mb-6 whitespace-pre-line"
+                style={{ fontSize: "16px", lineHeight: "24px", color: "#595959", fontFamily: "'Source Sans Pro', 'Helvetica Neue', Arial, sans-serif" }}
+              >
                 {customDocsDescription}
               </p>
-              <div className="flex items-center space-x-3 text-sm text-gray-600">
-                <span className="flex items-center">
-                  <span className="w-4 h-4 mr-2">🔧</span>
-                  Built with {appName}: v{litellmVersion}
-                </span>
-              </div>
-            </Card>
+              {litellmVersion && (
+                <div className="flex items-center space-x-2">
+                  <span
+                    className="inline-flex items-center px-3 py-1 text-sm font-medium text-white"
+                    style={{ backgroundColor: "#377dd0", borderRadius: "4px", fontFamily: "'Source Sans Pro', 'Helvetica Neue', Arial, sans-serif" }}
+                  >
+                    v{litellmVersion}
+                  </span>
+                  <span style={{ fontSize: "14px", color: "#767676" }}>
+                    Powered by {appName}
+                  </span>
+                </div>
+              )}
+            </div>
           )}
 
           {/* Useful Links - only shown when not embedded */}
           {usefulLinks && Object.keys(usefulLinks).length > 0 && (
-            <Card className="mb-10 p-8 bg-white border border-gray-200 rounded-lg shadow-sm">
-              <Title className="text-2xl font-semibold mb-6 text-gray-900">Useful Links</Title>
+            <div
+              className="mb-8 bg-white p-8"
+              style={{ borderRadius: "4px", boxShadow: "0 3px 4px 1px rgba(0,0,0,.1)" }}
+            >
+              <h2
+                className="font-semibold mb-5"
+                style={{ fontSize: "32px", lineHeight: "46px", color: "#363636", fontFamily: "'Source Sans Pro', 'Helvetica Neue', Arial, sans-serif" }}
+              >
+                Useful Links
+              </h2>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {Object.entries(usefulLinks || {})
                   .map(([title, value]) => {
@@ -1034,14 +1088,22 @@ const PublicModelHub: React.FC<PublicModelHubProps> = ({ accessToken, isEmbedded
                     <button
                       key={title}
                       onClick={() => window.open(url, "_blank")}
-                      className="flex items-center space-x-3 text-blue-600 hover:text-blue-800 transition-colors p-3 rounded-lg hover:bg-blue-50 border border-gray-200"
+                      className="flex items-center space-x-3 transition-colors p-3 border"
+                      style={{
+                        borderRadius: "4px",
+                        borderColor: "#cccccc",
+                        color: "#377dd0",
+                        fontFamily: "'Source Sans Pro', 'Helvetica Neue', Arial, sans-serif",
+                      }}
+                      onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.backgroundColor = "#f0f6fc"; }}
+                      onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.backgroundColor = "transparent"; }}
                     >
                       <ExternalLinkIcon className="w-4 h-4" />
                       <Text className="text-sm font-medium">{title}</Text>
                     </button>
                   ))}
               </div>
-            </Card>
+            </div>
           )}
 
           {/* Health and Endpoint Status - only shown when not embedded */}
