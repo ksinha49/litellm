@@ -10659,6 +10659,14 @@ async def claim_onboarding_link(data: InvitationClaim):
     return user_obj
 
 
+@app.get("/favicon.ico", include_in_schema=False)
+async def get_favicon():
+    """Serve favicon from the swagger directory for all pages."""
+    _current_dir = os.path.dirname(os.path.abspath(__file__))
+    favicon_path = os.path.join(_current_dir, "swagger", "favicon.ico")
+    return FileResponse(favicon_path, media_type="image/x-icon")
+
+
 @app.get("/get_logo_url", include_in_schema=False)
 def get_logo_url():
     """Get the current logo URL from environment"""
