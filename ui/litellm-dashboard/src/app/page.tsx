@@ -37,6 +37,8 @@ import Usage from "@/components/usage";
 import UserDashboard from "@/components/user_dashboard";
 import { AccessGroupsPage } from "@/components/AccessGroups/AccessGroupsPage";
 import VectorStoreManagement from "@/components/vector_store_management";
+import ApplicationsView from "@/app/(dashboard)/applications/ApplicationsView";
+import { applicationConfigCall, ApplicationConfig } from "@/components/networking";
 import SpendLogsTable from "@/components/view_logs";
 import ViewUserDashboard from "@/components/view_users";
 import { ThemeProvider } from "@/contexts/ThemeContext";
@@ -508,6 +510,13 @@ function CreateKeyPageContent() {
                     <TagManagement accessToken={accessToken} userRole={userRole} userID={userID} />
                   ) : page == "claude-code-plugins" ? (
                     <ClaudeCodePluginsPanel accessToken={accessToken} userRole={userRole} />
+                  ) : page == "applications" ? (
+                    <ApplicationsView
+                      accessToken={accessToken}
+                      userID={userID}
+                      userRole={userRole}
+                      config={{ departments: [], lines_of_business: [] }}
+                    />
                   ) : page == "access-groups" ? (
                     <AccessGroupsPage />
                   ) : page == "vector-stores" ? (
