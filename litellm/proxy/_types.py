@@ -4106,6 +4106,7 @@ class NewApplicationRequest(LiteLLMPydanticObjectBase):
     team_id: Optional[str] = None
     description: Optional[str] = None
     labels: Optional[dict] = None
+    health_check_url: Optional[str] = None
 
 
 class UpdateApplicationRequest(LiteLLMPydanticObjectBase):
@@ -4117,6 +4118,7 @@ class UpdateApplicationRequest(LiteLLMPydanticObjectBase):
     team_id: Optional[str] = None
     description: Optional[str] = None
     labels: Optional[dict] = None
+    health_check_url: Optional[str] = None
 
 
 class ApplicationMetrics(LiteLLMPydanticObjectBase):
@@ -4132,6 +4134,9 @@ class ApplicationMetrics(LiteLLMPydanticObjectBase):
     error_rate: float = 0.0  # 0.0 to 1.0
     is_active: bool = False
     key_count: int = 0
+    health_check_url: Optional[str] = None
+    health_status: str = "unknown"  # "healthy" | "unhealthy" | "unknown"
+    last_health_check_at: Optional[str] = None
 
 
 class ApplicationHealthResponse(LiteLLMPydanticObjectBase):

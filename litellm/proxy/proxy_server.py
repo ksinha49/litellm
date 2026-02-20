@@ -5641,6 +5641,32 @@ class ProxyStartupEvent:
         # Do NOT reset job times to "now" as this can trigger the memory leak
         # The misfire_grace_time and coalesce settings will handle any missed runs properly
 
+        ### APPLICATION HEALTH POLLING ###
+        try:
+            from litellm.proxy.common_utils.application_health_job import (
+                ApplicationHealthJob,
+            )
+
+            _app_health_job = ApplicationHealthJob()
+            _app_health_interval = int(
+                os.environ.get("APPLICATION_HEALTH_CHECK_INTERVAL", 300)
+            )
+            scheduler.add_job(
+                _app_health_job.run,
+                "interval",
+                seconds=_app_health_interval,
+                id="application_health_job",
+                replace_existing=True,
+                misfire_grace_time=APSCHEDULER_MISFIRE_GRACE_TIME,
+            )
+            verbose_proxy_logger.info(
+                f"Application health polling job scheduled every {_app_health_interval}s"
+            )
+        except Exception as e:
+            verbose_proxy_logger.debug(
+                f"Failed to setup application health polling: {e}"
+            )
+
         # Start the scheduler immediately without processing backlogs
         scheduler.start(paused=False)
         verbose_proxy_logger.info(
@@ -5783,6 +5809,7 @@ class ProxyStartupEvent:
                     replace_existing=True,
                 )
                 await proxy_logging_obj.slack_alerting_instance.send_fallback_stats_from_prometheus()
+
 
     @classmethod
     async def _setup_prisma_client(

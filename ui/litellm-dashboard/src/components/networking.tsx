@@ -15,6 +15,9 @@ export interface Application {
   updated_at: string;
   created_by?: string | null;
   updated_by?: string | null;
+  health_check_url?: string | null;
+  health_status?: string | null;
+  last_health_check_at?: string | null;
 }
 
 export interface NewApplicationRequest {
@@ -25,6 +28,7 @@ export interface NewApplicationRequest {
   team_id?: string;
   description?: string;
   labels?: Record<string, string>;
+  health_check_url?: string;
 }
 
 export interface UpdateApplicationRequest {
@@ -36,6 +40,7 @@ export interface UpdateApplicationRequest {
   team_id?: string;
   description?: string;
   labels?: Record<string, string>;
+  health_check_url?: string;
 }
 
 export interface ApplicationMetrics {
@@ -51,6 +56,9 @@ export interface ApplicationMetrics {
   error_rate: number;
   is_active: boolean;
   key_count: number;
+  health_check_url?: string | null;
+  health_status?: string;
+  last_health_check_at?: string | null;
 }
 
 export interface ApplicationHealthResponse {
@@ -274,6 +282,21 @@ export const applicationUnassignKeyCall = async (
     const err = await response.json();
     throw new Error(deriveErrorMessage(err));
   }
+};
+
+export const applicationListKeysCall = async (
+  accessToken: string,
+  app_id: string,
+): Promise<{ application_id: string; keys: any[] }> => {
+  const response = await fetch(
+    _applicationBase() + `/${encodeURIComponent(app_id)}/keys`,
+    { headers: { [globalLitellmHeaderName]: `Bearer ${accessToken}` } },
+  );
+  if (!response.ok) {
+    const err = await response.json();
+    throw new Error(deriveErrorMessage(err));
+  }
+  return response.json();
 };
 
 // ─── End Application Management API calls ─────────────────────────────────

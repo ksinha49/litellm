@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   Button,
   Form,
@@ -18,11 +18,12 @@ import {
   CheckCircleOutlined,
   DeleteOutlined,
   EditOutlined,
+  KeyOutlined,
   MinusCircleOutlined,
   PlusOutlined,
   ReloadOutlined,
 } from "@ant-design/icons";
-import { Card, Metric, Text } from "@tremor/react";
+import { Card, Metric, Text, TabGroup, TabList, Tab, TabPanels, TabPanel } from "@tremor/react";
 import {
   Application,
   ApplicationConfig,
@@ -34,8 +35,15 @@ import {
   applicationUpdateCall,
   applicationDeleteCall,
   applicationHealthCall,
+  applicationAssignKeyCall,
+  applicationUnassignKeyCall,
+  applicationListKeysCall,
+  keyListCall,
+  teamListCall,
 } from "@/components/networking";
 import { isAdminRole } from "@/utils/roles";
+import TeamDropdown from "@/components/common_components/team_dropdown";
+import type { Team } from "@/components/key_team_helpers/key_list";
 
 const { Option } = Select;
 
@@ -75,9 +83,6 @@ const ApplicationsView: React.FC<Props> = ({
 }) => {
   const isAdmin = isAdminRole(userRole ?? "");
 
-  // ── shared state ────────────────────────────────────────────────────────────
-  const [activeTab, setActiveTab] = useState<"health" | "registry">("health");
-
   // ── Health Dashboard state ───────────────────────────────────────────────────
   const [healthData, setHealthData] = useState<ApplicationMetrics[]>([]);
   const [healthLoading, setHealthLoading] = useState(false);
@@ -100,6 +105,19 @@ const ApplicationsView: React.FC<Props> = ({
   const [createForm] = Form.useForm();
   const [editForm] = Form.useForm();
   const [submitting, setSubmitting] = useState(false);
+
+  // ── Keys modal state ─────────────────────────────────────────────────────────
+  const [keysModalApp, setKeysModalApp] = useState<Application | null>(null);
+  const [assignedKeys, setAssignedKeys] = useState<any[]>([]);
+  const [allKeysForPicker, setAllKeysForPicker] = useState<any[]>([]);
+  const [keysLoading, setKeysLoading] = useState(false);
+  const [pickKey, setPickKey] = useState<string | undefined>(undefined);
+  const [assigning, setAssigning] = useState(false);
+  const [pickerSearching, setPickerSearching] = useState(false);
+  const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // ── Teams state (for TeamDropdown) ───────────────────────────────────────────
+  const [teams, setTeams] = useState<Team[]>([]);
 
   // ── Fetch health data ────────────────────────────────────────────────────────
   const fetchHealth = useCallback(async () => {
@@ -153,10 +171,23 @@ const ApplicationsView: React.FC<Props> = ({
     fetchApps();
   }, [fetchApps]);
 
+  useEffect(() => {
+    if (!accessToken) return;
+    teamListCall(accessToken, null, userID)
+      .then((data: any) => setTeams(Array.isArray(data) ? data : data.teams ?? []))
+      .catch(() => {});
+  }, [accessToken, userID]);
+
   // ── Summary numbers ───────────────────────────────────────────────────────────
   const totalTokens = healthData.reduce((s, a) => s + a.total_tokens, 0);
   const totalCost = healthData.reduce((s, a) => s + a.total_cost, 0);
   const activeApps = healthData.filter((a) => a.is_active).length;
+
+  // ── Helpers ──────────────────────────────────────────────────────────────────
+  const toLabelsRecord = (list: { key: string; value: string }[] | undefined) => {
+    if (!list || list.length === 0) return undefined;
+    return Object.fromEntries(list.map(({ key, value }) => [key, value]));
+  };
 
   // ── CRUD handlers ────────────────────────────────────────────────────────────
   const handleCreate = async () => {
@@ -170,6 +201,8 @@ const ApplicationsView: React.FC<Props> = ({
         lob: values.lob,
         team_id: values.team_id || undefined,
         description: values.description || undefined,
+        labels: toLabelsRecord(values.labels_list),
+        health_check_url: values.health_check_url || undefined,
       };
       await applicationCreateCall(accessToken!, payload);
       message.success(`Application "${payload.application_name}" created`);
@@ -198,6 +231,8 @@ const ApplicationsView: React.FC<Props> = ({
         lob: values.lob || undefined,
         team_id: values.team_id || undefined,
         description: values.description || undefined,
+        labels: toLabelsRecord(values.labels_list),
+        health_check_url: values.health_check_url || undefined,
       };
       await applicationUpdateCall(accessToken!, payload);
       message.success("Application updated");
@@ -238,6 +273,10 @@ const ApplicationsView: React.FC<Props> = ({
       lob: app.lob,
       team_id: app.team_id ?? undefined,
       description: app.description ?? undefined,
+      health_check_url: app.health_check_url ?? undefined,
+      labels_list: app.labels
+        ? Object.entries(app.labels).map(([key, value]) => ({ key, value }))
+        : [],
     });
     setEditModalOpen(true);
   };
@@ -245,6 +284,76 @@ const ApplicationsView: React.FC<Props> = ({
   const openDelete = (app: Application) => {
     setSelectedApp(app);
     setDeleteModalOpen(true);
+  };
+
+  // ── Keys modal handlers ───────────────────────────────────────────────────────
+  const openKeysModal = async (app: Application) => {
+    setKeysModalApp(app);
+    setKeysLoading(true);
+    try {
+      const [assignedRes, allRes] = await Promise.all([
+        applicationListKeysCall(accessToken!, app.application_id),
+        keyListCall(accessToken!, null, null, null, null, null, 1, 50),
+      ]);
+      setAssignedKeys(assignedRes.keys);
+      setAllKeysForPicker(allRes.keys ?? []);
+    } catch (e: any) {
+      message.error(e.message ?? "Failed to load keys");
+    } finally {
+      setKeysLoading(false);
+    }
+  };
+
+  const searchPickerKeys = useCallback(
+    (alias: string) => {
+      if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
+      searchDebounceRef.current = setTimeout(async () => {
+        if (!accessToken) return;
+        setPickerSearching(true);
+        try {
+          const res = await keyListCall(
+            accessToken,
+            null, null,
+            alias.trim() || null,  // selectedKeyAlias — null means no filter
+            null, null,
+            1, 50,
+          );
+          setAllKeysForPicker(res.keys ?? []);
+        } catch (e: any) {
+          message.error(e.message ?? "Failed to search keys");
+        } finally {
+          setPickerSearching(false);
+        }
+      }, 300);
+    },
+    [accessToken],
+  );
+
+  const handleAssignKey = async () => {
+    if (!keysModalApp || !pickKey) return;
+    setAssigning(true);
+    try {
+      await applicationAssignKeyCall(accessToken!, keysModalApp.application_id, pickKey);
+      message.success("Key assigned");
+      setPickKey(undefined);
+      const res = await applicationListKeysCall(accessToken!, keysModalApp.application_id);
+      setAssignedKeys(res.keys);
+    } catch (e: any) {
+      message.error(e.message ?? "Failed to assign key");
+    } finally {
+      setAssigning(false);
+    }
+  };
+
+  const handleUnassignKey = async (keyToken: string) => {
+    if (!keysModalApp) return;
+    try {
+      await applicationUnassignKeyCall(accessToken!, keysModalApp.application_id, keyToken);
+      message.success("Key removed");
+      setAssignedKeys((prev) => prev.filter((k) => k.token !== keyToken));
+    } catch (e: any) {
+      message.error(e.message ?? "Failed to remove key");
+    }
   };
 
   // ── Health Dashboard columns ─────────────────────────────────────────────────
@@ -352,6 +461,37 @@ const ApplicationsView: React.FC<Props> = ({
       render: (v: string) => new Date(v).toLocaleDateString(),
       sorter: (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime(),
     },
+    {
+      title: "Health",
+      key: "health_status",
+      render: (_: unknown, record: Application) => {
+        const status = record.health_status;
+        const url = record.health_check_url;
+        if (!url) return <span className="text-gray-400">—</span>;
+        const checkedAt = record.last_health_check_at
+          ? `Last checked: ${new Date(record.last_health_check_at).toLocaleString()}`
+          : "Not yet checked";
+        if (status === "healthy") {
+          return (
+            <Tooltip title={checkedAt}>
+              <Tag color="success">Healthy</Tag>
+            </Tooltip>
+          );
+        }
+        if (status === "unhealthy") {
+          return (
+            <Tooltip title={checkedAt}>
+              <Tag color="error">Unhealthy</Tag>
+            </Tooltip>
+          );
+        }
+        return (
+          <Tooltip title="Health check not yet run">
+            <Tag color="default">Unknown</Tag>
+          </Tooltip>
+        );
+      },
+    },
     ...(isAdmin
       ? ([
           {
@@ -359,6 +499,12 @@ const ApplicationsView: React.FC<Props> = ({
             key: "actions",
             render: (_: unknown, record: Application) => (
               <Space>
+                <Button
+                  size="small"
+                  icon={<KeyOutlined />}
+                  onClick={() => openKeysModal(record)}
+                  title="Manage Keys"
+                />
                 <Button
                   size="small"
                   icon={<EditOutlined />}
@@ -428,170 +574,194 @@ const ApplicationsView: React.FC<Props> = ({
           <Input placeholder="e.g. Retail" />
         )}
       </Form.Item>
-      <Form.Item name="team_id" label="Team ID (optional)">
-        <Input placeholder="team-uuid" />
+      <Form.Item name="team_id" label="Team (optional)">
+        <TeamDropdown teams={teams} />
       </Form.Item>
       <Form.Item name="description" label="Description (optional)">
         <Input.TextArea rows={2} />
       </Form.Item>
+      <Form.Item name="health_check_url" label="Health Check URL (optional)">
+        <Input placeholder="https://yourapp.example.com/health" />
+      </Form.Item>
+      <Form.Item label="Labels (optional)">
+        <Form.List name="labels_list">
+          {(fields, { add, remove }) => (
+            <>
+              {fields.map(({ key, name, ...restField }) => (
+                <Space key={key} className="flex mb-2" align="baseline">
+                  <Form.Item
+                    {...restField}
+                    name={[name, "key"]}
+                    rules={[{ required: true, message: "Key required" }]}
+                    className="mb-0"
+                  >
+                    <Input placeholder="key" style={{ width: 160 }} />
+                  </Form.Item>
+                  <Form.Item
+                    {...restField}
+                    name={[name, "value"]}
+                    rules={[{ required: true, message: "Value required" }]}
+                    className="mb-0"
+                  >
+                    <Input placeholder="value" style={{ width: 200 }} />
+                  </Form.Item>
+                  <MinusCircleOutlined onClick={() => remove(name)} className="text-gray-400 hover:text-red-500" />
+                </Space>
+              ))}
+              <Button
+                type="dashed"
+                onClick={() => add()}
+                icon={<PlusOutlined />}
+                size="small"
+              >
+                Add Label
+              </Button>
+            </>
+          )}
+        </Form.List>
+      </Form.Item>
     </>
   );
 
-  // ── Tab styling ──────────────────────────────────────────────────────────────
-  const tabStyle = (tab: "health" | "registry") => ({
-    padding: "8px 20px",
-    cursor: "pointer",
-    borderBottom: activeTab === tab ? "2px solid #1890ff" : "2px solid transparent",
-    color: activeTab === tab ? "#1890ff" : "#595959",
-    fontWeight: activeTab === tab ? 600 : 400,
-    marginRight: 8,
-  });
-
   // ── Render ────────────────────────────────────────────────────────────────────
   return (
-    <div style={{ padding: "24px" }}>
+    <div className="w-full p-6 overflow-x-hidden box-border">
       {/* Page header */}
-      <div style={{ marginBottom: 24 }}>
-        <h2 style={{ margin: 0, fontSize: 22, fontWeight: 700 }}>Applications</h2>
-        <Text className="text-gray-500">Register and monitor AI applications across your organization</Text>
+      <div className="mb-6">
+        <h2 className="text-xl font-semibold">Applications</h2>
+        <p className="text-sm text-gray-500 mt-1">Register and monitor AI applications across your organization</p>
       </div>
 
-      {/* Tabs */}
-      <div style={{ display: "flex", borderBottom: "1px solid #f0f0f0", marginBottom: 24 }}>
-        <span style={tabStyle("health")} onClick={() => setActiveTab("health")}>
-          Health Dashboard
-        </span>
-        <span style={tabStyle("registry")} onClick={() => setActiveTab("registry")}>
-          Registry
-        </span>
-      </div>
+      <TabGroup>
+        <TabList>
+          <Tab>Health Dashboard</Tab>
+          <Tab>Registry</Tab>
+        </TabList>
+        <TabPanels>
+          {/* ── Health Dashboard Tab ───────────────────────────────────────────── */}
+          <TabPanel>
+            {/* Summary cards */}
+            <div className="grid grid-cols-4 gap-4 mt-4 mb-6">
+              <Card>
+                <Text>Total Apps</Text>
+                <Metric>{healthData.length}</Metric>
+              </Card>
+              <Card>
+                <Text>Active (24h)</Text>
+                <Metric>{activeApps}</Metric>
+              </Card>
+              <Card>
+                <Text>Total Tokens</Text>
+                <Metric>{fmtTokens(totalTokens)}</Metric>
+              </Card>
+              <Card>
+                <Text>Total Cost</Text>
+                <Metric>{fmtCost(totalCost)}</Metric>
+              </Card>
+            </div>
 
-      {/* ── Health Dashboard Tab ─────────────────────────────────────────────── */}
-      {activeTab === "health" && (
-        <>
-          {/* Summary cards */}
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 16, marginBottom: 24 }}>
-            <Card>
-              <Text>Total Apps</Text>
-              <Metric>{healthData.length}</Metric>
-            </Card>
-            <Card>
-              <Text>Active (24h)</Text>
-              <Metric>{activeApps}</Metric>
-            </Card>
-            <Card>
-              <Text>Total Tokens</Text>
-              <Metric>{fmtTokens(totalTokens)}</Metric>
-            </Card>
-            <Card>
-              <Text>Total Cost</Text>
-              <Metric>{fmtCost(totalCost)}</Metric>
-            </Card>
-          </div>
-
-          {/* Filters */}
-          <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 16 }}>
-            <Select
-              value={timePreset}
-              onChange={(v) => setTimePreset(v as TimePreset)}
-              style={{ width: 120 }}
-            >
-              <Option value="24h">Last 24h</Option>
-              <Option value="7d">Last 7d</Option>
-              <Option value="30d">Last 30d</Option>
-            </Select>
-            <Select
-              placeholder="App Type"
-              allowClear
-              style={{ width: 180 }}
-              onChange={setTypeFilter}
-            >
-              <Option value="platform">Platform</Option>
-              <Option value="dev_tool">Dev Tool</Option>
-              <Option value="custom_integration">Custom Integration</Option>
-            </Select>
-            {config.departments.length > 0 && (
+            {/* Filters */}
+            <div className="flex flex-wrap gap-3 mb-4">
               <Select
-                placeholder="Department"
+                value={timePreset}
+                onChange={(v) => setTimePreset(v as TimePreset)}
+                style={{ width: 120 }}
+              >
+                <Option value="24h">Last 24h</Option>
+                <Option value="7d">Last 7d</Option>
+                <Option value="30d">Last 30d</Option>
+              </Select>
+              <Select
+                placeholder="App Type"
                 allowClear
                 style={{ width: 180 }}
-                showSearch
-                onChange={setDeptFilter}
+                onChange={setTypeFilter}
               >
-                {config.departments.map((d) => <Option key={d} value={d}>{d}</Option>)}
+                <Option value="platform">Platform</Option>
+                <Option value="dev_tool">Dev Tool</Option>
+                <Option value="custom_integration">Custom Integration</Option>
               </Select>
-            )}
-            {config.lines_of_business.length > 0 && (
-              <Select
-                placeholder="LOB"
-                allowClear
-                style={{ width: 180 }}
-                showSearch
-                onChange={setLobFilter}
-              >
-                {config.lines_of_business.map((l) => <Option key={l} value={l}>{l}</Option>)}
-              </Select>
-            )}
-            <Button icon={<ReloadOutlined />} onClick={fetchHealth} loading={healthLoading}>
-              Refresh
-            </Button>
-          </div>
-
-          {/* Health table */}
-          <Table<ApplicationMetrics>
-            dataSource={healthData}
-            columns={healthColumns}
-            rowKey="application_id"
-            loading={healthLoading}
-            pagination={false}
-            size="middle"
-            scroll={{ x: "max-content" }}
-          />
-        </>
-      )}
-
-      {/* ── Registry Tab ─────────────────────────────────────────────────────── */}
-      {activeTab === "registry" && (
-        <>
-          {/* Toolbar */}
-          <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 16 }}>
-            <div style={{ display: "flex", gap: 12 }}>
-              <Button icon={<ReloadOutlined />} onClick={fetchApps} loading={registryLoading}>
+              {config.departments.length > 0 && (
+                <Select
+                  placeholder="Department"
+                  allowClear
+                  style={{ width: 180 }}
+                  showSearch
+                  onChange={setDeptFilter}
+                >
+                  {config.departments.map((d) => <Option key={d} value={d}>{d}</Option>)}
+                </Select>
+              )}
+              {config.lines_of_business.length > 0 && (
+                <Select
+                  placeholder="LOB"
+                  allowClear
+                  style={{ width: 180 }}
+                  showSearch
+                  onChange={setLobFilter}
+                >
+                  {config.lines_of_business.map((l) => <Option key={l} value={l}>{l}</Option>)}
+                </Select>
+              )}
+              <Button icon={<ReloadOutlined />} onClick={fetchHealth} loading={healthLoading}>
                 Refresh
               </Button>
             </div>
-            {isAdmin && (
-              <Button
-                type="primary"
-                icon={<PlusOutlined />}
-                onClick={() => {
-                  createForm.resetFields();
-                  setCreateModalOpen(true);
-                }}
-              >
-                New Application
-              </Button>
-            )}
-          </div>
 
-          {/* Registry table */}
-          <Table<Application>
-            dataSource={apps}
-            columns={registryColumns}
-            rowKey="application_id"
-            loading={registryLoading}
-            scroll={{ x: "max-content" }}
-            pagination={{
-              total: totalApps,
-              pageSize: PAGE_SIZE,
-              current: page,
-              onChange: (p) => setPage(p),
-              showTotal: (total) => `${total} applications`,
-            }}
-            size="middle"
-          />
-        </>
-      )}
+            {/* Health table */}
+            <Table<ApplicationMetrics>
+              dataSource={healthData}
+              columns={healthColumns}
+              rowKey="application_id"
+              loading={healthLoading}
+              pagination={false}
+              size="middle"
+              scroll={{ x: "max-content" }}
+            />
+          </TabPanel>
+
+          {/* ── Registry Tab ──────────────────────────────────────────────────── */}
+          <TabPanel>
+            {/* Toolbar */}
+            <div className="flex justify-between mt-4 mb-4">
+              <div className="flex gap-3">
+                <Button icon={<ReloadOutlined />} onClick={fetchApps} loading={registryLoading}>
+                  Refresh
+                </Button>
+              </div>
+              {isAdmin && (
+                <Button
+                  type="primary"
+                  icon={<PlusOutlined />}
+                  onClick={() => {
+                    createForm.resetFields();
+                    setCreateModalOpen(true);
+                  }}
+                >
+                  New Application
+                </Button>
+              )}
+            </div>
+
+            {/* Registry table */}
+            <Table<Application>
+              dataSource={apps}
+              columns={registryColumns}
+              rowKey="application_id"
+              loading={registryLoading}
+              scroll={{ x: "max-content" }}
+              pagination={{
+                total: totalApps,
+                pageSize: PAGE_SIZE,
+                current: page,
+                onChange: (p) => setPage(p),
+                showTotal: (total) => `${total} applications`,
+              }}
+              size="middle"
+            />
+          </TabPanel>
+        </TabPanels>
+      </TabGroup>
 
       {/* ── Create Modal ─────────────────────────────────────────────────────── */}
       <Modal
@@ -641,6 +811,88 @@ const ApplicationsView: React.FC<Props> = ({
           <strong>{selectedApp?.application_name}</strong>? All virtual key
           associations will be removed. This cannot be undone.
         </p>
+      </Modal>
+
+      {/* ── Keys Modal ───────────────────────────────────────────────────────── */}
+      <Modal
+        title={`Keys — ${keysModalApp?.application_name}`}
+        open={!!keysModalApp}
+        onCancel={() => {
+          setKeysModalApp(null);
+          setAssignedKeys([]);
+          setAllKeysForPicker([]);
+        }}
+        footer={null}
+        width={640}
+      >
+        {/* Assigned keys */}
+        <p className="text-sm font-medium mb-2">Assigned Keys</p>
+        <Table
+          dataSource={assignedKeys}
+          rowKey="token"
+          loading={keysLoading}
+          size="small"
+          pagination={false}
+          columns={[
+            {
+              title: "Alias",
+              dataIndex: "key_alias",
+              key: "key_alias",
+              render: (v: string | null) =>
+                v ?? <span className="text-gray-400">—</span>,
+            },
+            {
+              title: "Spend",
+              dataIndex: "spend",
+              key: "spend",
+              render: (v: number) => `$${(v ?? 0).toFixed(4)}`,
+            },
+            {
+              title: "",
+              key: "remove",
+              render: (_: unknown, row: any) => (
+                <Button
+                  size="small"
+                  danger
+                  onClick={() => handleUnassignKey(row.token)}
+                >
+                  Remove
+                </Button>
+              ),
+            },
+          ]}
+          locale={{ emptyText: "No keys assigned yet" }}
+        />
+
+        {/* Assign a key */}
+        <p className="text-sm font-medium mt-4 mb-2">Assign a Key</p>
+        <Space>
+          <Select
+            showSearch
+            placeholder="Search by alias"
+            value={pickKey}
+            onChange={setPickKey}
+            onSearch={searchPickerKeys}
+            loading={pickerSearching}
+            filterOption={false}
+            allowClear
+            style={{ width: 380 }}
+            options={allKeysForPicker
+              .filter((k) => k.application_id !== keysModalApp?.application_id)
+              .map((k) => ({
+                value: k.token,
+                label: k.key_alias ?? k.key_name ?? k.token,
+              }))}
+          />
+          <Button
+            type="primary"
+            onClick={handleAssignKey}
+            loading={assigning}
+            disabled={!pickKey}
+          >
+            Assign
+          </Button>
+        </Space>
       </Modal>
     </div>
   );

@@ -163,7 +163,7 @@ async def _compute_app_metrics(
                     ).total_seconds() * 1000
                     if delta >= 0:
                         latencies.append(delta)
-                if row.status_code is not None and int(row.status_code) >= 400:
+                if row.status == "failure":
                     errors += 1
 
             avg_latency_ms = (
@@ -180,7 +180,7 @@ async def _compute_app_metrics(
         )
         is_active = active_rows > 0
 
-    return ApplicationMetrics(
+    metrics = ApplicationMetrics(
         application_id=app.application_id,
         application_name=app.application_name,
         application_type=app.application_type,
@@ -194,6 +194,12 @@ async def _compute_app_metrics(
         is_active=is_active,
         key_count=key_count,
     )
+    metrics.health_check_url = app.health_check_url
+    metrics.health_status = app.health_status or "unknown"
+    metrics.last_health_check_at = (
+        app.last_health_check_at.isoformat() if app.last_health_check_at else None
+    )
+    return metrics
 
 
 # ─── CRUD endpoints ─────────────────────────────────────────────────────────
@@ -240,6 +246,8 @@ async def new_application(
             create_data["description"] = data.description
         if data.labels is not None:
             create_data["labels"] = json.dumps(data.labels)
+        if data.health_check_url is not None:
+            create_data["health_check_url"] = data.health_check_url
 
         app = await prisma_client.db.litellm_applicationtable.create(data=create_data)
         return app.model_dump()
@@ -393,6 +401,8 @@ async def update_application(
             update_data["description"] = data.description
         if data.labels is not None:
             update_data["labels"] = json.dumps(data.labels)
+        if data.health_check_url is not None:
+            update_data["health_check_url"] = data.health_check_url
 
         app = await prisma_client.db.litellm_applicationtable.update(
             where={"application_id": data.application_id},
