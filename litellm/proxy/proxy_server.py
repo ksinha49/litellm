@@ -639,7 +639,7 @@ else:
 
 ui_link = f"{server_root_path}/ui"
 fallback_login_link = f"{server_root_path}/fallback/login"
-model_hub_link = f"{server_root_path}/ui/about"
+model_hub_link = f"{server_root_path}/ui/hub"
 ui_message = f"👉 [```LiteLLM Admin Panel on /ui```]({ui_link}). Create, Edit Keys with SSO. Having issues? Try [```Fallback Login```]({fallback_login_link})"
 ui_message += "\n\n💸 [```LiteLLM Model Cost Map```](https://models.litellm.ai/)."
 
@@ -1413,7 +1413,7 @@ def mount_swagger_ui():
 mount_swagger_ui()
 
 docs_url = _get_docs_url()
-root_redirect_url: str = os.getenv("ROOT_REDIRECT_URL", "/ui/about")
+root_redirect_url: str = os.getenv("ROOT_REDIRECT_URL", "/ui/hub")
 if docs_url != "/":
 
     @app.get("/", include_in_schema=False)

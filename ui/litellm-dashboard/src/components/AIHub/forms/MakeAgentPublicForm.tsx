@@ -193,7 +193,7 @@ const MakeAgentPublicForm: React.FC<MakeAgentPublicFormProps> = ({
         <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
           <Text className="text-sm text-yellow-800">
             <strong>Warning:</strong> Once you make these agents public, anyone who can go to the{" "}
-            <code>/ui/about</code> will be able to know they exist on the proxy.
+            <code>/ui/hub</code> will be able to know they exist on the proxy.
           </Text>
         </div>
 

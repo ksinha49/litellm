@@ -224,7 +224,7 @@ const ModelHubTable: React.FC<ModelHubTableProps> = ({ accessToken, publicPage, 
   };
 
   const goToPublicModelPage = () => {
-    router.replace(`/about?key=${accessToken}`);
+    router.replace(`/hub?key=${accessToken}`);
   };
 
   const handleMakePublicPage = () => {
@@ -381,9 +381,9 @@ const ModelHubTable: React.FC<ModelHubTableProps> = ({ accessToken, publicPage, 
             <div className="flex items-center space-x-4">
               <Text>Model Hub URL:</Text>
               <div className="flex items-center bg-gray-200 px-2 py-1 rounded">
-                <Text className="mr-2">{`${getProxyBaseUrl()}/ui/about`}</Text>
+                <Text className="mr-2">{`${getProxyBaseUrl()}/ui/hub`}</Text>
                 <button
-                  onClick={() => copyToClipboard(`${getProxyBaseUrl()}/ui/about`)}
+                  onClick={() => copyToClipboard(`${getProxyBaseUrl()}/ui/hub`)}
                   className="p-1 hover:bg-gray-300 rounded transition-colors"
                   title="Copy URL"
                 >
@@ -519,7 +519,7 @@ const ModelHubTable: React.FC<ModelHubTableProps> = ({ accessToken, publicPage, 
           <div className="flex justify-between mb-4">
             <Text className="text-base mr-2">Shareable Link:</Text>
             <Text className="max-w-sm ml-2 bg-gray-200 pr-2 pl-2 pt-1 pb-1 text-center rounded">
-              {`${getProxyBaseUrl()}/ui/about`}
+              {`${getProxyBaseUrl()}/ui/hub`}
             </Text>
           </div>
           <div className="flex justify-end">

@@ -295,7 +295,7 @@ const UsefulLinksManagement: React.FC<UsefulLinksManagementProps> = ({ accessTok
             <Text className="text-sm font-medium text-gray-700">Manage Existing Links</Text>
             <div className="flex items-center space-x-2">
               <Link
-                href={`${getProxyBaseUrl()}/ui/about`}
+                href={`${getProxyBaseUrl()}/ui/hub`}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-xs bg-blue-50 text-blue-600 px-3 py-1.5 rounded hover:bg-blue-100 flex items-center"
