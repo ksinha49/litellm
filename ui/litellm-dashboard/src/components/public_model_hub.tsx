@@ -1005,93 +1005,170 @@ const PublicModelHub: React.FC<PublicModelHubProps> = ({ accessToken, isEmbedded
           {!isEmbedded && (
             <>
               <style>{`
-                @keyframes gradientShift {
+                @keyframes ameritasGradient {
                   0%   { background-position: 0% 50%; }
+                  25%  { background-position: 50% 100%; }
                   50%  { background-position: 100% 50%; }
+                  75%  { background-position: 50% 0%; }
                   100% { background-position: 0% 50%; }
+                }
+                @keyframes floatOrb1 {
+                  0%, 100% { transform: translate(0, 0) scale(1); }
+                  33%      { transform: translate(60px, -40px) scale(1.1); }
+                  66%      { transform: translate(-30px, 30px) scale(0.95); }
+                }
+                @keyframes floatOrb2 {
+                  0%, 100% { transform: translate(0, 0) scale(1); }
+                  33%      { transform: translate(-50px, 50px) scale(1.05); }
+                  66%      { transform: translate(40px, -20px) scale(0.9); }
+                }
+                @keyframes floatOrb3 {
+                  0%, 100% { transform: translate(0, 0) scale(1); }
+                  50%      { transform: translate(30px, 40px) scale(1.08); }
+                }
+                @keyframes shimmer {
+                  0%   { opacity: 0.03; transform: translateX(-100%); }
+                  50%  { opacity: 0.08; }
+                  100% { opacity: 0.03; transform: translateX(100%); }
                 }
               `}</style>
               <div
-                className="mb-8 px-8 py-12"
+                className="mb-8 relative overflow-hidden"
                 style={{
-                  background: "linear-gradient(135deg, #377dd0 0%, #0758ac 50%, #1a5fa8 100%)",
-                  backgroundSize: "200% 200%",
-                  animation: "gradientShift 8s ease infinite",
+                  background: "linear-gradient(135deg, #0758ac 0%, #377dd0 25%, #0058db 50%, #b20d15 85%, #d3222a 100%)",
+                  backgroundSize: "400% 400%",
+                  animation: "ameritasGradient 12s ease infinite",
                   borderRadius: "0px",
+                  minHeight: "280px",
                 }}
               >
-                <h1
-                  className="text-white font-semibold mb-3"
-                  style={{ fontSize: "40px", lineHeight: "54px", fontFamily: "'Source Sans Pro', 'Helvetica Neue', Arial, sans-serif" }}
-                >
-                  AI Services Hub
-                </h1>
-                <p
-                  className="text-white mb-6"
-                  style={{ fontSize: "20px", lineHeight: "30px", opacity: 0.88, fontFamily: "'Source Sans Pro', 'Helvetica Neue', Arial, sans-serif" }}
-                >
-                  Enterprise-wide access to generative AI — secure, observable, and built to scale.
-                </p>
+                {/* Floating orbs for depth */}
+                <div style={{
+                  position: "absolute", top: "-60px", right: "10%", width: "300px", height: "300px",
+                  background: "radial-gradient(circle, rgba(183,217,243,0.18) 0%, transparent 70%)",
+                  borderRadius: "50%", animation: "floatOrb1 16s ease-in-out infinite", pointerEvents: "none",
+                }} />
+                <div style={{
+                  position: "absolute", bottom: "-40px", left: "5%", width: "250px", height: "250px",
+                  background: "radial-gradient(circle, rgba(211,34,42,0.12) 0%, transparent 70%)",
+                  borderRadius: "50%", animation: "floatOrb2 20s ease-in-out infinite", pointerEvents: "none",
+                }} />
+                <div style={{
+                  position: "absolute", top: "30%", right: "30%", width: "180px", height: "180px",
+                  background: "radial-gradient(circle, rgba(255,255,255,0.08) 0%, transparent 70%)",
+                  borderRadius: "50%", animation: "floatOrb3 14s ease-in-out infinite", pointerEvents: "none",
+                }} />
 
-                {/* Live stats chips */}
-                <div className="flex flex-wrap gap-3 mb-8">
-                  {[
-                    { label: "Models", count: modelHubData?.length ?? "—" },
-                    { label: "Agents", count: agentHubData?.length ?? "—" },
-                    { label: "MCP Servers", count: mcpHubData?.length ?? "—" },
-                  ].map(({ label, count }) => (
-                    <span
-                      key={label}
-                      className="text-white text-sm font-medium px-4 py-1"
+                {/* Diagonal shimmer overlay */}
+                <div style={{
+                  position: "absolute", inset: 0, pointerEvents: "none",
+                  background: "linear-gradient(120deg, transparent 30%, rgba(255,255,255,0.07) 50%, transparent 70%)",
+                  animation: "shimmer 8s ease-in-out infinite",
+                }} />
+
+                {/* Subtle wave SVG at bottom */}
+                <svg
+                  style={{ position: "absolute", bottom: 0, left: 0, width: "100%", height: "60px", pointerEvents: "none" }}
+                  viewBox="0 0 1440 60" preserveAspectRatio="none"
+                >
+                  <path
+                    d="M0,40 C360,10 720,55 1080,25 C1260,12 1380,30 1440,20 L1440,60 L0,60 Z"
+                    fill="rgba(255,255,255,0.06)"
+                  />
+                  <path
+                    d="M0,45 C320,20 640,55 960,30 C1200,15 1360,40 1440,35 L1440,60 L0,60 Z"
+                    fill="rgba(255,255,255,0.04)"
+                  />
+                </svg>
+
+                {/* Content */}
+                <div className="relative px-8 py-12" style={{ zIndex: 1 }}>
+                  <h1
+                    className="text-white font-semibold mb-3"
+                    style={{ fontSize: "40px", lineHeight: "54px", fontFamily: "'Century Gothic', 'Source Sans Pro', 'Helvetica Neue', Arial, sans-serif", letterSpacing: "-0.02em" }}
+                  >
+                    AI Services Hub
+                  </h1>
+                  <p
+                    className="text-white mb-6"
+                    style={{ fontSize: "20px", lineHeight: "30px", opacity: 0.9, fontFamily: "'Source Sans Pro', 'Helvetica Neue', Arial, sans-serif" }}
+                  >
+                    Enterprise-wide access to generative AI — secure, observable, and built to scale.
+                  </p>
+
+                  {/* Live stats chips */}
+                  <div className="flex flex-wrap gap-3 mb-8">
+                    {[
+                      { label: "Models", count: modelHubData?.length ?? "—" },
+                      { label: "Agents", count: agentHubData?.length ?? "—" },
+                      { label: "MCP Servers", count: mcpHubData?.length ?? "—" },
+                    ].map(({ label, count }) => (
+                      <span
+                        key={label}
+                        className="text-white text-sm font-medium px-4 py-1"
+                        style={{
+                          backgroundColor: "rgba(255,255,255,0.15)",
+                          backdropFilter: "blur(4px)",
+                          borderRadius: "9999px",
+                          border: "1px solid rgba(255,255,255,0.1)",
+                          fontFamily: "'Source Sans Pro', 'Helvetica Neue', Arial, sans-serif",
+                        }}
+                      >
+                        {count} {label}
+                      </span>
+                    ))}
+                  </div>
+
+                  {/* CTA buttons */}
+                  <div className="flex flex-wrap gap-4">
+                    <a
+                      href="/docs"
+                      className="text-sm font-medium px-6 py-2 transition-all"
                       style={{
-                        backgroundColor: "rgba(255,255,255,0.15)",
+                        border: "2px solid rgba(255,255,255,0.8)",
+                        color: "#ffffff",
                         borderRadius: "9999px",
                         fontFamily: "'Source Sans Pro', 'Helvetica Neue', Arial, sans-serif",
+                        textDecoration: "none",
+                        backdropFilter: "blur(4px)",
+                        transition: "all 0.3s ease",
+                      }}
+                      onMouseEnter={e => {
+                        (e.currentTarget as HTMLAnchorElement).style.backgroundColor = "#ffffff";
+                        (e.currentTarget as HTMLAnchorElement).style.color = "#0758ac";
+                        (e.currentTarget as HTMLAnchorElement).style.borderColor = "#ffffff";
+                      }}
+                      onMouseLeave={e => {
+                        (e.currentTarget as HTMLAnchorElement).style.backgroundColor = "transparent";
+                        (e.currentTarget as HTMLAnchorElement).style.color = "#ffffff";
+                        (e.currentTarget as HTMLAnchorElement).style.borderColor = "rgba(255,255,255,0.8)";
                       }}
                     >
-                      {count} {label}
-                    </span>
-                  ))}
-                </div>
-
-                {/* CTA buttons */}
-                <div className="flex flex-wrap gap-4">
-                  <a
-                    href="/docs"
-                    className="text-sm font-medium px-6 py-2 transition-colors"
-                    style={{
-                      border: "2px solid #ffffff",
-                      color: "#ffffff",
-                      borderRadius: "9999px",
-                      fontFamily: "'Source Sans Pro', 'Helvetica Neue', Arial, sans-serif",
-                      textDecoration: "none",
-                    }}
-                    onMouseEnter={e => {
-                      (e.currentTarget as HTMLAnchorElement).style.backgroundColor = "#ffffff";
-                      (e.currentTarget as HTMLAnchorElement).style.color = "#377dd0";
-                    }}
-                    onMouseLeave={e => {
-                      (e.currentTarget as HTMLAnchorElement).style.backgroundColor = "transparent";
-                      (e.currentTarget as HTMLAnchorElement).style.color = "#ffffff";
-                    }}
-                  >
-                    View API Docs
-                  </a>
-                  <a
-                    href="/ui"
-                    className="text-sm font-medium px-6 py-2 transition-colors"
-                    style={{
-                      backgroundColor: "#ffffff",
-                      color: "#377dd0",
-                      borderRadius: "9999px",
-                      fontFamily: "'Source Sans Pro', 'Helvetica Neue', Arial, sans-serif",
-                      textDecoration: "none",
-                    }}
-                    onMouseEnter={e => { (e.currentTarget as HTMLAnchorElement).style.backgroundColor = "#ededed"; }}
-                    onMouseLeave={e => { (e.currentTarget as HTMLAnchorElement).style.backgroundColor = "#ffffff"; }}
-                  >
-                    Open Console
-                  </a>
+                      View API Docs
+                    </a>
+                    <a
+                      href="/ui"
+                      className="text-sm font-medium px-6 py-2 transition-all"
+                      style={{
+                        backgroundColor: "#ffffff",
+                        color: "#0758ac",
+                        borderRadius: "9999px",
+                        fontFamily: "'Source Sans Pro', 'Helvetica Neue', Arial, sans-serif",
+                        textDecoration: "none",
+                        transition: "all 0.3s ease",
+                      }}
+                      onMouseEnter={e => {
+                        (e.currentTarget as HTMLAnchorElement).style.backgroundColor = "#e1f3ff";
+                        (e.currentTarget as HTMLAnchorElement).style.color = "#0758ac";
+                      }}
+                      onMouseLeave={e => {
+                        (e.currentTarget as HTMLAnchorElement).style.backgroundColor = "#ffffff";
+                        (e.currentTarget as HTMLAnchorElement).style.color = "#0758ac";
+                      }}
+                    >
+                      Open Console
+                    </a>
+                  </div>
                 </div>
               </div>
 
