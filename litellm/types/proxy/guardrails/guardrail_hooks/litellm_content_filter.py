@@ -56,7 +56,7 @@ class ContentFilterCategoryConfig(BaseLiteLLMOpenAIResponseObject):
         default=True,
         description="Whether the category is enabled",
     )
-    action: Literal["BLOCK", "MASK"] = Field(
+    action: Literal["BLOCK", "MASK", "MONITOR"] = Field(
         description="The action to take when the category is detected",
     )
     severity_threshold: Literal["high", "medium", "low"] = Field(

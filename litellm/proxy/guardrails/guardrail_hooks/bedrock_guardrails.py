@@ -127,6 +127,7 @@ class BedrockGuardrail(CustomGuardrail, BaseAWSLLM):
         guardrailIdentifier: Optional[str] = None,
         guardrailVersion: Optional[str] = None,
         disable_exception_on_block: Optional[bool] = False,
+        on_flagged: Optional[str] = "block",
         **kwargs,
     ):
         self.async_handler = get_async_httpx_client(
@@ -145,6 +146,12 @@ class BedrockGuardrail(CustomGuardrail, BaseAWSLLM):
         self.disable_exception_on_block: bool = disable_exception_on_block or False
         """
         If True, will not raise an exception when the guardrail is blocked.
+        """
+
+        self.on_flagged: str = on_flagged or "block"
+        """
+        Action to take when content is flagged: "block" or "monitor".
+        In "monitor" mode, violations are detected and logged but requests are allowed through.
         """
 
         # Set supported event hooks to include MCP hooks
@@ -529,9 +536,14 @@ class BedrockGuardrail(CustomGuardrail, BaseAWSLLM):
             if self._should_raise_guardrail_blocked_exception(
                 bedrock_guardrail_response
             ):
-                raise self._get_http_exception_for_blocked_guardrail(
-                    bedrock_guardrail_response
-                )
+                if self.on_flagged == "monitor":
+                    verbose_proxy_logger.warning(
+                        "Bedrock Guardrail: MONITOR mode - violation detected but allowing request"
+                    )
+                else:
+                    raise self._get_http_exception_for_blocked_guardrail(
+                        bedrock_guardrail_response
+                    )
         else:
             status_code, detail_message = self._parse_bedrock_guardrail_error_response(
                 httpx_response
@@ -600,6 +612,8 @@ class BedrockGuardrail(CustomGuardrail, BaseAWSLLM):
                 if self._should_raise_guardrail_blocked_exception(
                     bedrock_guardrail_response
                 ):
+                    if self.on_flagged == "monitor":
+                        return "guardrail_monitored"
                     return "guardrail_intervened"
             except Exception:
                 pass

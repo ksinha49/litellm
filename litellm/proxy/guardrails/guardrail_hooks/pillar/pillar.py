@@ -786,6 +786,8 @@ class PillarGuardrail(CustomGuardrail):
                     )
             elif self.on_flagged_action == "monitor":
                 verbose_proxy_logger.info("Pillar Guardrail: Monitoring mode - allowing flagged content to proceed")
+                # Set status override so _process_response logs guardrail_monitored
+                metadata_store["_guardrail_status_override"] = "guardrail_monitored"
 
         build_pillar_response_headers(metadata_store)
 

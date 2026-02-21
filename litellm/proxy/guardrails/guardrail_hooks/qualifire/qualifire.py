@@ -279,6 +279,7 @@ class QualifireGuardrail(CustomGuardrail):
         output: Optional[str],
         dynamic_params: Dict[str, Any],
         available_tools: Optional[List[Any]] = None,
+        request_data: Optional[dict] = None,
     ) -> None:
         """
         Core Qualifire check logic - shared between hooks.
@@ -288,6 +289,7 @@ class QualifireGuardrail(CustomGuardrail):
             output: The LLM output text (for post_call)
             dynamic_params: Dynamic parameters from request body
             available_tools: Available tools from the request (for tool_selection_quality_check)
+            request_data: Original request data (used for setting status override in monitor mode)
 
         Raises:
             HTTPException: If content is blocked
@@ -376,6 +378,10 @@ class QualifireGuardrail(CustomGuardrail):
                         "Qualifire Guardrail: Monitoring mode - violation detected but allowing request. "
                         f"Response: {qualifire_response}"
                     )
+                    # Set status override so _process_response logs guardrail_monitored
+                    if request_data is not None:
+                        _metadata = request_data.get("metadata") or request_data.get("litellm_metadata") or {}
+                        _metadata["_guardrail_status_override"] = "guardrail_monitored"
                 else:
                     # Block the request
                     raise HTTPException(
@@ -464,6 +470,7 @@ class QualifireGuardrail(CustomGuardrail):
             output=output,
             dynamic_params=dynamic_params,
             available_tools=available_tools,
+            request_data=request_data,
         )
 
         return inputs

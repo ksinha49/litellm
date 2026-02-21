@@ -128,6 +128,7 @@ class LakeraCategoryThresholds(TypedDict, total=False):
 class PiiAction(str, Enum):
     BLOCK = "BLOCK"
     MASK = "MASK"
+    MONITOR = "MONITOR"
 
 
 class PiiEntityCategory(str, Enum):
@@ -496,6 +497,7 @@ class ContentFilterAction(str, Enum):
 
     BLOCK = "BLOCK"
     MASK = "MASK"
+    MONITOR = "MONITOR"
 
 
 class BlockedWord(BaseModel):

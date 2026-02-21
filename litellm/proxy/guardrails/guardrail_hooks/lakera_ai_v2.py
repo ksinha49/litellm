@@ -239,7 +239,9 @@ class LakeraAIGuardrail(CustomGuardrail):
                     verbose_proxy_logger.warning(
                         "Lakera Guardrail: Monitoring mode - violation detected but allowing request"
                     )
-                    # Log violation but continue
+                    # Set status override so _process_response logs guardrail_monitored
+                    _metadata = data.get("metadata") or data.get("litellm_metadata") or {}
+                    _metadata["_guardrail_status_override"] = "guardrail_monitored"
                 elif self.on_flagged == "block":
                     # If there are other violations or not set to mask PII, raise exception
                     raise self._get_http_exception_for_blocked_guardrail(
@@ -305,7 +307,9 @@ class LakeraAIGuardrail(CustomGuardrail):
                     verbose_proxy_logger.warning(
                         "Lakera Guardrail: Monitoring mode - violation detected but allowing request"
                     )
-                    # Log violation but continue
+                    # Set status override so _process_response logs guardrail_monitored
+                    _metadata = data.get("metadata") or data.get("litellm_metadata") or {}
+                    _metadata["_guardrail_status_override"] = "guardrail_monitored"
                 elif self.on_flagged == "block":
                     # If there are other violations or not set to mask PII, raise exception
                     raise self._get_http_exception_for_blocked_guardrail(
