@@ -102,6 +102,16 @@ function LoginPageContent() {
 
   return (
     <div style={styles.pageContainer}>
+      {/* Top-left navigation buttons */}
+      <div style={styles.topNav}>
+        <Link href={`${rootPath}/hub`} style={styles.topNavButton}>
+          Landing Page
+        </Link>
+        <Link href={`${rootPath}/api-reference`} style={styles.topNavButton}>
+          API Docs
+        </Link>
+      </div>
+
       {/* Left branding panel */}
       <div style={styles.brandPanel}>
         <div style={styles.brandContent}>
@@ -226,15 +236,6 @@ function LoginPageContent() {
             />
           )}
 
-          <div style={styles.navLinks}>
-            <Link href={`${rootPath}/ui/hub`} style={styles.navLink}>
-              Landing Page
-            </Link>
-            <span style={styles.navDivider}>|</span>
-            <Link href={`${rootPath}/ui/api-reference`} style={styles.navLink}>
-              API Documentation
-            </Link>
-          </div>
         </div>
       </div>
     </div>
@@ -246,6 +247,7 @@ const styles: Record<string, React.CSSProperties> = {
     minHeight: "100vh",
     display: "flex",
     flexDirection: "row" as const,
+    position: "relative" as const,
   },
   brandPanel: {
     flex: "0 0 420px",
@@ -346,24 +348,26 @@ const styles: Record<string, React.CSSProperties> = {
     textAlign: "center" as const,
     marginBottom: 24,
   },
-  navLinks: {
-    marginTop: 24,
-    paddingTop: 20,
-    borderTop: "1px solid #ededed",
+  topNav: {
+    position: "absolute" as const,
+    top: 16,
+    left: 16,
     display: "flex",
-    justifyContent: "center",
+    gap: 8,
+    zIndex: 10,
+  },
+  topNavButton: {
+    display: "inline-flex",
     alignItems: "center",
-    gap: 12,
-  },
-  navLink: {
-    color: "#377dd0",
-    fontSize: 14,
+    padding: "6px 16px",
+    fontSize: 13,
     fontWeight: 600,
+    color: "#ffffff",
+    backgroundColor: "rgba(255, 255, 255, 0.15)",
+    borderRadius: 4,
     textDecoration: "none",
-  },
-  navDivider: {
-    color: "#cccccc",
-    fontSize: 14,
+    border: "1px solid rgba(255, 255, 255, 0.25)",
+    backdropFilter: "blur(4px)",
   },
 };
 
