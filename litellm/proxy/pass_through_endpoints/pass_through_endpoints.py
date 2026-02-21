@@ -14,6 +14,7 @@ from fastapi import (
     Depends,
     FastAPI,
     HTTPException,
+    Query,
     Request,
     Response,
     UploadFile,
@@ -2533,13 +2534,24 @@ async def _filter_endpoints_by_team_allowed_routes(
 
 @router.get(
     "/config/pass_through_endpoint",
+    tags=["pass-through endpoints"],
     dependencies=[Depends(user_api_key_auth)],
     response_model=PassThroughEndpointResponse,
+    summary="List Pass-Through Endpoints",
+    responses={
+        200: {"description": "List of configured pass-through endpoints"},
+        404: {"description": "Endpoint not found (when filtering by endpoint_id)"},
+    },
 )
 @router.get(
     "/config/pass_through_endpoint/team/{team_id}",
+    tags=["pass-through endpoints"],
     dependencies=[Depends(user_api_key_auth)],
     response_model=PassThroughEndpointResponse,
+    summary="List Pass-Through Endpoints by Team",
+    responses={
+        200: {"description": "List of pass-through endpoints allowed for the specified team"},
+    },
 )
 async def get_pass_through_endpoints(
     endpoint_id: Optional[str] = None,
@@ -2547,9 +2559,29 @@ async def get_pass_through_endpoints(
     team_id: Optional[str] = None,
 ):
     """
-    GET configured pass through endpoint.
+    Get configured pass-through endpoints.
 
-    If no endpoint_id given, return all configured endpoints.
+    Returns all configured pass-through endpoints, merging DB-managed and
+    config-file-defined endpoints. Config-file endpoints are read-only.
+
+    Parameters:
+    - endpoint_id: Optional[str] — Filter by a specific endpoint ID. Returns only that endpoint.
+    - team_id: Optional[str] — (path param) Filter endpoints by team's allowed routes.
+
+    Authorization:
+    - Requires a valid LiteLLM API key.
+
+    Example — List all endpoints:
+    ```bash
+    curl -X GET 'http://0.0.0.0:4000/config/pass_through_endpoint' \\
+      -H 'Authorization: Bearer sk-1234'
+    ```
+
+    Example — Get a specific endpoint:
+    ```bash
+    curl -X GET 'http://0.0.0.0:4000/config/pass_through_endpoint?endpoint_id=abc-123' \\
+      -H 'Authorization: Bearer sk-1234'
+    ```
     """  ## Get existing pass-through endpoint field value
     from litellm.proxy._types import CommonProxyErrors
     from litellm.proxy.proxy_server import prisma_client
@@ -2591,7 +2623,14 @@ async def get_pass_through_endpoints(
 
 @router.post(
     "/config/pass_through_endpoint/{endpoint_id}",
+    tags=["pass-through endpoints"],
     dependencies=[Depends(user_api_key_auth)],
+    response_model=PassThroughEndpointResponse,
+    summary="Update Pass-Through Endpoint",
+    responses={
+        200: {"description": "The updated pass-through endpoint"},
+        404: {"description": "Endpoint not found"},
+    },
 )
 async def update_pass_through_endpoints(
     endpoint_id: str,
@@ -2601,6 +2640,29 @@ async def update_pass_through_endpoints(
 ):
     """
     Update a pass-through endpoint by ID.
+
+    Performs a partial update — only fields present in the request body are changed.
+    The endpoint route is re-registered with the updated configuration.
+
+    Parameters:
+    - endpoint_id: str — The ID of the endpoint to update (path parameter).
+    - data: PassThroughGenericEndpoint — Updated endpoint configuration (request body).
+
+    Authorization:
+    - Requires a valid LiteLLM API key with admin privileges.
+
+    Example:
+    ```bash
+    curl -X POST 'http://0.0.0.0:4000/config/pass_through_endpoint/abc-123' \\
+      -H 'Authorization: Bearer sk-1234' \\
+      -H 'Content-Type: application/json' \\
+      -d '{
+        "target": "https://new-target.example.com/api",
+        "inject_metadata": true,
+        "response_mode": "async",
+        "service_type": "idp"
+      }'
+    ```
     """
     from litellm.proxy.proxy_server import (
         get_config_general_settings,
@@ -2735,7 +2797,13 @@ async def update_pass_through_endpoints(
 
 @router.post(
     "/config/pass_through_endpoint",
+    tags=["pass-through endpoints"],
     dependencies=[Depends(user_api_key_auth)],
+    response_model=PassThroughEndpointResponse,
+    summary="Create Pass-Through Endpoint",
+    responses={
+        200: {"description": "The newly created pass-through endpoint"},
+    },
 )
 async def create_pass_through_endpoints(
     data: PassThroughGenericEndpoint,
@@ -2743,7 +2811,40 @@ async def create_pass_through_endpoints(
     user_api_key_dict: UserAPIKeyAuth = Depends(user_api_key_auth),
 ):
     """
-    Create new pass-through endpoint
+    Create a new pass-through endpoint.
+
+    Registers a new route on the proxy that forwards requests to the specified
+    target URL. An ID is auto-generated if not provided. The route is immediately
+    live after creation.
+
+    Parameters:
+    - path: str — The route path on the proxy (e.g., "/ai-services/idp").
+    - target: str — The URL to forward requests to (e.g., "https://nlb.example.com/idp").
+    - headers: dict — Headers to include when forwarding (e.g., {"x-api-key": "..."}).
+    - auth: bool — Whether LiteLLM API key auth is required (default: false).
+    - inject_metadata: bool — Wrap request body with LiteLLM context metadata (default: false).
+    - response_mode: str — "sync" (default) or "async" for fire-and-forget with tracking.
+    - service_type: Optional[str] — Label for the AI service type (e.g., "idp", "redaction").
+    - include_subpath: bool — Forward subpath requests too (default: false).
+
+    Authorization:
+    - Requires a valid LiteLLM API key with admin privileges.
+
+    Example:
+    ```bash
+    curl -X POST 'http://0.0.0.0:4000/config/pass_through_endpoint' \\
+      -H 'Authorization: Bearer sk-1234' \\
+      -H 'Content-Type: application/json' \\
+      -d '{
+        "path": "/ai-services/idp",
+        "target": "https://nlb.example.com/idp/process",
+        "headers": {"x-api-key": "lambda-key"},
+        "auth": true,
+        "inject_metadata": true,
+        "response_mode": "async",
+        "service_type": "idp"
+      }'
+    ```
     """
     from litellm._uuid import uuid
     from litellm.proxy.proxy_server import (
@@ -2828,17 +2929,36 @@ async def create_pass_through_endpoints(
 
 @router.delete(
     "/config/pass_through_endpoint",
+    tags=["pass-through endpoints"],
     dependencies=[Depends(user_api_key_auth)],
     response_model=PassThroughEndpointResponse,
+    summary="Delete Pass-Through Endpoint",
+    responses={
+        200: {"description": "The deleted pass-through endpoint"},
+        400: {"description": "Endpoint not found or no endpoints configured"},
+    },
 )
 async def delete_pass_through_endpoints(
-    endpoint_id: str,
+    endpoint_id: str = Query(..., description="The ID of the pass-through endpoint to delete"),
     user_api_key_dict: UserAPIKeyAuth = Depends(user_api_key_auth),
 ):
     """
     Delete a pass-through endpoint by ID.
 
-    Returns - the deleted endpoint
+    Removes the endpoint from the configuration and unregisters its route.
+    Returns the deleted endpoint configuration.
+
+    Parameters:
+    - endpoint_id: str — The ID of the endpoint to delete.
+
+    Authorization:
+    - Requires a valid LiteLLM API key with admin privileges.
+
+    Example:
+    ```bash
+    curl -X DELETE 'http://0.0.0.0:4000/config/pass_through_endpoint?endpoint_id=abc-123' \\
+      -H 'Authorization: Bearer sk-1234'
+    ```
     """
     from litellm.proxy.proxy_server import (
         get_config_general_settings,

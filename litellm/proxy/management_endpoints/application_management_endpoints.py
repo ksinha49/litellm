@@ -209,6 +209,11 @@ async def _compute_app_metrics(
     "/application/new",
     tags=["application management"],
     dependencies=[Depends(user_api_key_auth)],
+    summary="Create Application",
+    responses={
+        200: {"description": "The newly created application object"},
+        403: {"description": "Forbidden — only proxy admins can create applications"},
+    },
 )
 @management_endpoint_wrapper
 async def new_application(
@@ -217,16 +222,34 @@ async def new_application(
     user_api_key_dict: UserAPIKeyAuth = Depends(user_api_key_auth),
 ):
     """
-    Create a new application.  Admin only.
+    Create a new application. Admin only.
+
+    Applications are first-class entities that group virtual keys, track usage
+    metrics, and provide health monitoring for your AI-powered services.
 
     Parameters:
-    - application_name: str - Unique name for the application
-    - application_type: str - "platform" | "dev_tool" | "custom_integration"
-    - department: str - Department owning the application
-    - lob: str - Line of Business
-    - team_id: Optional[str] - Associated team ID
-    - description: Optional[str] - Description of the application
-    - labels: Optional[dict] - Arbitrary key/value metadata labels
+    - application_name: str — Unique name for the application.
+    - application_type: str — One of "platform", "dev_tool", "custom_integration".
+    - department: str — Department owning the application.
+    - lob: str — Line of Business.
+    - team_id: Optional[str] — Associated team ID.
+    - description: Optional[str] — Description of the application.
+    - labels: Optional[dict] — Arbitrary key/value metadata labels.
+    - health_check_url: Optional[str] — URL to poll for application health status.
+
+    Example:
+    ```bash
+    curl -X POST 'http://0.0.0.0:4000/application/new' \\
+      -H 'Authorization: Bearer sk-1234' \\
+      -H 'Content-Type: application/json' \\
+      -d '{
+        "application_name": "Invoice Processor",
+        "application_type": "platform",
+        "department": "Finance",
+        "lob": "Commercial",
+        "description": "IDP service for invoice extraction"
+      }'
+    ```
     """
     try:
         _require_admin(user_api_key_dict)
@@ -267,25 +290,48 @@ async def new_application(
     "/application/list",
     tags=["application management"],
     dependencies=[Depends(user_api_key_auth)],
+    summary="List Applications",
+    responses={
+        200: {
+            "description": "Paginated list of applications",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "applications": [{"application_id": "app-abc", "application_name": "Invoice Processor", "application_type": "platform", "department": "Finance", "lob": "Commercial"}],
+                        "total": 1,
+                        "page": 1,
+                        "page_size": 25,
+                    }
+                }
+            },
+        },
+    },
 )
 @management_endpoint_wrapper
 async def list_applications(
     http_request: Request,
     user_api_key_dict: UserAPIKeyAuth = Depends(user_api_key_auth),
-    application_type: Optional[str] = Query(default=None),
-    department: Optional[str] = Query(default=None),
-    lob: Optional[str] = Query(default=None),
-    team_id: Optional[str] = Query(default=None),
-    page: int = Query(default=1, ge=1),
-    page_size: int = Query(default=25, ge=1, le=500),
-    sort_by: Optional[str] = Query(default="created_at"),
-    sort_order: Optional[str] = Query(default="desc"),
+    application_type: Optional[str] = Query(default=None, description="Filter by application type ('platform', 'dev_tool', 'custom_integration')."),
+    department: Optional[str] = Query(default=None, description="Filter by department name."),
+    lob: Optional[str] = Query(default=None, description="Filter by line of business."),
+    team_id: Optional[str] = Query(default=None, description="Filter by associated team ID."),
+    page: int = Query(default=1, ge=1, description="Page number (1-indexed)."),
+    page_size: int = Query(default=25, ge=1, le=500, description="Number of records per page (max 500)."),
+    sort_by: Optional[str] = Query(default="created_at", description="Sort field: 'created_at', 'updated_at', or 'application_name'."),
+    sort_order: Optional[str] = Query(default="desc", description="Sort order: 'asc' or 'desc'."),
 ):
     """
-    List applications with optional filters.
+    List applications with optional filters and pagination.
 
-    - Admin: sees all applications
-    - Team lead: sees only applications belonging to their team
+    Authorization:
+    - Admin: sees all applications.
+    - Non-admin: sees only applications belonging to their team.
+
+    Example:
+    ```bash
+    curl -X GET 'http://0.0.0.0:4000/application/list?department=Finance&page=1&page_size=10' \\
+      -H 'Authorization: Bearer sk-1234'
+    ```
     """
     try:
         prisma_client = await _get_prisma()
@@ -343,14 +389,30 @@ async def list_applications(
     "/application/info",
     tags=["application management"],
     dependencies=[Depends(user_api_key_auth)],
+    summary="Get Application Info",
+    responses={
+        200: {"description": "Application details"},
+        404: {"description": "Application not found"},
+    },
 )
 @management_endpoint_wrapper
 async def application_info(
     http_request: Request,
-    application_id: str = Query(...),
+    application_id: str = Query(..., description="The unique application ID to retrieve."),
     user_api_key_dict: UserAPIKeyAuth = Depends(user_api_key_auth),
 ):
-    """Get details for a single application by application_id."""
+    """
+    Get details for a single application by application_id.
+
+    Parameters:
+    - application_id: str — The unique application ID.
+
+    Example:
+    ```bash
+    curl -X GET 'http://0.0.0.0:4000/application/info?application_id=app-abc' \\
+      -H 'Authorization: Bearer sk-1234'
+    ```
+    """
     try:
         prisma_client = await _get_prisma()
         app = await _get_app_or_404(prisma_client, application_id)
@@ -371,6 +433,12 @@ async def application_info(
     "/application/update",
     tags=["application management"],
     dependencies=[Depends(user_api_key_auth)],
+    summary="Update Application",
+    responses={
+        200: {"description": "The updated application object"},
+        403: {"description": "Forbidden — only proxy admins can update applications"},
+        404: {"description": "Application not found"},
+    },
 )
 @management_endpoint_wrapper
 async def update_application(
@@ -378,7 +446,34 @@ async def update_application(
     http_request: Request,
     user_api_key_dict: UserAPIKeyAuth = Depends(user_api_key_auth),
 ):
-    """Update application metadata. Admin only."""
+    """
+    Update application metadata. Admin only.
+
+    Performs a partial update — only fields present in the request body are changed.
+
+    Parameters:
+    - application_id: str — The application to update (required).
+    - application_name: Optional[str] — New name.
+    - application_type: Optional[str] — New type.
+    - department: Optional[str] — New department.
+    - lob: Optional[str] — New line of business.
+    - team_id: Optional[str] — New team association.
+    - description: Optional[str] — New description.
+    - labels: Optional[dict] — New metadata labels.
+    - health_check_url: Optional[str] — New health check URL.
+
+    Example:
+    ```bash
+    curl -X PATCH 'http://0.0.0.0:4000/application/update' \\
+      -H 'Authorization: Bearer sk-1234' \\
+      -H 'Content-Type: application/json' \\
+      -d '{
+        "application_id": "app-abc",
+        "department": "Engineering",
+        "health_check_url": "https://my-app.example.com/health"
+      }'
+    ```
+    """
     try:
         _require_admin(user_api_key_dict)
         prisma_client = await _get_prisma()
@@ -425,14 +520,36 @@ async def update_application(
     "/application/delete",
     tags=["application management"],
     dependencies=[Depends(user_api_key_auth)],
+    summary="Delete Application",
+    responses={
+        200: {
+            "description": "Application deleted",
+            "content": {"application/json": {"example": {"deleted": True, "application_id": "app-abc"}}},
+        },
+        403: {"description": "Forbidden — only proxy admins can delete applications"},
+        404: {"description": "Application not found"},
+    },
 )
 @management_endpoint_wrapper
 async def delete_application(
     http_request: Request,
-    application_id: str = Query(...),
+    application_id: str = Query(..., description="The unique application ID to delete."),
     user_api_key_dict: UserAPIKeyAuth = Depends(user_api_key_auth),
 ):
-    """Delete an application by application_id. Admin only."""
+    """
+    Delete an application by application_id. Admin only.
+
+    Also unlinks any virtual keys that were assigned to this application.
+
+    Parameters:
+    - application_id: str — The application to delete.
+
+    Example:
+    ```bash
+    curl -X DELETE 'http://0.0.0.0:4000/application/delete?application_id=app-abc' \\
+      -H 'Authorization: Bearer sk-1234'
+    ```
+    """
     try:
         _require_admin(user_api_key_dict)
         prisma_client = await _get_prisma()
@@ -467,6 +584,14 @@ async def delete_application(
     "/application/{app_id}/keys",
     tags=["application management"],
     dependencies=[Depends(user_api_key_auth)],
+    summary="List Application Keys",
+    responses={
+        200: {
+            "description": "List of virtual keys assigned to the application",
+            "content": {"application/json": {"example": {"application_id": "app-abc", "keys": [{"token": "sk-...", "key_alias": "prod-key"}]}}},
+        },
+        404: {"description": "Application not found"},
+    },
 )
 @management_endpoint_wrapper
 async def application_keys(
@@ -474,7 +599,18 @@ async def application_keys(
     http_request: Request,
     user_api_key_dict: UserAPIKeyAuth = Depends(user_api_key_auth),
 ):
-    """List all virtual keys belonging to an application."""
+    """
+    List all virtual keys belonging to an application.
+
+    Parameters:
+    - app_id: str — The application ID (path parameter).
+
+    Example:
+    ```bash
+    curl -X GET 'http://0.0.0.0:4000/application/app-abc/keys' \\
+      -H 'Authorization: Bearer sk-1234'
+    ```
+    """
     try:
         prisma_client = await _get_prisma()
         await _get_app_or_404(prisma_client, app_id)
@@ -499,6 +635,15 @@ async def application_keys(
     "/application/{app_id}/keys/assign",
     tags=["application management"],
     dependencies=[Depends(user_api_key_auth)],
+    summary="Assign Key to Application",
+    responses={
+        200: {
+            "description": "Key successfully assigned",
+            "content": {"application/json": {"example": {"application_id": "app-abc", "key_token": "sk-...", "assigned": True}}},
+        },
+        403: {"description": "Forbidden — only proxy admins can assign keys"},
+        404: {"description": "Application or key not found"},
+    },
 )
 @management_endpoint_wrapper
 async def assign_key_to_application(
@@ -507,7 +652,21 @@ async def assign_key_to_application(
     user_api_key_dict: UserAPIKeyAuth = Depends(user_api_key_auth),
     key_token: str = Query(..., description="Hashed token of the virtual key to assign"),
 ):
-    """Assign an existing virtual key to this application. Admin only."""
+    """
+    Assign an existing virtual key to this application. Admin only.
+
+    Links a virtual key to an application for usage tracking and grouping.
+
+    Parameters:
+    - app_id: str — The application ID (path parameter).
+    - key_token: str — Hashed token of the virtual key to assign.
+
+    Example:
+    ```bash
+    curl -X POST 'http://0.0.0.0:4000/application/app-abc/keys/assign?key_token=sk-hashed-token' \\
+      -H 'Authorization: Bearer sk-1234'
+    ```
+    """
     try:
         _require_admin(user_api_key_dict)
         prisma_client = await _get_prisma()
@@ -543,6 +702,15 @@ async def assign_key_to_application(
     "/application/{app_id}/keys/unassign",
     tags=["application management"],
     dependencies=[Depends(user_api_key_auth)],
+    summary="Unassign Key from Application",
+    responses={
+        200: {
+            "description": "Key successfully unassigned",
+            "content": {"application/json": {"example": {"application_id": "app-abc", "key_token": "sk-...", "unassigned": True}}},
+        },
+        403: {"description": "Forbidden — only proxy admins can unassign keys"},
+        404: {"description": "Key not found or not assigned to this application"},
+    },
 )
 @management_endpoint_wrapper
 async def unassign_key_from_application(
@@ -551,7 +719,21 @@ async def unassign_key_from_application(
     user_api_key_dict: UserAPIKeyAuth = Depends(user_api_key_auth),
     key_token: str = Query(..., description="Hashed token of the virtual key to unassign"),
 ):
-    """Remove a virtual key from this application. Admin only."""
+    """
+    Remove a virtual key from this application. Admin only.
+
+    Unlinks the key from the application. The key itself is not deleted.
+
+    Parameters:
+    - app_id: str — The application ID (path parameter).
+    - key_token: str — Hashed token of the virtual key to unassign.
+
+    Example:
+    ```bash
+    curl -X POST 'http://0.0.0.0:4000/application/app-abc/keys/unassign?key_token=sk-hashed-token' \\
+      -H 'Authorization: Bearer sk-1234'
+    ```
+    """
     try:
         _require_admin(user_api_key_dict)
         prisma_client = await _get_prisma()
@@ -590,20 +772,39 @@ async def unassign_key_from_application(
     tags=["application management"],
     dependencies=[Depends(user_api_key_auth)],
     response_model=ApplicationMetrics,
+    summary="Get Application Metrics",
+    responses={
+        200: {"description": "Per-application observability metrics"},
+        404: {"description": "Application not found"},
+    },
 )
 @management_endpoint_wrapper
 async def application_metrics(
     app_id: str,
     http_request: Request,
     user_api_key_dict: UserAPIKeyAuth = Depends(user_api_key_auth),
-    start_date: Optional[str] = Query(default=None, description="ISO 8601 start date"),
-    end_date: Optional[str] = Query(default=None, description="ISO 8601 end date"),
+    start_date: Optional[str] = Query(default=None, description="ISO 8601 start date (defaults to 30 days before end_date)."),
+    end_date: Optional[str] = Query(default=None, description="ISO 8601 end date (defaults to now)."),
 ):
     """
     Per-application observability metrics.
 
+    Returns token usage, cost, latency, error rate, active status, key count,
+    and health check status for a specific application.
+
     Metrics window defaults to the last 30 days if not specified.
     Active status is always evaluated against the last 24 hours.
+
+    Parameters:
+    - app_id: str — The application ID (path parameter).
+    - start_date: Optional[str] — ISO 8601 start date for the metrics window.
+    - end_date: Optional[str] — ISO 8601 end date for the metrics window.
+
+    Example:
+    ```bash
+    curl -X GET 'http://0.0.0.0:4000/application/app-abc/metrics?start_date=2026-01-01T00:00:00Z' \\
+      -H 'Authorization: Bearer sk-1234'
+    ```
     """
     try:
         prisma_client = await _get_prisma()
@@ -639,22 +840,44 @@ async def application_metrics(
     tags=["application management"],
     dependencies=[Depends(user_api_key_auth)],
     response_model=ApplicationHealthResponse,
+    summary="Application Health Dashboard",
+    responses={
+        200: {"description": "Aggregate health metrics across all applications"},
+    },
 )
 @management_endpoint_wrapper
 async def application_health(
     http_request: Request,
     user_api_key_dict: UserAPIKeyAuth = Depends(user_api_key_auth),
-    start_date: Optional[str] = Query(default=None, description="ISO 8601 start date"),
-    end_date: Optional[str] = Query(default=None, description="ISO 8601 end date"),
-    application_type: Optional[str] = Query(default=None),
-    department: Optional[str] = Query(default=None),
-    lob: Optional[str] = Query(default=None),
+    start_date: Optional[str] = Query(default=None, description="ISO 8601 start date (defaults to 30 days before end_date)."),
+    end_date: Optional[str] = Query(default=None, description="ISO 8601 end date (defaults to now)."),
+    application_type: Optional[str] = Query(default=None, description="Filter by application type."),
+    department: Optional[str] = Query(default=None, description="Filter by department."),
+    lob: Optional[str] = Query(default=None, description="Filter by line of business."),
 ):
     """
     All-apps health dashboard aggregate.
 
-    Returns per-app metrics + totals for active apps, total apps, etc.
-    Default window: last 30 days.
+    Returns per-app metrics plus totals for active apps, total apps, etc.
+    Default metrics window: last 30 days. Active status is evaluated
+    against the last 24 hours.
+
+    Authorization:
+    - Admin: sees all applications.
+    - Non-admin: sees only applications belonging to their team.
+
+    Parameters:
+    - start_date: Optional[str] — ISO 8601 start date.
+    - end_date: Optional[str] — ISO 8601 end date.
+    - application_type: Optional[str] — Filter by type.
+    - department: Optional[str] — Filter by department.
+    - lob: Optional[str] — Filter by line of business.
+
+    Example:
+    ```bash
+    curl -X GET 'http://0.0.0.0:4000/application/health?department=Finance' \\
+      -H 'Authorization: Bearer sk-1234'
+    ```
     """
     try:
         prisma_client = await _get_prisma()
@@ -726,13 +949,37 @@ async def application_health(
     "/application/config",
     tags=["application management"],
     dependencies=[Depends(user_api_key_auth)],
+    summary="Get Application Config",
+    responses={
+        200: {
+            "description": "Application configuration (departments and lines of business)",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "departments": ["Engineering", "Finance", "Operations"],
+                        "lines_of_business": ["Retail", "Commercial", "Wealth"],
+                    }
+                }
+            },
+        },
+    },
 )
 @management_endpoint_wrapper
 async def get_application_config(
     http_request: Request,
     user_api_key_dict: UserAPIKeyAuth = Depends(user_api_key_auth),
 ):
-    """Get configured department and line-of-business lists."""
+    """
+    Get configured department and line-of-business lists.
+
+    Returns the available dropdown options used when creating or updating applications.
+
+    Example:
+    ```bash
+    curl -X GET 'http://0.0.0.0:4000/application/config' \\
+      -H 'Authorization: Bearer sk-1234'
+    ```
+    """
     try:
         prisma_client = await _get_prisma()
         config = await _read_app_config(prisma_client)
@@ -753,6 +1000,21 @@ async def get_application_config(
     "/application/config/update",
     tags=["application management"],
     dependencies=[Depends(user_api_key_auth)],
+    summary="Update Application Config",
+    responses={
+        200: {
+            "description": "Updated application configuration",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "departments": ["Engineering", "Finance", "Operations"],
+                        "lines_of_business": ["Retail", "Commercial", "Wealth"],
+                    }
+                }
+            },
+        },
+        403: {"description": "Forbidden — only proxy admins can update config"},
+    },
 )
 @management_endpoint_wrapper
 async def update_application_config(
@@ -762,11 +1024,24 @@ async def update_application_config(
     """
     Update department / line-of-business lists. Admin only.
 
+    Merges the provided fields into the existing config. Only the fields
+    included in the request body are updated.
+
     Request body (JSON):
+    ```json
     {
-        "departments": ["Engineering", "Finance", ...],
-        "lines_of_business": ["Retail", "Commercial", ...]
+        "departments": ["Engineering", "Finance", "Operations"],
+        "lines_of_business": ["Retail", "Commercial", "Wealth"]
     }
+    ```
+
+    Example:
+    ```bash
+    curl -X POST 'http://0.0.0.0:4000/application/config/update' \\
+      -H 'Authorization: Bearer sk-1234' \\
+      -H 'Content-Type: application/json' \\
+      -d '{"departments": ["Engineering", "Finance", "Operations"]}'
+    ```
     """
     try:
         _require_admin(user_api_key_dict)
