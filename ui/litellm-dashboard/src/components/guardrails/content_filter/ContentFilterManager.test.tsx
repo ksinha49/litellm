@@ -18,7 +18,7 @@ const GUARDRAIL_SETTINGS = {
   content_filter_settings: {
     prebuilt_patterns: [],
     pattern_categories: ["PII"],
-    supported_actions: ["BLOCK", "MASK"],
+    supported_actions: ["BLOCK", "MASK", "MONITOR"],
   },
 };
 
