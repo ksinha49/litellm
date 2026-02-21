@@ -107,7 +107,7 @@ function LoginPageContent() {
         <Link href={`${rootPath}/hub`} style={styles.topNavButton}>
           Landing Page
         </Link>
-        <Link href={`${rootPath}/api-reference`} style={styles.topNavButton}>
+        <Link href={`${rootPath}/docs/`} style={styles.topNavButton}>
           API Docs
         </Link>
       </div>
