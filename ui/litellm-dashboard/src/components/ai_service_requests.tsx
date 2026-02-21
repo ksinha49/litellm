@@ -3,7 +3,7 @@ import { Text, Badge, Button, Title } from "@tremor/react";
 import { Select, Tooltip, Modal, Input } from "antd";
 import { DataTable } from "./view_logs/table";
 import { ColumnDef } from "@tanstack/react-table";
-import { getAIServiceRequests } from "./networking";
+import { getAIServiceRequests, getAIServiceRequest } from "./networking";
 
 interface AIServiceRequest {
   request_id: string;
@@ -37,6 +37,21 @@ const AIServiceRequests: React.FC<AIServiceRequestsProps> = ({ accessToken }) =>
   const [isLoading, setIsLoading] = useState(false);
   const [autoRefresh, setAutoRefresh] = useState(false);
   const [selectedRequest, setSelectedRequest] = useState<AIServiceRequest | null>(null);
+  const [detailLoading, setDetailLoading] = useState(false);
+
+  const openRequestDetail = useCallback(async (req: AIServiceRequest) => {
+    setSelectedRequest(req);
+    if (!accessToken) return;
+    setDetailLoading(true);
+    try {
+      const fresh = await getAIServiceRequest(accessToken, req.request_id);
+      setSelectedRequest(fresh);
+    } catch {
+      // Fall back to the row data already set above
+    } finally {
+      setDetailLoading(false);
+    }
+  }, [accessToken]);
 
   const loadRequests = useCallback(async () => {
     if (!accessToken) return;
@@ -75,7 +90,7 @@ const AIServiceRequests: React.FC<AIServiceRequestsProps> = ({ accessToken }) =>
         <Tooltip title={info.getValue()}>
           <span
             className="font-mono text-blue-500 text-xs cursor-pointer hover:underline truncate max-w-[18ch] block"
-            onClick={() => setSelectedRequest(info.row.original)}
+            onClick={() => openRequestDetail(info.row.original)}
           >
             {info.getValue()?.substring(0, 12)}...
           </span>
@@ -126,7 +141,7 @@ const AIServiceRequests: React.FC<AIServiceRequestsProps> = ({ accessToken }) =>
         <Button
           size="xs"
           variant="secondary"
-          onClick={() => setSelectedRequest(row.original)}
+          onClick={() => openRequestDetail(row.original)}
         >
           View
         </Button>

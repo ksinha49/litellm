@@ -307,28 +307,28 @@ const menuItems: MenuItemCfg[] = [
     roles: all_admin_roles,
     children: [
       {
-        key: "11",
+        key: "settings-router",
         page: "general-settings",
         label: "Router Settings",
         icon: <SettingOutlined style={{ fontSize: 18 }} />,
         roles: all_admin_roles,
       },
       {
-        key: "8",
+        key: "settings-logging",
         page: "settings",
         label: "Logging & Alerts",
         icon: <SettingOutlined style={{ fontSize: 18 }} />,
         roles: all_admin_roles,
       },
       {
-        key: "13",
+        key: "settings-admin",
         page: "admin-panel",
         label: "Admin Settings",
         icon: <SettingOutlined style={{ fontSize: 18 }} />,
         roles: all_admin_roles,
       },
       {
-        key: "14",
+        key: "settings-ui-theme",
         page: "ui-theme",
         label: "UI Theme",
         icon: <SettingOutlined style={{ fontSize: 18 }} />,
