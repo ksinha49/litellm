@@ -6,9 +6,10 @@ import LoadingScreen from "@/components/common_components/LoadingScreen";
 import { getProxyBaseUrl } from "@/components/networking";
 import { getCookie } from "@/utils/cookieUtils";
 import { isJwtExpired } from "@/utils/jwtUtils";
-import { InfoCircleOutlined, LockOutlined, UserOutlined } from "@ant-design/icons";
+import { LockOutlined, UserOutlined } from "@ant-design/icons";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Alert, Button, Form, Input, Popover, Typography } from "antd";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
@@ -133,21 +134,6 @@ function LoginPageContent() {
             </Text>
           </div>
 
-          <Alert
-            message="Default Credentials"
-            description={
-              <>
-                <Paragraph style={{ fontSize: 13, marginBottom: 4 }}>
-                  Username: <code style={styles.codeInline}>admin</code> &nbsp;|&nbsp; Password: your <code style={styles.codeInline}>MASTER_KEY</code>
-                </Paragraph>
-              </>
-            }
-            type="info"
-            icon={<InfoCircleOutlined />}
-            showIcon
-            style={{ marginBottom: 24, borderRadius: 6, borderColor: "#b0d9f3", backgroundColor: "#eff8ff" }}
-          />
-
           {error && <Alert message={error} type="error" showIcon style={{ marginBottom: 16, borderRadius: 6 }} />}
 
           <Form onFinish={handleSubmit} layout="vertical" requiredMark={false}>
@@ -239,6 +225,16 @@ function LoginPageContent() {
               }
             />
           )}
+
+          <div style={styles.navLinks}>
+            <Link href={`${rootPath}/ui/hub`} style={styles.navLink}>
+              Landing Page
+            </Link>
+            <span style={styles.navDivider}>|</span>
+            <Link href={`${rootPath}/ui/api-reference`} style={styles.navLink}>
+              API Documentation
+            </Link>
+          </div>
         </div>
       </div>
     </div>
@@ -349,6 +345,25 @@ const styles: Record<string, React.CSSProperties> = {
   logoSection: {
     textAlign: "center" as const,
     marginBottom: 24,
+  },
+  navLinks: {
+    marginTop: 24,
+    paddingTop: 20,
+    borderTop: "1px solid #ededed",
+    display: "flex",
+    justifyContent: "center",
+    alignItems: "center",
+    gap: 12,
+  },
+  navLink: {
+    color: "#377dd0",
+    fontSize: 14,
+    fontWeight: 600,
+    textDecoration: "none",
+  },
+  navDivider: {
+    color: "#cccccc",
+    fontSize: 14,
   },
 };
 
