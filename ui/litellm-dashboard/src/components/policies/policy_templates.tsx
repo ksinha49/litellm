@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from "react";
-import { Card, Button, Spin, message, Checkbox, Badge } from "antd";
+import { Card, Button, Spin, message, Checkbox, Badge, Collapse, Tag } from "antd";
 import {
   ShieldCheckIcon,
   ShieldExclamationIcon,
@@ -9,6 +9,93 @@ import {
 } from "@heroicons/react/outline";
 import { getPolicyTemplates } from "../networking";
 
+// ---------------------------------------------------------------------------
+// Guardrail definition helpers
+// ---------------------------------------------------------------------------
+
+interface GuardrailDef {
+  guardrail_name: string;
+  litellm_params: {
+    guardrail?: string;
+    mode?: string;
+    patterns?: any[];
+    blocked_words?: any[];
+    categories?: any[];
+    [key: string]: any;
+  };
+  guardrail_info?: { description?: string; [key: string]: any };
+}
+
+function buildDefsMap(defs?: GuardrailDef[]): Record<string, GuardrailDef> {
+  const map: Record<string, GuardrailDef> = {};
+  if (!defs) return map;
+  for (const d of defs) {
+    if (d.guardrail_name) map[d.guardrail_name] = d;
+  }
+  return map;
+}
+
+/** Compact summary of a guardrail's configured items. */
+function GuardrailSummary({ def }: { def: GuardrailDef }) {
+  const params = def.litellm_params || {};
+  const description = def.guardrail_info?.description;
+  const patterns: any[] = params.patterns || [];
+  const keywords: any[] = params.blocked_words || [];
+  const categories: any[] = params.categories || [];
+
+  if (!description && patterns.length === 0 && keywords.length === 0 && categories.length === 0) {
+    return null;
+  }
+
+  return (
+    <div style={{ fontSize: 12, lineHeight: "18px", display: "flex", flexDirection: "column", gap: 4 }}>
+      {description && (
+        <div style={{ color: "#666", fontStyle: "italic" }}>{description}</div>
+      )}
+      {patterns.length > 0 && (
+        <div>
+          <span style={{ fontWeight: 500 }}>Patterns: </span>
+          {patterns.map((p: any) => p.pattern_name || p.name).join(", ")}
+          <Tag
+            color={patterns[0]?.action === "BLOCK" ? "red" : "blue"}
+            style={{ margin: "0 0 0 6px", fontSize: 10, lineHeight: "16px", padding: "0 4px" }}
+          >
+            {patterns[0]?.action || "BLOCK"}
+          </Tag>
+        </div>
+      )}
+      {categories.length > 0 && (
+        <div>
+          <span style={{ fontWeight: 500 }}>Categories: </span>
+          {categories.map((c: any) => c.category).join(", ")}
+          <Tag
+            color={categories[0]?.action === "BLOCK" ? "red" : "blue"}
+            style={{ margin: "0 0 0 6px", fontSize: 10, lineHeight: "16px", padding: "0 4px" }}
+          >
+            {categories[0]?.action || "BLOCK"}
+          </Tag>
+        </div>
+      )}
+      {keywords.length > 0 && (
+        <div>
+          <span style={{ fontWeight: 500 }}>Keywords: </span>
+          {keywords.map((w: any) => w.keyword).join(", ")}
+          <Tag
+            color={keywords[0]?.action === "BLOCK" ? "red" : "blue"}
+            style={{ margin: "0 0 0 6px", fontSize: 10, lineHeight: "16px", padding: "0 4px" }}
+          >
+            {keywords[0]?.action || "BLOCK"}
+          </Tag>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Template card
+// ---------------------------------------------------------------------------
+
 interface PolicyTemplateCardProps {
   title: string;
   description: string;
@@ -16,6 +103,7 @@ interface PolicyTemplateCardProps {
   iconColor: string;
   iconBg: string;
   guardrails: string[];
+  guardrailDefinitions?: GuardrailDef[];
   tags: string[];
   inherits?: string;
   complexity: "Low" | "Medium" | "High";
@@ -29,11 +117,14 @@ const PolicyTemplateCard: React.FC<PolicyTemplateCardProps> = ({
   iconColor,
   iconBg,
   guardrails,
+  guardrailDefinitions,
   tags,
   inherits,
   complexity,
   onUseTemplate,
 }) => {
+  const defsMap = useMemo(() => buildDefsMap(guardrailDefinitions), [guardrailDefinitions]);
+
   const getComplexityStyle = () => {
     switch (complexity) {
       case "Low":
@@ -44,6 +135,19 @@ const PolicyTemplateCard: React.FC<PolicyTemplateCardProps> = ({
         return "bg-purple-50 text-purple-600 border-purple-100";
     }
   };
+
+  // Split guardrails into those with expandable detail and those without
+  const hasAnyDefs = guardrails.some((name) => {
+    const def = defsMap[name];
+    if (!def) return false;
+    const p = def.litellm_params || {};
+    return (
+      def.guardrail_info?.description ||
+      (p.patterns && p.patterns.length > 0) ||
+      (p.blocked_words && p.blocked_words.length > 0) ||
+      (p.categories && p.categories.length > 0)
+    );
+  });
 
   return (
     <Card
@@ -90,16 +194,77 @@ const PolicyTemplateCard: React.FC<PolicyTemplateCardProps> = ({
         <span className="text-xs font-medium text-gray-500 uppercase tracking-wider block mb-2">
           Included Guardrails
         </span>
-        <div className="flex flex-wrap gap-2">
-          {guardrails.map((g) => (
-            <span
-              key={g}
-              className="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-gray-50 text-gray-700 border border-gray-200"
-            >
-              {g}
-            </span>
-          ))}
-        </div>
+
+        {hasAnyDefs ? (
+          /* Collapsible guardrails with detail */
+          <Collapse
+            ghost
+            size="small"
+            expandIconPosition="start"
+            style={{ margin: "0 -12px" }}
+            items={guardrails.map((name) => {
+              const def = defsMap[name];
+              const hasDetail =
+                def &&
+                (def.guardrail_info?.description ||
+                  (def.litellm_params?.patterns?.length ?? 0) > 0 ||
+                  (def.litellm_params?.blocked_words?.length ?? 0) > 0 ||
+                  (def.litellm_params?.categories?.length ?? 0) > 0);
+
+              const mode = def?.litellm_params?.mode;
+              const patternCount = def?.litellm_params?.patterns?.length || 0;
+              const keywordCount = def?.litellm_params?.blocked_words?.length || 0;
+              const categoryCount = def?.litellm_params?.categories?.length || 0;
+
+              return {
+                key: name,
+                collapsible: hasDetail ? ("header" as const) : ("disabled" as const),
+                showArrow: !!hasDetail,
+                label: (
+                  <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+                    <span style={{ fontWeight: 500, fontSize: 12 }}>{name}</span>
+                    {mode && (
+                      <Tag
+                        color="blue"
+                        style={{ margin: 0, fontSize: 10, lineHeight: "16px", padding: "0 4px" }}
+                      >
+                        {mode}
+                      </Tag>
+                    )}
+                    {patternCount > 0 && (
+                      <Tag style={{ margin: 0, fontSize: 10, lineHeight: "16px", padding: "0 4px" }}>
+                        {patternCount} pattern{patternCount !== 1 ? "s" : ""}
+                      </Tag>
+                    )}
+                    {categoryCount > 0 && (
+                      <Tag style={{ margin: 0, fontSize: 10, lineHeight: "16px", padding: "0 4px" }}>
+                        {categoryCount} categor{categoryCount !== 1 ? "ies" : "y"}
+                      </Tag>
+                    )}
+                    {keywordCount > 0 && (
+                      <Tag style={{ margin: 0, fontSize: 10, lineHeight: "16px", padding: "0 4px" }}>
+                        {keywordCount} keyword{keywordCount !== 1 ? "s" : ""}
+                      </Tag>
+                    )}
+                  </div>
+                ),
+                children: hasDetail && def ? <GuardrailSummary def={def} /> : null,
+              };
+            })}
+          />
+        ) : (
+          /* Flat spans fallback (no definitions available) */
+          <div className="flex flex-wrap gap-2">
+            {guardrails.map((g) => (
+              <span
+                key={g}
+                className="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-gray-50 text-gray-700 border border-gray-200"
+              >
+                {g}
+              </span>
+            ))}
+          </div>
+        )}
       </div>
 
       <Button
@@ -274,6 +439,7 @@ const PolicyTemplates: React.FC<PolicyTemplatesProps> = ({ onUseTemplate, access
                 iconColor={template.iconColor}
                 iconBg={template.iconBg}
                 guardrails={template.guardrails}
+                guardrailDefinitions={template.guardrailDefinitions}
                 tags={template.tags || []}
                 inherits={template.inherits}
                 complexity={template.complexity}
