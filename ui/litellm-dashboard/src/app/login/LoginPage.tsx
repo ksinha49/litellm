@@ -6,9 +6,9 @@ import LoadingScreen from "@/components/common_components/LoadingScreen";
 import { getProxyBaseUrl } from "@/components/networking";
 import { getCookie } from "@/utils/cookieUtils";
 import { isJwtExpired } from "@/utils/jwtUtils";
-import { InfoCircleOutlined } from "@ant-design/icons";
+import { InfoCircleOutlined, LockOutlined, UserOutlined } from "@ant-design/icons";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { Alert, Button, Card, Form, Input, Popover, Space, Typography } from "antd";
+import { Alert, Button, Form, Input, Popover, Typography } from "antd";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
@@ -71,107 +71,121 @@ function LoginPageContent() {
   // Show disabled message if admin UI is disabled
   if (uiConfig && uiConfig.admin_ui_disabled) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <Card className="w-full max-w-lg shadow-md">
-          <Space direction="vertical" size="middle" className="w-full">
-            <div className="text-center">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={`${rootPath}/assets/logos/ameritas_logo.png`} alt={`${appName} logo`} style={{ height: 48, width: "auto", margin: "0 auto" }} />
-            </div>
+      <div style={styles.pageContainer}>
+        <div style={styles.loginCard}>
+          <div style={styles.logoSection}>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={`${rootPath}/assets/logos/ameritas_logo.png`} alt={`${appName} logo`} style={{ height: 40, width: "auto" }} />
+          </div>
 
-            <Alert
-              message="Admin UI Disabled"
-              description={
-                <>
-                  <Paragraph className="text-sm">
-                    The Admin UI has been disabled by the administrator. To re-enable it, please update the following
-                    environment variable:
-                  </Paragraph>
-                  <Paragraph className="text-sm">
-                    <code className="bg-gray-100 px-1 py-0.5 rounded text-xs">DISABLE_ADMIN_UI=False</code>
-                  </Paragraph>
-                </>
-              }
-              type="warning"
-              showIcon
-            />
-          </Space>
-        </Card>
+          <Alert
+            message="Admin UI Disabled"
+            description={
+              <>
+                <Paragraph style={{ fontSize: 14, marginBottom: 8 }}>
+                  The Admin UI has been disabled by the administrator. To re-enable it, please update the following
+                  environment variable:
+                </Paragraph>
+                <Paragraph style={{ fontSize: 14, marginBottom: 0 }}>
+                  <code style={styles.codeInline}>DISABLE_ADMIN_UI=False</code>
+                </Paragraph>
+              </>
+            }
+            type="warning"
+            showIcon
+          />
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50">
-      <Card className="w-full max-w-lg shadow-md">
-        <Space direction="vertical" size="middle" className="w-full">
-          <div className="text-center">
-            <Title level={2}>🚅 {appName}</Title>
-          </div>
+    <div style={styles.pageContainer}>
+      {/* Left branding panel */}
+      <div style={styles.brandPanel}>
+        <div style={styles.brandContent}>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={`${rootPath}/assets/logos/ameritas_logo.png`}
+            alt={`${appName} logo`}
+            style={{ height: 48, width: "auto", marginBottom: 32 }}
+          />
+          <h1 style={styles.brandHeading}>LLM Gateway</h1>
+          <p style={styles.brandSubtext}>
+            Centralized AI model management, monitoring, and access control for your organization.
+          </p>
+          <div style={styles.brandDivider} />
+          <p style={styles.brandFootnote}>
+            Powered by LiteLLM Proxy
+          </p>
+        </div>
+      </div>
 
-          <div className="text-center">
-            <Title level={3}>Login</Title>
-            <Text type="secondary">Access your {appName} Admin UI.</Text>
+      {/* Right login panel */}
+      <div style={styles.loginPanel}>
+        <div style={styles.loginCard}>
+          <div style={styles.loginHeader}>
+            <Title level={3} style={{ margin: 0, color: "#333333", fontWeight: 600 }}>
+              Sign In
+            </Title>
+            <Text style={{ color: "#767676", fontSize: 15 }}>
+              Access the {appName} Admin Console
+            </Text>
           </div>
 
           <Alert
             message="Default Credentials"
             description={
               <>
-                <Paragraph className="text-sm">
-                  By default, Username is <code className="bg-gray-100 px-1 py-0.5 rounded text-xs">admin</code> and
-                  Password is your set {appName} Proxy
-                  <code className="bg-gray-100 px-1 py-0.5 rounded text-xs">MASTER_KEY</code>.
-                </Paragraph>
-                <Paragraph className="text-sm">
-                  Need to set UI credentials or SSO?{" "}
-                  <a href="https://docs.litellm.ai/docs/proxy/ui" target="_blank" rel="noopener noreferrer">
-                    Check the documentation
-                  </a>
-                  .
+                <Paragraph style={{ fontSize: 13, marginBottom: 4 }}>
+                  Username: <code style={styles.codeInline}>admin</code> &nbsp;|&nbsp; Password: your <code style={styles.codeInline}>MASTER_KEY</code>
                 </Paragraph>
               </>
             }
             type="info"
             icon={<InfoCircleOutlined />}
             showIcon
+            style={{ marginBottom: 24, borderRadius: 6, borderColor: "#b0d9f3", backgroundColor: "#eff8ff" }}
           />
 
-          {error && <Alert message={error} type="error" showIcon />}
+          {error && <Alert message={error} type="error" showIcon style={{ marginBottom: 16, borderRadius: 6 }} />}
 
-          <Form onFinish={handleSubmit} layout="vertical" requiredMark={true}>
+          <Form onFinish={handleSubmit} layout="vertical" requiredMark={false}>
             <Form.Item
-              label="Username"
+              label={<span style={styles.formLabel}>Username</span>}
               name="username"
               rules={[{ required: true, message: "Please enter your username" }]}
             >
               <Input
+                prefix={<UserOutlined style={{ color: "#767676" }} />}
                 placeholder="Enter your username"
                 autoComplete="username"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
                 disabled={isLoginLoading}
                 size="large"
-                className="rounded-md border-gray-300"
+                style={styles.input}
               />
             </Form.Item>
 
             <Form.Item
-              label="Password"
+              label={<span style={styles.formLabel}>Password</span>}
               name="password"
               rules={[{ required: true, message: "Please enter your password" }]}
             >
               <Input.Password
+                prefix={<LockOutlined style={{ color: "#767676" }} />}
                 placeholder="Enter your password"
                 autoComplete="current-password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 disabled={isLoginLoading}
                 size="large"
+                style={styles.input}
               />
             </Form.Item>
 
-            <Form.Item>
+            <Form.Item style={{ marginBottom: 12, marginTop: 8 }}>
               <Button
                 type="primary"
                 htmlType="submit"
@@ -179,18 +193,20 @@ function LoginPageContent() {
                 disabled={isLoginLoading}
                 block
                 size="large"
+                style={styles.primaryButton}
               >
-                {isLoginLoading ? "Logging in..." : "Login"}
+                {isLoginLoading ? "Signing in..." : "Sign In"}
               </Button>
             </Form.Item>
-            <Form.Item>
+
+            <Form.Item style={{ marginBottom: 0 }}>
               {!uiConfig?.sso_configured ? (
                 <Popover
                   content="Please configure SSO to log in with SSO."
                   trigger="hover"
                 >
-                  <Button disabled block size="large">
-                    Login with SSO
+                  <Button disabled block size="large" style={styles.ssoButton}>
+                    Sign In with SSO
                   </Button>
                 </Popover>
               ) : (
@@ -201,25 +217,140 @@ function LoginPageContent() {
                   }
                   block
                   size="large"
+                  style={styles.ssoButton}
                 >
-                  Login with SSO
+                  Sign In with SSO
                 </Button>
               )}
             </Form.Item>
           </Form>
-        </Space>
-        {uiConfig?.sso_configured && (
-          <Alert
-            type="info"
-            showIcon
-            closable
-            message={<Text>Single Sign-On (SSO) is enabled. Ameritas LLM no longer automatically redirects to the SSO login flow upon loading this page. To re-enable auto-redirect-to-SSO, set <Text code>AUTO_REDIRECT_UI_LOGIN_TO_SSO=true</Text> in your environment configuration.</Text>}
-          />
-        )}
-      </Card>
+
+          {uiConfig?.sso_configured && (
+            <Alert
+              type="info"
+              showIcon
+              closable
+              style={{ marginTop: 16, borderRadius: 6, borderColor: "#b0d9f3", backgroundColor: "#eff8ff" }}
+              message={
+                <Text style={{ fontSize: 13 }}>
+                  SSO is enabled. Auto-redirect is off. Set{" "}
+                  <Text code>AUTO_REDIRECT_UI_LOGIN_TO_SSO=true</Text> to re-enable.
+                </Text>
+              }
+            />
+          )}
+        </div>
+      </div>
     </div>
   );
 }
+
+const styles: Record<string, React.CSSProperties> = {
+  pageContainer: {
+    minHeight: "100vh",
+    display: "flex",
+    flexDirection: "row" as const,
+  },
+  brandPanel: {
+    flex: "0 0 420px",
+    background: "linear-gradient(165deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%)",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    padding: "48px 40px",
+    position: "relative" as const,
+    overflow: "hidden",
+  },
+  brandContent: {
+    position: "relative" as const,
+    zIndex: 1,
+    maxWidth: 320,
+  },
+  brandHeading: {
+    fontSize: 32,
+    fontWeight: 700,
+    color: "#ffffff",
+    margin: "0 0 16px 0",
+    letterSpacing: "-0.02em",
+    lineHeight: 1.2,
+  },
+  brandSubtext: {
+    fontSize: 16,
+    color: "rgba(255, 255, 255, 0.7)",
+    lineHeight: 1.6,
+    margin: "0 0 32px 0",
+  },
+  brandDivider: {
+    width: 48,
+    height: 3,
+    backgroundColor: "#d3222a",
+    borderRadius: 2,
+    marginBottom: 16,
+  },
+  brandFootnote: {
+    fontSize: 13,
+    color: "rgba(255, 255, 255, 0.4)",
+    margin: 0,
+  },
+  loginPanel: {
+    flex: 1,
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    padding: "48px 40px",
+    backgroundColor: "#f5f5f5",
+  },
+  loginCard: {
+    width: "100%",
+    maxWidth: 420,
+    backgroundColor: "#ffffff",
+    borderRadius: 12,
+    padding: "40px 36px",
+    boxShadow: "0 1px 3px rgba(0, 0, 0, 0.08), 0 8px 24px rgba(0, 0, 0, 0.04)",
+  },
+  loginHeader: {
+    marginBottom: 28,
+    display: "flex",
+    flexDirection: "column" as const,
+    gap: 6,
+  },
+  formLabel: {
+    fontSize: 14,
+    fontWeight: 600,
+    color: "#333333",
+  },
+  input: {
+    borderRadius: 6,
+    borderColor: "#cccccc",
+  },
+  primaryButton: {
+    height: 44,
+    borderRadius: 6,
+    fontWeight: 600,
+    fontSize: 15,
+    backgroundColor: "#d3222a",
+    borderColor: "#d3222a",
+  },
+  ssoButton: {
+    height: 44,
+    borderRadius: 6,
+    fontWeight: 600,
+    fontSize: 15,
+    borderColor: "#0058db",
+    color: "#0058db",
+  },
+  codeInline: {
+    backgroundColor: "#f5f5f5",
+    padding: "1px 6px",
+    borderRadius: 3,
+    fontSize: 12,
+    fontFamily: "'SF Mono', 'Fira Code', monospace",
+  },
+  logoSection: {
+    textAlign: "center" as const,
+    marginBottom: 24,
+  },
+};
 
 export default function LoginPage() {
   const queryClient = new QueryClient();

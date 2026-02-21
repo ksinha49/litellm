@@ -1,10 +1,13 @@
 import type { Metadata } from "next";
-import { Inter } from "next/font/google";
+import { Source_Sans_3 } from "next/font/google";
 import "./globals.css";
 
 import AntdGlobalProvider from "@/contexts/AntdGlobalProvider";
 
-const inter = Inter({ subsets: ["latin"] });
+const sourceSans3 = Source_Sans_3({
+  subsets: ["latin"],
+  weight: ["300", "400", "600", "700"],
+});
 
 const appName = process.env.NEXT_PUBLIC_APP_NAME || "Ameritas LLM";
 
@@ -21,7 +24,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body className={inter.className}>
+      <body className={sourceSans3.className}>
         <AntdGlobalProvider>{children}</AntdGlobalProvider>
       </body>
     </html>
