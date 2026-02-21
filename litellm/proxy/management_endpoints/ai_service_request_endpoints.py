@@ -3,9 +3,9 @@ AI SERVICE REQUEST TRACKING
 
 Endpoints for tracking async AI service requests submitted via pass-through endpoints.
 
-GET  /ai-services/requests/{request_id}    — Poll for request status
-POST /ai-services/requests/{request_id}/result — Callback from downstream service
-GET  /ai-services/requests                  — List recent requests
+GET  /ai-services/requests/{request_id}        — Poll for request status
+POST /ai-services/requests/{request_id}/result  — Callback from downstream service
+GET  /ai-services/requests                      — List recent requests
 """
 
 import json
@@ -15,8 +15,10 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request
 
 from litellm._logging import verbose_proxy_logger
 from litellm.proxy._types import (
+    AIServiceRequestListResponse,
     AIServiceRequestResponse,
     AIServiceResultCallback,
+    AIServiceResultCallbackResponse,
     LitellmUserRoles,
     ProxyException,
     UserAPIKeyAuth,
@@ -63,13 +65,61 @@ def _parse_json_field(value: Any) -> Optional[dict]:
     tags=["ai service requests"],
     dependencies=[Depends(user_api_key_auth)],
     response_model=AIServiceRequestResponse,
+    summary="Get AI Service Request",
+    responses={
+        200: {
+            "description": "AI service request details",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "request_id": "chatcmpl-abc123",
+                        "service_type": "idp",
+                        "status": "completed",
+                        "request_body": {
+                            "document_url": "s3://bucket/doc.pdf",
+                            "extraction_type": "invoice",
+                        },
+                        "response_body": {
+                            "invoice_number": "INV-001",
+                            "total": 1250.00,
+                        },
+                        "error": None,
+                        "created_at": "2026-02-21T10:30:00",
+                        "updated_at": "2026-02-21T10:31:05",
+                    }
+                }
+            },
+        },
+        404: {"description": "Request not found"},
+        403: {"description": "Forbidden — non-admin user cannot view another user's request"},
+    },
 )
 async def get_ai_service_request(
     request_id: str,
     http_request: Request,
     user_api_key_dict: UserAPIKeyAuth = Depends(user_api_key_auth),
 ):
-    """Get status of a specific AI service request."""
+    """
+    Poll for the status of a specific AI service request.
+
+    Use this endpoint to check whether an async AI service request has completed.
+    When a pass-through endpoint is configured with `response_mode: "async"`, the
+    initial request returns a `request_id`. Use that ID here to poll for results.
+
+    Parameters:
+    - request_id: str — The unique request ID returned by the async pass-through endpoint.
+
+    Authorization:
+    - Requires a valid LiteLLM API key (`Authorization: Bearer sk-...`).
+    - Non-admin users can only view their own requests.
+    - Admin users can view any request.
+
+    Example:
+    ```bash
+    curl -X GET 'http://0.0.0.0:4000/ai-services/requests/chatcmpl-abc123' \\
+      -H 'Authorization: Bearer sk-1234'
+    ```
+    """
     try:
         prisma_client = await _get_prisma()
 
@@ -116,6 +166,25 @@ async def get_ai_service_request(
     "/ai-services/requests/{request_id}/result",
     tags=["ai service requests"],
     dependencies=[Depends(user_api_key_auth)],
+    response_model=AIServiceResultCallbackResponse,
+    summary="Post AI Service Result Callback",
+    responses={
+        200: {
+            "description": "Result successfully recorded",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "request_id": "chatcmpl-abc123",
+                        "status": "completed",
+                        "updated": True,
+                        "updated_at": "2026-02-21T10:31:05",
+                    }
+                }
+            },
+        },
+        404: {"description": "Request not found"},
+        403: {"description": "Forbidden — only admins or the request owner can post results"},
+    },
 )
 async def post_ai_service_result(
     request_id: str,
@@ -126,9 +195,46 @@ async def post_ai_service_result(
     """
     Callback endpoint for downstream services to post results.
 
-    Only admins or the original request owner can update a request.
-    The downstream Lambda or service should use a dedicated admin API key
-    to authenticate and update the request status.
+    After an async AI service request is dispatched (e.g., to a Lambda via EventBridge),
+    the downstream processor calls this endpoint to update the request status and
+    deliver the response payload.
+
+    Parameters:
+    - request_id: str — The request ID to update.
+    - status: str — New status: "processing", "completed", or "failed".
+    - response_body: Optional[dict] — The result payload (required for "completed").
+    - error: Optional[str] — Error message (required for "failed").
+
+    Authorization:
+    - Requires a valid LiteLLM API key (`Authorization: Bearer sk-...`).
+    - Only admins or the original request owner can post results.
+    - Downstream Lambda functions should use a dedicated admin/service API key.
+
+    Example — Mark request as completed:
+    ```bash
+    curl -X POST 'http://0.0.0.0:4000/ai-services/requests/chatcmpl-abc123/result' \\
+      -H 'Authorization: Bearer sk-admin-service-key' \\
+      -H 'Content-Type: application/json' \\
+      -d '{
+        "status": "completed",
+        "response_body": {
+          "invoice_number": "INV-001",
+          "vendor": "Acme Corp",
+          "total": 1250.00
+        }
+      }'
+    ```
+
+    Example — Mark request as failed:
+    ```bash
+    curl -X POST 'http://0.0.0.0:4000/ai-services/requests/chatcmpl-abc123/result' \\
+      -H 'Authorization: Bearer sk-admin-service-key' \\
+      -H 'Content-Type: application/json' \\
+      -d '{
+        "status": "failed",
+        "error": "Document parsing failed: unsupported format"
+      }'
+    ```
     """
     try:
         prisma_client = await _get_prisma()
@@ -161,12 +267,12 @@ async def post_ai_service_result(
             data=update_data,
         )
 
-        return {
-            "request_id": updated.request_id,
-            "status": updated.status,
-            "updated": True,
-            "updated_at": updated.updated_at.isoformat() if updated.updated_at else None,
-        }
+        return AIServiceResultCallbackResponse(
+            request_id=updated.request_id,
+            status=updated.status,
+            updated=True,
+            updated_at=updated.updated_at.isoformat() if updated.updated_at else None,
+        )
     except HTTPException:
         raise
     except Exception as e:
@@ -183,19 +289,91 @@ async def post_ai_service_result(
     "/ai-services/requests",
     tags=["ai service requests"],
     dependencies=[Depends(user_api_key_auth)],
+    response_model=AIServiceRequestListResponse,
+    summary="List AI Service Requests",
+    responses={
+        200: {
+            "description": "Paginated list of AI service requests",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "requests": [
+                            {
+                                "request_id": "chatcmpl-abc123",
+                                "service_type": "idp",
+                                "status": "completed",
+                                "request_body": None,
+                                "response_body": None,
+                                "error": None,
+                                "created_at": "2026-02-21T10:30:00",
+                                "updated_at": "2026-02-21T10:31:05",
+                            },
+                            {
+                                "request_id": "chatcmpl-def456",
+                                "service_type": "redaction",
+                                "status": "processing",
+                                "request_body": None,
+                                "response_body": None,
+                                "error": None,
+                                "created_at": "2026-02-21T10:29:00",
+                                "updated_at": "2026-02-21T10:29:00",
+                            },
+                        ],
+                        "total": 42,
+                        "page": 1,
+                        "page_size": 25,
+                    }
+                }
+            },
+        },
+    },
 )
 async def list_ai_service_requests(
     http_request: Request,
     user_api_key_dict: UserAPIKeyAuth = Depends(user_api_key_auth),
-    status: Optional[str] = Query(default=None, description="Filter by status"),
-    service_type: Optional[str] = Query(default=None, max_length=100, description="Filter by service type"),
-    page: int = Query(default=1, ge=1),
-    page_size: int = Query(default=25, ge=1, le=100),
+    status: Optional[str] = Query(
+        default=None,
+        description="Filter by request status. One of: 'accepted', 'processing', 'completed', 'failed'.",
+    ),
+    service_type: Optional[str] = Query(
+        default=None,
+        max_length=100,
+        description="Filter by service type label (e.g., 'idp', 'redaction', 'entity-extraction').",
+    ),
+    page: int = Query(
+        default=1,
+        ge=1,
+        description="Page number (1-indexed).",
+    ),
+    page_size: int = Query(
+        default=25,
+        ge=1,
+        le=100,
+        description="Number of records per page (max 100).",
+    ),
 ):
     """
-    List recent AI service requests.
+    List recent AI service requests with optional filters and pagination.
 
-    Admins see all requests; non-admins see only their own.
+    Returns a paginated list of async AI service request tracking records.
+    Useful for monitoring the status of requests submitted to pass-through
+    endpoints configured with `response_mode: "async"`.
+
+    Parameters:
+    - status: Optional[str] — Filter by status ('accepted', 'processing', 'completed', 'failed').
+    - service_type: Optional[str] — Filter by service type label (e.g., 'idp', 'redaction').
+    - page: int — Page number, starting at 1.
+    - page_size: int — Records per page (1–100, default 25).
+
+    Authorization:
+    - Admin users see all requests across all users.
+    - Non-admin users see only their own requests.
+
+    Example:
+    ```bash
+    curl -X GET 'http://0.0.0.0:4000/ai-services/requests?status=completed&service_type=idp&page=1&page_size=10' \\
+      -H 'Authorization: Bearer sk-1234'
+    ```
     """
     try:
         prisma_client = await _get_prisma()
@@ -220,27 +398,26 @@ async def list_ai_service_requests(
         )
         total = await prisma_client.db.litellm_aiservicerequest.count(where=where)
 
-        requests = []
-        for r in records:
-            requests.append(
-                AIServiceRequestResponse(
-                    request_id=r.request_id,
-                    service_type=r.service_type,
-                    status=r.status,
-                    request_body=_parse_json_field(r.request_body),
-                    response_body=_parse_json_field(r.response_body),
-                    error=r.error,
-                    created_at=r.created_at.isoformat() if r.created_at else None,
-                    updated_at=r.updated_at.isoformat() if r.updated_at else None,
-                ).model_dump()
+        requests = [
+            AIServiceRequestResponse(
+                request_id=r.request_id,
+                service_type=r.service_type,
+                status=r.status,
+                request_body=_parse_json_field(r.request_body),
+                response_body=_parse_json_field(r.response_body),
+                error=r.error,
+                created_at=r.created_at.isoformat() if r.created_at else None,
+                updated_at=r.updated_at.isoformat() if r.updated_at else None,
             )
+            for r in records
+        ]
 
-        return {
-            "requests": requests,
-            "total": total,
-            "page": page,
-            "page_size": page_size,
-        }
+        return AIServiceRequestListResponse(
+            requests=requests,
+            total=total,
+            page=page,
+            page_size=page_size,
+        )
     except HTTPException:
         raise
     except Exception as e:

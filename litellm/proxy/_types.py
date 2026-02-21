@@ -1965,20 +1965,80 @@ class AIServiceRequestStatus(str, enum.Enum):
 
 
 class AIServiceRequestResponse(LiteLLMPydanticObjectBase):
-    request_id: str
-    service_type: Optional[str] = None
-    status: str
-    request_body: Optional[dict] = None
-    response_body: Optional[dict] = None
-    error: Optional[str] = None
-    created_at: Optional[str] = None
-    updated_at: Optional[str] = None
+    """Response model for an AI service request tracking record."""
+
+    request_id: str = Field(description="Unique identifier for the AI service request.")
+    service_type: Optional[str] = Field(
+        default=None,
+        description="The AI service type label (e.g., 'idp', 'redaction', 'entity-extraction', 's3-presigned').",
+    )
+    status: str = Field(
+        description="Current status of the request. One of: 'accepted', 'processing', 'completed', 'failed'."
+    )
+    request_body: Optional[dict] = Field(
+        default=None,
+        description="The original request payload sent by the client.",
+    )
+    response_body: Optional[dict] = Field(
+        default=None,
+        description="The response payload from the downstream service, populated when status is 'completed'.",
+    )
+    error: Optional[str] = Field(
+        default=None,
+        description="Error message if the request failed.",
+    )
+    created_at: Optional[str] = Field(
+        default=None,
+        description="ISO 8601 timestamp when the request was created.",
+    )
+    updated_at: Optional[str] = Field(
+        default=None,
+        description="ISO 8601 timestamp when the request was last updated.",
+    )
+
+
+class AIServiceRequestListResponse(LiteLLMPydanticObjectBase):
+    """Paginated list of AI service request tracking records."""
+
+    requests: List[AIServiceRequestResponse] = Field(
+        description="List of AI service request records for the current page."
+    )
+    total: int = Field(description="Total number of records matching the filter criteria.")
+    page: int = Field(description="Current page number (1-indexed).")
+    page_size: int = Field(description="Number of records per page.")
 
 
 class AIServiceResultCallback(LiteLLMPydanticObjectBase):
-    status: Literal["processing", "completed", "failed"]
-    response_body: Optional[dict] = None
-    error: Optional[str] = None
+    """
+    Callback payload for downstream services to post results back to LiteLLM.
+
+    Used by Lambda functions or other async processors to update the status
+    of an AI service request after processing completes.
+    """
+
+    status: Literal["processing", "completed", "failed"] = Field(
+        description="New status for the request. 'processing' = still in progress, 'completed' = done successfully, 'failed' = error occurred."
+    )
+    response_body: Optional[dict] = Field(
+        default=None,
+        description="The response payload from the downstream service. Required when status is 'completed'.",
+    )
+    error: Optional[str] = Field(
+        default=None,
+        description="Error message describing what went wrong. Required when status is 'failed'.",
+    )
+
+
+class AIServiceResultCallbackResponse(LiteLLMPydanticObjectBase):
+    """Response returned after a downstream service posts a result callback."""
+
+    request_id: str = Field(description="The AI service request ID that was updated.")
+    status: str = Field(description="The new status of the request after the update.")
+    updated: bool = Field(description="Whether the update was successfully applied.")
+    updated_at: Optional[str] = Field(
+        default=None,
+        description="ISO 8601 timestamp of the update.",
+    )
 
 
 class ConfigFieldUpdate(LiteLLMPydanticObjectBase):
