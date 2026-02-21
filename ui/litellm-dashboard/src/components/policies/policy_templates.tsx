@@ -57,7 +57,7 @@ function GuardrailSummary({ def }: { def: GuardrailDef }) {
           <span style={{ fontWeight: 500 }}>Patterns: </span>
           {patterns.map((p: any) => p.pattern_name || p.name).join(", ")}
           <Tag
-            color={patterns[0]?.action === "BLOCK" ? "red" : "blue"}
+            color={patterns[0]?.action === "BLOCK" ? "red" : patterns[0]?.action === "MONITOR" ? "orange" : "blue"}
             style={{ margin: "0 0 0 6px", fontSize: 10, lineHeight: "16px", padding: "0 4px" }}
           >
             {patterns[0]?.action || "BLOCK"}
@@ -69,7 +69,7 @@ function GuardrailSummary({ def }: { def: GuardrailDef }) {
           <span style={{ fontWeight: 500 }}>Categories: </span>
           {categories.map((c: any) => c.category).join(", ")}
           <Tag
-            color={categories[0]?.action === "BLOCK" ? "red" : "blue"}
+            color={categories[0]?.action === "BLOCK" ? "red" : categories[0]?.action === "MONITOR" ? "orange" : "blue"}
             style={{ margin: "0 0 0 6px", fontSize: 10, lineHeight: "16px", padding: "0 4px" }}
           >
             {categories[0]?.action || "BLOCK"}
@@ -81,7 +81,7 @@ function GuardrailSummary({ def }: { def: GuardrailDef }) {
           <span style={{ fontWeight: 500 }}>Keywords: </span>
           {keywords.map((w: any) => w.keyword).join(", ")}
           <Tag
-            color={keywords[0]?.action === "BLOCK" ? "red" : "blue"}
+            color={keywords[0]?.action === "BLOCK" ? "red" : keywords[0]?.action === "MONITOR" ? "orange" : "blue"}
             style={{ margin: "0 0 0 6px", fontSize: 10, lineHeight: "16px", padding: "0 4px" }}
           >
             {keywords[0]?.action || "BLOCK"}

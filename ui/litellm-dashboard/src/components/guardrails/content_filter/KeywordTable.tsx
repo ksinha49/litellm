@@ -8,7 +8,7 @@ const { Option } = Select;
 interface BlockedWord {
   id: string;
   keyword: string;
-  action: "BLOCK" | "MASK";
+  action: "BLOCK" | "MASK" | "MONITOR";
   description?: string;
 }
 
@@ -43,6 +43,7 @@ const KeywordTable: React.FC<KeywordTableProps> = ({
         >
           <Option value="BLOCK">Block</Option>
           <Option value="MASK">Mask</Option>
+          <Option value="MONITOR">Monitor</Option>
         </Select>
       ),
     },

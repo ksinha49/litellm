@@ -9,13 +9,13 @@ interface ContentCategory {
   id: string;
   category: string;
   display_name: string;
-  action: "BLOCK" | "MASK";
+  action: "BLOCK" | "MASK" | "MONITOR";
   severity_threshold: "high" | "medium" | "low";
 }
 
 interface CategoryTableProps {
   categories: ContentCategory[];
-  onActionChange?: (id: string, action: "BLOCK" | "MASK") => void;
+  onActionChange?: (id: string, action: "BLOCK" | "MASK" | "MONITOR") => void;
   onSeverityChange?: (id: string, severity: "high" | "medium" | "low") => void;
   onRemove?: (id: string) => void;
   readOnly?: boolean;
@@ -86,7 +86,7 @@ const CategoryTable: React.FC<CategoryTableProps> = ({
       render: (action: string, record: ContentCategory) => {
         if (readOnly) {
           return (
-            <Tag color={action === "BLOCK" ? "red" : "blue"}>
+            <Tag color={action === "BLOCK" ? "red" : action === "MONITOR" ? "orange" : "blue"}>
               {action}
             </Tag>
           );
@@ -94,12 +94,13 @@ const CategoryTable: React.FC<CategoryTableProps> = ({
         return (
           <Select
             value={action}
-            onChange={(value) => onActionChange?.(record.id, value as "BLOCK" | "MASK")}
+            onChange={(value) => onActionChange?.(record.id, value as "BLOCK" | "MASK" | "MONITOR")}
             style={{ width: 120 }}
             size="small"
           >
             <Option value="BLOCK">Block</Option>
             <Option value="MASK">Mask</Option>
+            <Option value="MONITOR">Monitor</Option>
           </Select>
         );
       },

@@ -7,7 +7,7 @@ export interface ContentFilterDetection {
   keyword?: string;
   category?: string;
   severity?: string;
-  action: "BLOCK" | "MASK";
+  action: "BLOCK" | "MASK" | "MONITOR";
   description?: string;
 }
 
@@ -108,6 +108,7 @@ const ContentFilterDetails: React.FC<ContentFilterDetailsProps> = ({ response })
   // Count actions
   const blockedCount = detections.filter((d) => d.action === "BLOCK").length;
   const maskedCount = detections.filter((d) => d.action === "MASK").length;
+  const monitoredCount = detections.filter((d) => d.action === "MONITOR").length;
 
   // Summary stats
   const totalDetections = detections.length;
@@ -125,7 +126,8 @@ const ContentFilterDetails: React.FC<ContentFilterDetailsProps> = ({ response })
               <div className="flex flex-wrap gap-2">
                 {blockedCount > 0 && chip(`${blockedCount} blocked`, "red")}
                 {maskedCount > 0 && chip(`${maskedCount} masked`, "blue")}
-                {blockedCount === 0 && maskedCount === 0 && chip("passed", "green")}
+                {monitoredCount > 0 && chip(`${monitoredCount} monitored`, "amber")}
+                {blockedCount === 0 && maskedCount === 0 && monitoredCount === 0 && chip("passed", "green")}
               </div>
             </KV>
           </div>
@@ -152,7 +154,7 @@ const ContentFilterDetails: React.FC<ContentFilterDetailsProps> = ({ response })
                     <KV label="Pattern:">{detection.pattern_name || "unknown"}</KV>
                   </div>
                   <div className="space-y-1">
-                    <KV label="Action:">{chip(detection.action, detection.action === "BLOCK" ? "red" : "blue")}</KV>
+                    <KV label="Action:">{chip(detection.action, detection.action === "BLOCK" ? "red" : detection.action === "MONITOR" ? "amber" : "blue")}</KV>
                   </div>
                 </div>
               </div>
@@ -175,7 +177,7 @@ const ContentFilterDetails: React.FC<ContentFilterDetailsProps> = ({ response })
                     {detection.description && <KV label="Description:">{detection.description}</KV>}
                   </div>
                   <div className="space-y-1">
-                    <KV label="Action:">{chip(detection.action, detection.action === "BLOCK" ? "red" : "blue")}</KV>
+                    <KV label="Action:">{chip(detection.action, detection.action === "BLOCK" ? "red" : detection.action === "MONITOR" ? "amber" : "blue")}</KV>
                   </div>
                 </div>
               </div>
@@ -203,7 +205,7 @@ const ContentFilterDetails: React.FC<ContentFilterDetailsProps> = ({ response })
                     )}
                   </div>
                   <div className="space-y-1">
-                    <KV label="Action:">{chip(detection.action, detection.action === "BLOCK" ? "red" : "blue")}</KV>
+                    <KV label="Action:">{chip(detection.action, detection.action === "BLOCK" ? "red" : detection.action === "MONITOR" ? "amber" : "blue")}</KV>
                   </div>
                 </div>
               </div>

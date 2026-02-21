@@ -7,10 +7,10 @@ const { Option } = Select;
 interface KeywordModalProps {
   visible: boolean;
   keyword: string;
-  action: "BLOCK" | "MASK";
+  action: "BLOCK" | "MASK" | "MONITOR";
   description: string;
   onKeywordChange: (keyword: string) => void;
-  onActionChange: (action: "BLOCK" | "MASK") => void;
+  onActionChange: (action: "BLOCK" | "MASK" | "MONITOR") => void;
   onDescriptionChange: (description: string) => void;
   onAdd: () => void;
   onCancel: () => void;
@@ -58,6 +58,7 @@ const KeywordModal: React.FC<KeywordModalProps> = ({
           >
             <Option value="BLOCK">Block</Option>
             <Option value="MASK">Mask</Option>
+            <Option value="MONITOR">Monitor</Option>
           </Select>
         </div>
 

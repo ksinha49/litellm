@@ -16,9 +16,9 @@ interface PatternModalProps {
   prebuiltPatterns: PrebuiltPattern[];
   categories: string[];
   selectedPatternName: string;
-  patternAction: "BLOCK" | "MASK";
+  patternAction: "BLOCK" | "MASK" | "MONITOR";
   onPatternNameChange: (name: string) => void;
-  onActionChange: (action: "BLOCK" | "MASK") => void;
+  onActionChange: (action: "BLOCK" | "MASK" | "MONITOR") => void;
   onAdd: () => void;
   onCancel: () => void;
 }
@@ -91,6 +91,7 @@ const PatternModal: React.FC<PatternModalProps> = ({
           >
             <Option value="BLOCK">Block</Option>
             <Option value="MASK">Mask</Option>
+            <Option value="MONITOR">Monitor</Option>
           </Select>
         </div>
       </Space>

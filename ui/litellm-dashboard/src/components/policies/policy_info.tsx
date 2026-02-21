@@ -105,7 +105,7 @@ const patternColumns = [
     dataIndex: "action",
     width: 80,
     render: (action: string) => (
-      <Tag color={action === "BLOCK" ? "red" : "blue"} style={{ margin: 0 }}>
+      <Tag color={action === "BLOCK" ? "red" : action === "MONITOR" ? "orange" : "blue"} style={{ margin: 0 }}>
         {action}
       </Tag>
     ),
@@ -143,7 +143,7 @@ const categoryColumns = [
     dataIndex: "action",
     width: 80,
     render: (action: string) => (
-      <Tag color={action === "BLOCK" ? "red" : "blue"} style={{ margin: 0 }}>
+      <Tag color={action === "BLOCK" ? "red" : action === "MONITOR" ? "orange" : "blue"} style={{ margin: 0 }}>
         {action}
       </Tag>
     ),
@@ -157,7 +157,7 @@ const keywordColumns = [
     dataIndex: "action",
     width: 80,
     render: (action: string) => (
-      <Tag color={action === "BLOCK" ? "red" : "blue"} style={{ margin: 0 }}>
+      <Tag color={action === "BLOCK" ? "red" : action === "MONITOR" ? "orange" : "blue"} style={{ margin: 0 }}>
         {action}
       </Tag>
     ),
