@@ -53,12 +53,18 @@ const AddPassThroughEndpoint: React.FC<AddFallbacksProps> = ({
   const [includeSubpath, setIncludeSubpath] = useState(true);
   const [authEnabled, setAuthEnabled] = useState(false);
   const [guardrails, setGuardrails] = useState<Record<string, { request_fields?: string[]; response_fields?: string[] } | null>>({});
+  const [injectMetadata, setInjectMetadata] = useState(false);
+  const [responseMode, setResponseMode] = useState<"sync" | "async">("sync");
+  const [serviceType, setServiceType] = useState("");
   const handleCancel = () => {
     form.resetFields();
     setPathValue("");
     setTargetValue("");
     setIncludeSubpath(true);
     setGuardrails({});
+    setInjectMetadata(false);
+    setResponseMode("sync");
+    setServiceType("");
     setIsModalVisible(false);
   };
 
@@ -85,7 +91,18 @@ const AddPassThroughEndpoint: React.FC<AddFallbacksProps> = ({
       if (guardrails && Object.keys(guardrails).length > 0) {
         formValues.guardrails = guardrails;
       }
-      
+
+      // Add AI service configuration fields
+      if (injectMetadata) {
+        formValues.inject_metadata = true;
+      }
+      if (responseMode !== "sync") {
+        formValues.response_mode = responseMode;
+      }
+      if (serviceType) {
+        formValues.service_type = serviceType;
+      }
+
       console.log(`formValues: ${JSON.stringify(formValues)}`);
 
       const response = await createPassThroughEndpoint(accessToken, formValues);
@@ -102,6 +119,9 @@ const AddPassThroughEndpoint: React.FC<AddFallbacksProps> = ({
       setTargetValue("");
       setIncludeSubpath(true);
       setGuardrails({});
+      setInjectMetadata(false);
+      setResponseMode("sync");
+      setServiceType("");
       setIsModalVisible(false);
     } catch (error) {
       NotificationsManager.fromBackend("Error creating pass-through endpoint: " + error);
@@ -266,6 +286,59 @@ const AddPassThroughEndpoint: React.FC<AddFallbacksProps> = ({
               value={guardrails}
               onChange={setGuardrails}
             />
+
+            {/* AI Service Configuration Section */}
+            <Card className="p-6">
+              <Title className="text-lg font-semibold text-gray-900 mb-2">AI Service Configuration</Title>
+              <Subtitle className="text-gray-600 mb-5">
+                Configure metadata injection and async processing for AI services
+              </Subtitle>
+
+              <div className="space-y-5">
+                <Form.Item
+                  label={<span className="text-sm font-medium text-gray-700">Service Type</span>}
+                  extra={
+                    <div className="text-xs text-gray-500 mt-1">
+                      Label for the AI service (e.g., idp, redaction, entity-extraction)
+                    </div>
+                  }
+                >
+                  <TextInput
+                    placeholder="e.g., idp, redaction, entity-extraction"
+                    value={serviceType}
+                    onChange={(e) => setServiceType(e.target.value)}
+                  />
+                </Form.Item>
+
+                <div className="flex items-center justify-between py-3">
+                  <div>
+                    <div className="text-sm font-medium text-gray-700">Inject LiteLLM Metadata</div>
+                    <div className="text-xs text-gray-500 mt-0.5">
+                      Wraps request body with LiteLLM context (user_id, team_id, request_id) under &quot;litellm_metadata&quot;
+                    </div>
+                  </div>
+                  <Switch checked={injectMetadata} onChange={setInjectMetadata} />
+                </div>
+
+                <Form.Item
+                  label={<span className="text-sm font-medium text-gray-700">Response Mode</span>}
+                  extra={
+                    <div className="text-xs text-gray-500 mt-1">
+                      Sync returns the target response directly. Async returns a request_id immediately for later polling.
+                    </div>
+                  }
+                >
+                  <Select2
+                    value={responseMode}
+                    onChange={(value: string) => setResponseMode(value as "sync" | "async")}
+                    style={{ width: "100%" }}
+                  >
+                    <Option value="sync">Synchronous</Option>
+                    <Option value="async">Asynchronous</Option>
+                  </Select2>
+                </Form.Item>
+              </div>
+            </Card>
 
             {/* Billing Section */}
             <Card className="p-6">

@@ -399,6 +399,9 @@ from litellm.proxy.management_endpoints.tag_management_endpoints import (
 from litellm.proxy.management_endpoints.team_callback_endpoints import (
     router as team_callback_router,
 )
+from litellm.proxy.management_endpoints.ai_service_request_endpoints import (
+    router as ai_service_request_router,
+)
 from litellm.proxy.management_endpoints.application_management_endpoints import (
     router as application_management_router,
 )
@@ -12528,6 +12531,7 @@ app.include_router(key_management_router)
 app.include_router(internal_user_router)
 app.include_router(team_router)
 app.include_router(application_management_router)
+app.include_router(ai_service_request_router)
 app.include_router(ui_sso_router)
 app.include_router(scim_router)
 app.include_router(organization_router)

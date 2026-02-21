@@ -289,6 +289,29 @@ model LiteLLM_ApplicationTable {
     updated_by       String?
 }
 
+// Async AI Service Request Tracking
+model LiteLLM_AIServiceRequest {
+    request_id    String   @id
+    service_type  String?
+    path          String?
+    status        String   @default("accepted")
+    request_body  Json?    @default("{}")
+    response_body Json?
+    error         String?
+    api_key       String   @default("")
+    user_id       String?
+    team_id       String?
+    org_id        String?
+    cost          Float?   @default(0.0)
+    created_at    DateTime @default(now()) @map("created_at")
+    updated_at    DateTime @default(now()) @updatedAt @map("updated_at")
+
+    @@index([status])
+    @@index([user_id])
+    @@index([team_id])
+    @@index([created_at])
+}
+
 // Generate Tokens for Proxy
 model LiteLLM_VerificationToken {
     token      String   @id

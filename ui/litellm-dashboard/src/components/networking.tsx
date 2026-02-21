@@ -8644,6 +8644,71 @@ export const getPassThroughEndpointInfo = async (accessToken: string, endpointPa
   }
 };
 
+export const getAIServiceRequests = async (
+  accessToken: string,
+  params: { page?: number; page_size?: number; status?: string; service_type?: string }
+) => {
+  try {
+    const queryParams = new URLSearchParams();
+    if (params.page) queryParams.set("page", params.page.toString());
+    if (params.page_size) queryParams.set("page_size", params.page_size.toString());
+    if (params.status) queryParams.set("status", params.status);
+    if (params.service_type) queryParams.set("service_type", params.service_type);
+
+    let url = proxyBaseUrl
+      ? `${proxyBaseUrl}/ai-services/requests?${queryParams.toString()}`
+      : `/ai-services/requests?${queryParams.toString()}`;
+
+    const response = await fetch(url, {
+      method: "GET",
+      headers: {
+        [globalLitellmHeaderName]: `Bearer ${accessToken}`,
+        "Content-Type": "application/json",
+      },
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      const errorMessage = deriveErrorMessage(errorData);
+      handleError(errorMessage);
+      throw new Error(errorMessage);
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error("Failed to get AI service requests:", error);
+    throw error;
+  }
+};
+
+export const getAIServiceRequest = async (accessToken: string, requestId: string) => {
+  try {
+    let url = proxyBaseUrl
+      ? `${proxyBaseUrl}/ai-services/requests/${encodeURIComponent(requestId)}`
+      : `/ai-services/requests/${encodeURIComponent(requestId)}`;
+
+    const response = await fetch(url, {
+      method: "GET",
+      headers: {
+        [globalLitellmHeaderName]: `Bearer ${accessToken}`,
+        "Content-Type": "application/json",
+      },
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      const errorMessage = deriveErrorMessage(errorData);
+      handleError(errorMessage);
+      throw new Error(errorMessage);
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error("Failed to get AI service request:", error);
+    throw error;
+  }
+};
+
 export const deleteCallback = async (accessToken: string, callbackName: string) => {
   /**
    * Delete specific callback from proxy using the /config/callback/delete API

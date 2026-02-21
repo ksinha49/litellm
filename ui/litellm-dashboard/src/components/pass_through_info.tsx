@@ -13,7 +13,7 @@ import {
   TabPanels,
   TextInput,
 } from "@tremor/react";
-import { Button, Form, Input, Switch, InputNumber } from "antd";
+import { Button, Form, Input, Switch, InputNumber, Select } from "antd";
 import { updatePassThroughEndpoint, deletePassThroughEndpointsCall } from "./networking";
 import { Eye, EyeOff } from "lucide-react";
 import RoutePreview from "./route_preview";
@@ -39,6 +39,9 @@ interface PassThroughEndpoint {
   cost_per_request?: number;
   auth?: boolean;
   guardrails?: Record<string, { request_fields?: string[]; response_fields?: string[] } | null>;
+  inject_metadata?: boolean;
+  response_mode?: "sync" | "async";
+  service_type?: string;
 }
 
 // Password field component for headers
@@ -98,6 +101,9 @@ const PassThroughInfoView: React.FC<PassThroughInfoProps> = ({
         cost_per_request: values.cost_per_request,
         auth: premiumUser ? values.auth : undefined,
         guardrails: guardrails && Object.keys(guardrails).length > 0 ? guardrails : undefined,
+        inject_metadata: values.inject_metadata || false,
+        response_mode: values.response_mode || "sync",
+        service_type: values.service_type || undefined,
       };
 
       await updatePassThroughEndpoint(accessToken, endpointData.id, updateData);
@@ -191,6 +197,21 @@ const PassThroughInfoView: React.FC<PassThroughInfoProps> = ({
                       {endpointData.auth ? "Auth Required" : "No Auth"}
                     </Badge>
                   </div>
+                  {endpointData.inject_metadata && (
+                    <div>
+                      <Badge color="green">Metadata Injection</Badge>
+                    </div>
+                  )}
+                  <div>
+                    <Badge color={endpointData.response_mode === "async" ? "orange" : "blue"}>
+                      {endpointData.response_mode === "async" ? "Async" : "Sync"}
+                    </Badge>
+                  </div>
+                  {endpointData.service_type && (
+                    <div>
+                      <Badge color="purple">{endpointData.service_type}</Badge>
+                    </div>
+                  )}
                   {endpointData.cost_per_request !== undefined && (
                     <div>
                       <Text>Cost per request: ${endpointData.cost_per_request}</Text>
@@ -277,6 +298,9 @@ const PassThroughInfoView: React.FC<PassThroughInfoProps> = ({
                       include_subpath: endpointData.include_subpath || false,
                       cost_per_request: endpointData.cost_per_request,
                       auth: endpointData.auth || false,
+                      inject_metadata: endpointData.inject_metadata || false,
+                      response_mode: endpointData.response_mode || "sync",
+                      service_type: endpointData.service_type || "",
                     }}
                     layout="vertical"
                   >
@@ -301,6 +325,21 @@ const PassThroughInfoView: React.FC<PassThroughInfoProps> = ({
 
                     <Form.Item label="Cost per Request" name="cost_per_request">
                       <InputNumber min={0} step={0.01} precision={2} placeholder="0.00" addonBefore="$" />
+                    </Form.Item>
+
+                    <Form.Item label="Service Type" name="service_type">
+                      <TextInput placeholder="e.g., idp, redaction, entity-extraction" />
+                    </Form.Item>
+
+                    <Form.Item label="Inject LiteLLM Metadata" name="inject_metadata" valuePropName="checked">
+                      <Switch />
+                    </Form.Item>
+
+                    <Form.Item label="Response Mode" name="response_mode">
+                      <Select>
+                        <Select.Option value="sync">Synchronous</Select.Option>
+                        <Select.Option value="async">Asynchronous</Select.Option>
+                      </Select>
                     </Form.Item>
 
                     <PassThroughSecuritySection
@@ -351,6 +390,24 @@ const PassThroughInfoView: React.FC<PassThroughInfoProps> = ({
                       <Text className="font-medium">Authentication Required</Text>
                       <Badge color={endpointData.auth ? "green" : "gray"}>
                         {endpointData.auth ? "Yes" : "No"}
+                      </Badge>
+                    </div>
+                    {endpointData.service_type && (
+                      <div>
+                        <Text className="font-medium">Service Type</Text>
+                        <div><Badge color="purple">{endpointData.service_type}</Badge></div>
+                      </div>
+                    )}
+                    <div>
+                      <Text className="font-medium">Inject Metadata</Text>
+                      <Badge color={endpointData.inject_metadata ? "green" : "gray"}>
+                        {endpointData.inject_metadata ? "Yes" : "No"}
+                      </Badge>
+                    </div>
+                    <div>
+                      <Text className="font-medium">Response Mode</Text>
+                      <Badge color={endpointData.response_mode === "async" ? "orange" : "blue"}>
+                        {endpointData.response_mode === "async" ? "Async" : "Sync"}
                       </Badge>
                     </div>
                     <div>

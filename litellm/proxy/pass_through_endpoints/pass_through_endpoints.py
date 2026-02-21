@@ -5,7 +5,7 @@ import json
 import traceback
 from base64 import b64encode
 from datetime import datetime
-from typing import Any, Dict, List, Optional, Tuple, Union, cast
+from typing import Any, Dict, List, Literal, Optional, Tuple, Union, cast
 from urllib.parse import urlencode, urlparse
 
 import httpx
@@ -20,7 +20,7 @@ from fastapi import (
     WebSocket,
     status,
 )
-from fastapi.responses import StreamingResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 from starlette.datastructures import UploadFile as StarletteUploadFile
 from starlette.websockets import WebSocketState
 from websockets.asyncio.client import connect
@@ -591,6 +591,104 @@ class HttpPassThroughEndpointHelpers(BasePassthroughUtils):
         return stream
 
 
+async def _create_ai_service_request(
+    request_id: str,
+    service_type: Optional[str],
+    path: Optional[str],
+    request_body: Optional[dict],
+    user_api_key_dict: UserAPIKeyAuth,
+) -> None:
+    """Create a tracking record for an async AI service request."""
+    from litellm.proxy.proxy_server import prisma_client
+
+    if prisma_client is None:
+        return  # Graceful no-op if no DB configured
+    try:
+        await prisma_client.db.litellm_aiservicerequest.create(
+            data={
+                "request_id": request_id,
+                "service_type": service_type,
+                "path": path,
+                "status": "accepted",
+                "request_body": request_body if request_body else {},
+                "api_key": getattr(user_api_key_dict, "api_key", "") or "",
+                "user_id": getattr(user_api_key_dict, "user_id", None),
+                "team_id": getattr(user_api_key_dict, "team_id", None),
+                "org_id": getattr(user_api_key_dict, "org_id", None),
+            }
+        )
+    except Exception as e:
+        verbose_proxy_logger.error(
+            "Failed to create AI service request tracking record: %s", str(e)
+        )
+
+
+async def _async_fire_and_forget_request(
+    request: Request,
+    async_client: httpx.AsyncClient,
+    url: httpx.URL,
+    headers: dict,
+    requested_query_params: Optional[dict],
+    _parsed_body: Optional[dict],
+    litellm_call_id: str,
+    service_type: Optional[str],
+) -> None:
+    """
+    Fire the HTTP request to the target in background and update the tracking record.
+
+    This is used for response_mode='async' — the 202 response has already been
+    returned to the client, so this runs as a background task.
+    """
+    from litellm.proxy.proxy_server import prisma_client
+
+    try:
+        response = await HttpPassThroughEndpointHelpers.non_streaming_http_request_handler(
+            request=request,
+            async_client=async_client,
+            url=url,
+            headers=headers,
+            requested_query_params=requested_query_params,
+            _parsed_body=_parsed_body,
+        )
+
+        response_body: Optional[dict] = get_response_body(response)
+
+        # Update tracking record with result
+        if prisma_client is not None:
+            if response.status_code < 300:
+                await prisma_client.db.litellm_aiservicerequest.update(
+                    where={"request_id": litellm_call_id},
+                    data={
+                        "status": "processing",
+                        "response_body": response_body if response_body else {},
+                    },
+                )
+            else:
+                await prisma_client.db.litellm_aiservicerequest.update(
+                    where={"request_id": litellm_call_id},
+                    data={
+                        "status": "failed",
+                        "error": f"Target returned HTTP {response.status_code}: {response.text[:500]}",
+                    },
+                )
+    except Exception as e:
+        verbose_proxy_logger.error(
+            "Async fire-and-forget request failed for %s: %s", litellm_call_id, str(e)
+        )
+        # Update tracking record with error
+        if prisma_client is not None:
+            try:
+                await prisma_client.db.litellm_aiservicerequest.update(
+                    where={"request_id": litellm_call_id},
+                    data={
+                        "status": "failed",
+                        "error": str(e)[:500],
+                    },
+                )
+            except Exception:
+                pass  # Best effort — record may not exist
+
+
 async def pass_through_request(  # noqa: PLR0915
     request: Request,
     target: str,
@@ -604,6 +702,9 @@ async def pass_through_request(  # noqa: PLR0915
     cost_per_request: Optional[float] = None,
     custom_llm_provider: Optional[str] = None,
     guardrails_config: Optional[dict] = None,
+    inject_metadata: Optional[bool] = False,
+    response_mode: Optional[Literal["sync", "async"]] = "sync",
+    service_type: Optional[str] = None,
 ):
     """
     Pass through endpoint handler, makes the httpx request for pass-through endpoints and ensures logging hooks are called
@@ -621,6 +722,9 @@ async def pass_through_request(  # noqa: PLR0915
         cost_per_request: Optional field - cost per request to the target endpoint
         custom_llm_provider: Optional field - custom LLM provider for the endpoint
         guardrails_config: Optional field - guardrails configuration for passthrough endpoint
+        inject_metadata: Optional field - when True, wraps request body with LiteLLM context
+        response_mode: Optional field - 'sync' or 'async' response mode
+        service_type: Optional field - AI service type label
     """
     from litellm.litellm_core_utils.litellm_logging import Logging
     from litellm.proxy.pass_through_endpoints.passthrough_guardrails import (
@@ -636,6 +740,8 @@ async def pass_through_request(  # noqa: PLR0915
 
     # parsed request body
     _parsed_body: Optional[dict] = None
+    # original body before metadata wrapping (for async tracking)
+    _original_parsed_body: Optional[dict] = None
     # kwargs for pass through endpoint, contains metadata, litellm_params, call_type, litellm_call_id, passthrough_logging_payload
     kwargs: Optional[dict] = None
 
@@ -668,6 +774,27 @@ async def pass_through_request(  # noqa: PLR0915
             _parsed_body = custom_body
         else:
             _parsed_body = await _read_request_body(request)
+
+        # Save the original body before metadata wrapping (for async tracking)
+        _original_parsed_body = _parsed_body
+
+        ### METADATA INJECTION ###
+        # When inject_metadata is True, wrap the client body with LiteLLM context
+        if inject_metadata and _parsed_body is not None:
+            _parsed_body = {
+                "litellm_metadata": {
+                    "request_id": litellm_call_id,
+                    "user_id": getattr(user_api_key_dict, "user_id", None),
+                    "team_id": getattr(user_api_key_dict, "team_id", None),
+                    "org_id": getattr(user_api_key_dict, "org_id", None),
+                    "end_user_id": getattr(user_api_key_dict, "end_user_id", None),
+                    "api_key_alias": getattr(user_api_key_dict, "key_alias", None),
+                    "timestamp": datetime.now().isoformat(),
+                    "source": "litellm-proxy",
+                },
+                "payload": _parsed_body,
+            }
+
         verbose_proxy_logger.debug(
             "Pass through endpoint sending request to \nURL {}\nheaders: {}\nbody: {}\n".format(
                 url, headers, _parsed_body
@@ -789,6 +916,39 @@ async def pass_through_request(  # noqa: PLR0915
                 stream=stream,
             )
         )
+
+        ## ASYNC RESPONSE MODE — fire-and-forget ##
+        # When response_mode="async", create a tracking record, fire HTTP in background, return 202 immediately.
+        if response_mode == "async":
+            await _create_ai_service_request(
+                request_id=litellm_call_id,
+                service_type=service_type,
+                path=str(url),
+                request_body=_original_parsed_body,
+                user_api_key_dict=user_api_key_dict,
+            )
+            # Fire HTTP request to target in background
+            asyncio.create_task(
+                _async_fire_and_forget_request(
+                    request=request,
+                    async_client=async_client,
+                    url=url,
+                    headers=headers,
+                    requested_query_params=requested_query_params,
+                    _parsed_body=_parsed_body,
+                    litellm_call_id=litellm_call_id,
+                    service_type=service_type,
+                )
+            )
+            return JSONResponse(
+                content={
+                    "request_id": litellm_call_id,
+                    "status": "accepted",
+                    "message": "Request submitted for async processing",
+                },
+                status_code=202,
+                headers={"x-litellm-call-id": litellm_call_id},
+            )
 
         if stream:
             req = async_client.build_request(
@@ -1081,6 +1241,9 @@ def create_pass_through_route(
     is_streaming_request: Optional[bool] = False,
     query_params: Optional[dict] = None,
     guardrails: Optional[Dict[str, Any]] = None,
+    inject_metadata: Optional[bool] = False,
+    response_mode: Optional[Literal["sync", "async"]] = "sync",
+    service_type: Optional[str] = None,
 ):
     # check if target is an adapter.py or a url
     from litellm._uuid import uuid
@@ -1152,6 +1315,9 @@ def create_pass_through_route(
                 "merge_query_params": _merge_query_params,
                 "cost_per_request": cost_per_request,
                 "guardrails": None,
+                "inject_metadata": inject_metadata,
+                "response_mode": response_mode,
+                "service_type": service_type,
             }
 
             if passthrough_params is not None:
@@ -1170,6 +1336,9 @@ def create_pass_through_route(
                 "cost_per_request", cost_per_request
             )
             param_guardrails = target_params.get("guardrails", None)
+            param_inject_metadata = target_params.get("inject_metadata", inject_metadata)
+            param_response_mode = target_params.get("response_mode", response_mode)
+            param_service_type = target_params.get("service_type", service_type)
 
             # Construct the full target URL with subpath if needed
             full_target = (
@@ -1212,6 +1381,9 @@ def create_pass_through_route(
                 cost_per_request=cast(Optional[float], param_cost_per_request),
                 custom_llm_provider=custom_llm_provider,
                 guardrails_config=cast(Optional[dict], param_guardrails),
+                inject_metadata=cast(Optional[bool], param_inject_metadata),
+                response_mode=cast(Optional[str], param_response_mode),
+                service_type=cast(Optional[str], param_service_type),
             )
 
     return endpoint_func
@@ -1847,6 +2019,9 @@ class InitPassThroughEndpointHelpers:
         cost_per_request: Optional[float],
         endpoint_id: str,
         guardrails: Optional[dict] = None,
+        inject_metadata: Optional[bool] = False,
+        response_mode: Optional[Literal["sync", "async"]] = "sync",
+        service_type: Optional[str] = None,
     ):
         """Add exact path route for pass-through endpoint"""
         route_key = f"{endpoint_id}:exact:{path}"
@@ -1877,6 +2052,9 @@ class InitPassThroughEndpointHelpers:
                 dependencies,
                 cost_per_request=cost_per_request,
                 guardrails=guardrails,
+                inject_metadata=inject_metadata,
+                response_mode=response_mode,
+                service_type=service_type,
             ),
             methods=["GET", "POST", "PUT", "DELETE", "PATCH"],
             dependencies=dependencies,
@@ -1895,6 +2073,9 @@ class InitPassThroughEndpointHelpers:
                 "dependencies": dependencies,
                 "cost_per_request": cost_per_request,
                 "guardrails": guardrails,
+                "inject_metadata": inject_metadata,
+                "response_mode": response_mode,
+                "service_type": service_type,
             },
         }
 
@@ -1910,6 +2091,9 @@ class InitPassThroughEndpointHelpers:
         cost_per_request: Optional[float],
         endpoint_id: str,
         guardrails: Optional[dict] = None,
+        inject_metadata: Optional[bool] = False,
+        response_mode: Optional[Literal["sync", "async"]] = "sync",
+        service_type: Optional[str] = None,
     ):
         """Add wildcard route for sub-paths"""
         wildcard_path = f"{path}/{{subpath:path}}"
@@ -1942,6 +2126,9 @@ class InitPassThroughEndpointHelpers:
                 include_subpath=True,
                 cost_per_request=cost_per_request,
                 guardrails=guardrails,
+                inject_metadata=inject_metadata,
+                response_mode=response_mode,
+                service_type=service_type,
             ),
             methods=["GET", "POST", "PUT", "DELETE", "PATCH"],
             dependencies=dependencies,
@@ -1960,6 +2147,9 @@ class InitPassThroughEndpointHelpers:
                 "dependencies": dependencies,
                 "cost_per_request": cost_per_request,
                 "guardrails": guardrails,
+                "inject_metadata": inject_metadata,
+                "response_mode": response_mode,
+                "service_type": service_type,
             },
         }
 
@@ -2158,6 +2348,9 @@ async def initialize_pass_through_endpoints(
 
         # Get guardrails config if present
         _guardrails = endpoint.get("guardrails", None)
+        _inject_metadata = endpoint.get("inject_metadata", False)
+        _response_mode = endpoint.get("response_mode", "sync")
+        _service_type = endpoint.get("service_type", None)
 
         # Add exact path route
         verbose_proxy_logger.debug(
@@ -2174,6 +2367,9 @@ async def initialize_pass_through_endpoints(
             cost_per_request=endpoint.get("cost_per_request", None),
             endpoint_id=endpoint_id,
             guardrails=_guardrails,
+            inject_metadata=_inject_metadata,
+            response_mode=_response_mode,
+            service_type=_service_type,
         )
 
         visited_endpoints.add(f"{endpoint_id}:exact:{_path}")
@@ -2191,6 +2387,9 @@ async def initialize_pass_through_endpoints(
                 cost_per_request=endpoint.get("cost_per_request", None),
                 endpoint_id=endpoint_id,
                 guardrails=_guardrails,
+                inject_metadata=_inject_metadata,
+                response_mode=_response_mode,
+                service_type=_service_type,
             )
 
             visited_endpoints.add(f"{endpoint_id}:subpath:{_path}")
@@ -2508,6 +2707,9 @@ async def update_pass_through_endpoints(
             cost_per_request=updated_endpoint.cost_per_request,
             endpoint_id=updated_endpoint.id or endpoint_id or "",
             guardrails=getattr(updated_endpoint, "guardrails", None),
+            inject_metadata=updated_endpoint.inject_metadata,
+            response_mode=updated_endpoint.response_mode,
+            service_type=updated_endpoint.service_type,
         )
     else:
         InitPassThroughEndpointHelpers.add_exact_path_route(
@@ -2521,6 +2723,9 @@ async def update_pass_through_endpoints(
             cost_per_request=updated_endpoint.cost_per_request,
             endpoint_id=updated_endpoint.id or endpoint_id or "",
             guardrails=getattr(updated_endpoint, "guardrails", None),
+            inject_metadata=updated_endpoint.inject_metadata,
+            response_mode=updated_endpoint.response_mode,
+            service_type=updated_endpoint.service_type,
         )
 
     return PassThroughEndpointResponse(
@@ -2597,6 +2802,9 @@ async def create_pass_through_endpoints(
             cost_per_request=created_endpoint.cost_per_request,
             endpoint_id=created_endpoint.id or "",
             guardrails=getattr(created_endpoint, "guardrails", None),
+            inject_metadata=created_endpoint.inject_metadata,
+            response_mode=created_endpoint.response_mode,
+            service_type=created_endpoint.service_type,
         )
     else:
         InitPassThroughEndpointHelpers.add_exact_path_route(
@@ -2610,6 +2818,9 @@ async def create_pass_through_endpoints(
             cost_per_request=created_endpoint.cost_per_request,
             endpoint_id=created_endpoint.id or "",
             guardrails=getattr(created_endpoint, "guardrails", None),
+            inject_metadata=created_endpoint.inject_metadata,
+            response_mode=created_endpoint.response_mode,
+            service_type=created_endpoint.service_type,
         )
 
     return PassThroughEndpointResponse(endpoints=[created_endpoint])

@@ -930,6 +930,10 @@ class GenerateKeyRequest(KeyRequestBase):
         description="How often to rotate this key (e.g., '30d', '90d'). Required if auto_rotate=True",
     )
     organization_id: Optional[str] = None
+    application_id: Optional[str] = Field(
+        default=None,
+        description="Application ID to assign this key to at creation time.",
+    )
 
 
 class GenerateKeyResponse(KeyRequestBase):
@@ -1934,10 +1938,47 @@ class PassThroughGenericEndpoint(LiteLLMPydanticObjectBase):
         default=False,
         description="True if this endpoint is defined in the config file, False if from DB. Config-defined endpoints cannot be edited via the UI.",
     )
+    inject_metadata: bool = Field(
+        default=False,
+        description="When True, wraps the client request body in an envelope with LiteLLM context (user_id, team_id, request_id, etc.) under 'litellm_metadata', and the original body under 'payload'.",
+    )
+    response_mode: Literal["sync", "async"] = Field(
+        default="sync",
+        description="'sync' returns the target's response directly. 'async' generates a request_id, forwards to target, and returns {request_id, status: 'accepted'} immediately.",
+    )
+    service_type: Optional[str] = Field(
+        default=None,
+        max_length=100,
+        description="Free-text label for the AI service type (e.g., 'idp', 'redaction', 'entity-extraction'). Used for display and filtering in the UI.",
+    )
 
 
 class PassThroughEndpointResponse(LiteLLMPydanticObjectBase):
     endpoints: List[PassThroughGenericEndpoint]
+
+
+class AIServiceRequestStatus(str, enum.Enum):
+    ACCEPTED = "accepted"
+    PROCESSING = "processing"
+    COMPLETED = "completed"
+    FAILED = "failed"
+
+
+class AIServiceRequestResponse(LiteLLMPydanticObjectBase):
+    request_id: str
+    service_type: Optional[str] = None
+    status: str
+    request_body: Optional[dict] = None
+    response_body: Optional[dict] = None
+    error: Optional[str] = None
+    created_at: Optional[str] = None
+    updated_at: Optional[str] = None
+
+
+class AIServiceResultCallback(LiteLLMPydanticObjectBase):
+    status: Literal["processing", "completed", "failed"]
+    response_body: Optional[dict] = None
+    error: Optional[str] = None
 
 
 class ConfigFieldUpdate(LiteLLMPydanticObjectBase):

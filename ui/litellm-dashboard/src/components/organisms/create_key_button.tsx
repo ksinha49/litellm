@@ -29,6 +29,7 @@ import MCPServerSelector from "../mcp_server_management/MCPServerSelector";
 import MCPToolPermissions from "../mcp_server_management/MCPToolPermissions";
 import NotificationsManager from "../molecules/notifications_manager";
 import {
+  applicationListCall,
   getGuardrailsList,
   getPoliciesList,
   getPossibleUserRoles,
@@ -169,6 +170,7 @@ const CreateKey: React.FC<CreateKeyProps> = ({ team, teams, data, addKey }) => {
   const [rotationInterval, setRotationInterval] = useState<string>("30d");
   const [routerSettings, setRouterSettings] = useState<RouterSettingsAccordionValue | null>(null);
   const [routerSettingsKey, setRouterSettingsKey] = useState<number>(0);
+  const [applicationOptions, setApplicationOptions] = useState<{ value: string; label: string }[]>([]);
   const handleOk = () => {
     setIsModalVisible(false);
     form.resetFields();
@@ -233,9 +235,25 @@ const CreateKey: React.FC<CreateKeyProps> = ({ team, teams, data, addKey }) => {
       }
     };
 
+    const fetchApplications = async () => {
+      try {
+        if (!accessToken) return;
+        const result = await applicationListCall(accessToken, { page: 1, page_size: 500 });
+        setApplicationOptions(
+          (result.applications ?? []).map((a: any) => ({
+            value: a.application_id,
+            label: a.application_name,
+          }))
+        );
+      } catch {
+        // silently ignore — application field is optional
+      }
+    };
+
     fetchGuardrails();
     fetchPolicies();
     fetchPrompts();
+    fetchApplications();
   }, [accessToken]);
 
   // Fetch possible user roles when component mounts
@@ -750,6 +768,30 @@ const CreateKey: React.FC<CreateKeyProps> = ({ team, teams, data, addKey }) => {
                   </Option>
                 </Select>
               </Form.Item>
+              {applicationOptions.length > 0 && (
+                <Form.Item
+                  label={
+                    <span>
+                      Application{" "}
+                      <Tooltip title="Assign this key to an application so its spend is tracked under that application">
+                        <InfoCircleOutlined style={{ marginLeft: "4px" }} />
+                      </Tooltip>
+                    </span>
+                  }
+                  name="application_id"
+                  className="mt-4"
+                  help="Optional — links this key to an application for spend tracking"
+                >
+                  <Select
+                    allowClear
+                    showSearch
+                    placeholder="Select application (optional)"
+                    style={{ width: "100%" }}
+                    optionFilterProp="label"
+                    options={applicationOptions}
+                  />
+                </Form.Item>
+              )}
             </div>
           )}
 
@@ -1339,6 +1381,7 @@ const CreateKey: React.FC<CreateKeyProps> = ({ team, teams, data, addKey }) => {
                           "budget_duration",
                           "tpm_limit",
                           "rpm_limit",
+                          "application_id",
                         ]}
                       />
                     </AccordionBody>

@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from "react";
-import { Text, Button, Icon, Title } from "@tremor/react";
+import { Text, Button, Icon, Title, Tab, TabGroup, TabList, TabPanel, TabPanels } from "@tremor/react";
 import { deletePassThroughEndpointsCall, getPassThroughEndpointsCall } from "./networking";
 import { Badge, Tooltip } from "antd";
 import { PencilAltIcon, TrashIcon, InformationCircleIcon } from "@heroicons/react/outline";
 import AddPassThroughEndpoint from "./add_pass_through";
 import PassThroughInfoView from "./pass_through_info";
+import AIServiceRequests from "./ai_service_requests";
 import { DataTable } from "./view_logs/table";
 import { ColumnDef } from "@tanstack/react-table";
 import { Eye, EyeOff } from "lucide-react";
@@ -40,6 +41,9 @@ export interface passThroughItem {
   cost_per_request?: number;
   auth?: boolean;
   guardrails?: Record<string, { request_fields?: string[]; response_fields?: string[] } | null>;
+  inject_metadata?: boolean;
+  response_mode?: "sync" | "async";
+  service_type?: string;
 }
 
 // Password field component for headers
@@ -160,6 +164,22 @@ const PassThroughSettings: React.FC<GeneralSettingsPageProps> = ({ accessToken, 
       cell: (info: any) => <Badge color={info.getValue() ? "green" : "gray"}>{info.getValue() ? "Yes" : "No"}</Badge>,
     },
     {
+      header: "Service",
+      accessorKey: "service_type",
+      cell: (info: any) => info.getValue() ? (
+        <Badge color="purple" style={{ borderColor: "#d3adf7", backgroundColor: "#f9f0ff" }}>{info.getValue()}</Badge>
+      ) : <span className="text-gray-400">—</span>,
+    },
+    {
+      header: "Mode",
+      accessorKey: "response_mode",
+      cell: (info: any) => (
+        <Badge color={info.getValue() === "async" ? "orange" : "blue"}>
+          {info.getValue() === "async" ? "Async" : "Sync"}
+        </Badge>
+      ),
+    },
+    {
       header: "Headers",
       accessorKey: "headers",
       cell: (info: any) => <PasswordField value={info.getValue() || {}} />,
@@ -216,9 +236,17 @@ const PassThroughSettings: React.FC<GeneralSettingsPageProps> = ({ accessToken, 
   return (
     <div>
       <div>
-        <Title>Pass Through Endpoints</Title>
-        <Text className="text-tremor-content">Configure and manage your pass-through endpoints</Text>
+        <Title>AI Services & Pass Through Endpoints</Title>
+        <Text className="text-tremor-content">Configure and manage your pass-through endpoints and AI service requests</Text>
       </div>
+
+      <TabGroup className="mt-4">
+        <TabList>
+          <Tab>Endpoints</Tab>
+          <Tab>Async Requests</Tab>
+        </TabList>
+        <TabPanels>
+          <TabPanel>
 
       <AddPassThroughEndpoint
         accessToken={accessToken}
@@ -272,6 +300,13 @@ const PassThroughSettings: React.FC<GeneralSettingsPageProps> = ({ accessToken, 
           </div>
         </div>
       )}
+
+          </TabPanel>
+          <TabPanel>
+            <AIServiceRequests accessToken={accessToken} />
+          </TabPanel>
+        </TabPanels>
+      </TabGroup>
     </div>
   );
 };

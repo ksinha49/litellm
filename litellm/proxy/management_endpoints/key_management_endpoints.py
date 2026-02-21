@@ -645,6 +645,20 @@ async def _common_key_generation_helper(  # noqa: PLR0915
             },
         )
 
+    # validate application_id exists if provided
+    if data.application_id is not None:
+        from litellm.proxy.proxy_server import prisma_client as _prisma
+
+        if _prisma is not None:
+            app_row = await _prisma.db.litellm_applicationtable.find_unique(
+                where={"application_id": data.application_id}
+            )
+            if app_row is None:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Application not found for application_id={data.application_id}",
+                )
+
     # check org key limits - done here to handle inheriting org id from team
     if data.organization_id is not None:
         from litellm.proxy.proxy_server import prisma_client, user_api_key_cache
@@ -2541,6 +2555,7 @@ async def generate_key_helper_fn(  # noqa: PLR0915
     rotation_interval: Optional[str] = None,
     router_settings: Optional[dict] = None,
     access_group_ids: Optional[list] = None,
+    application_id: Optional[str] = None,
 ):
     from litellm.proxy.proxy_server import premium_user, prisma_client
 
@@ -2658,6 +2673,7 @@ async def generate_key_helper_fn(  # noqa: PLR0915
             "object_permission_id": object_permission_id,
             "router_settings": router_settings_json,
             "access_group_ids": access_group_ids or [],
+            "application_id": application_id,
         }
 
         # Add rotation fields if auto_rotate is enabled
