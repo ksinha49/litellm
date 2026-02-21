@@ -6,7 +6,7 @@ import LoadingScreen from "@/components/common_components/LoadingScreen";
 import { getProxyBaseUrl } from "@/components/networking";
 import { getCookie } from "@/utils/cookieUtils";
 import { isJwtExpired } from "@/utils/jwtUtils";
-import { LockOutlined, UserOutlined } from "@ant-design/icons";
+import { FileTextOutlined, HomeOutlined, LockOutlined, UserOutlined } from "@ant-design/icons";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Alert, Button, Form, Input, Popover, Typography } from "antd";
 import Link from "next/link";
@@ -104,11 +104,11 @@ function LoginPageContent() {
     <div style={styles.pageContainer}>
       {/* Top-left navigation buttons */}
       <div style={styles.topNav}>
-        <Link href={`${rootPath}/hub`} style={styles.topNavButton}>
-          Landing Page
+        <Link href={`${rootPath}/hub`} style={styles.topNavButton} title="Hub">
+          <HomeOutlined />
         </Link>
-        <Link href={`${rootPath}/docs/`} style={styles.topNavButton}>
-          API Docs
+        <Link href={`${rootPath}/docs/`} style={styles.topNavButton} title="API Docs">
+          <FileTextOutlined />
         </Link>
       </div>
 
@@ -359,9 +359,10 @@ const styles: Record<string, React.CSSProperties> = {
   topNavButton: {
     display: "inline-flex",
     alignItems: "center",
-    padding: "6px 16px",
-    fontSize: 13,
-    fontWeight: 600,
+    justifyContent: "center",
+    width: 32,
+    height: 32,
+    fontSize: 16,
     color: "#ffffff",
     backgroundColor: "rgba(255, 255, 255, 0.15)",
     borderRadius: 4,
