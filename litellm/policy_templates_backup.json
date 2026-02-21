@@ -2001,5 +2001,893 @@
     "tags": [
       "Brand Protection"
     ]
+  },
+  {
+    "id": "pci-dss-v4-payment-card-protection",
+    "title": "PCI DSS v4.0 — Payment Card Data Protection",
+    "description": "Protects payment card industry data per PCI DSS v4.0 requirements. Masks cardholder data, sensitive authentication data, bank account identifiers, and blocks exposure of payment system credentials.",
+    "icon": "CurrencyDollarIcon",
+    "iconColor": "text-amber-500",
+    "iconBg": "bg-amber-50",
+    "guardrails": [
+      "pci-cardholder-data-masking",
+      "pci-sensitive-auth-data",
+      "pci-bank-account-identifiers",
+      "pci-payment-system-credentials"
+    ],
+    "complexity": "Medium",
+    "guardrailDefinitions": [
+      {
+        "guardrail_name": "pci-cardholder-data-masking",
+        "litellm_params": {
+          "guardrail": "litellm_content_filter",
+          "mode": "pre_call",
+          "patterns": [
+            {
+              "pattern_type": "prebuilt",
+              "pattern_name": "visa",
+              "action": "MASK"
+            },
+            {
+              "pattern_type": "prebuilt",
+              "pattern_name": "mastercard",
+              "action": "MASK"
+            },
+            {
+              "pattern_type": "prebuilt",
+              "pattern_name": "amex",
+              "action": "MASK"
+            },
+            {
+              "pattern_type": "prebuilt",
+              "pattern_name": "discover",
+              "action": "MASK"
+            },
+            {
+              "pattern_type": "prebuilt",
+              "pattern_name": "credit_card",
+              "action": "MASK"
+            }
+          ],
+          "pattern_redaction_format": "[CARD_NUMBER_REDACTED]"
+        },
+        "guardrail_info": {
+          "description": "Masks Visa, Mastercard, Amex, Discover, and generic credit card numbers to protect cardholder data (Req. 3.4)"
+        }
+      },
+      {
+        "guardrail_name": "pci-sensitive-auth-data",
+        "litellm_params": {
+          "guardrail": "litellm_content_filter",
+          "mode": "pre_call",
+          "patterns": [
+            {
+              "pattern_type": "regex",
+              "name": "cvv_cvc_code",
+              "pattern": "\\b(?:CVV|CVC|CVV2|CVC2|CSC)[:\\s]*\\d{3,4}\\b",
+              "action": "MASK"
+            },
+            {
+              "pattern_type": "regex",
+              "name": "card_expiration_date",
+              "pattern": "\\b(?:exp(?:iry|iration)?[:\\s]*)?(?:0[1-9]|1[0-2])[\\s/\\-](?:\\d{2}|\\d{4})\\b",
+              "action": "MASK"
+            },
+            {
+              "pattern_type": "regex",
+              "name": "magnetic_stripe_track_data",
+              "pattern": "(?:%B\\d{13,19}\\^[\\w\\s/]+\\^\\d{4}\\d*\\?|;\\d{13,19}=\\d{4}\\d*\\?)",
+              "action": "BLOCK"
+            }
+          ],
+          "pattern_redaction_format": "[SENSITIVE_AUTH_DATA_REDACTED]"
+        },
+        "guardrail_info": {
+          "description": "Masks CVV/CVC codes and card expiration dates. Blocks magnetic stripe track data (Req. 3.3)"
+        }
+      },
+      {
+        "guardrail_name": "pci-bank-account-identifiers",
+        "litellm_params": {
+          "guardrail": "litellm_content_filter",
+          "mode": "pre_call",
+          "patterns": [
+            {
+              "pattern_type": "prebuilt",
+              "pattern_name": "iban",
+              "action": "MASK"
+            },
+            {
+              "pattern_type": "regex",
+              "name": "aba_routing_number",
+              "pattern": "\\b(?:routing(?:\\s*(?:number|no|#))?[:\\s]*)?(0[0-9]|1[0-2]|2[1-9]|3[0-2]|6[1-9]|7[0-2]|80)\\d{7}\\b",
+              "action": "MASK"
+            },
+            {
+              "pattern_type": "regex",
+              "name": "bank_account_number",
+              "pattern": "\\b(?:account(?:\\s*(?:number|no|#))?[:\\s]*)\\d{8,17}\\b",
+              "action": "MASK"
+            }
+          ],
+          "pattern_redaction_format": "[BANK_ACCOUNT_REDACTED]"
+        },
+        "guardrail_info": {
+          "description": "Masks IBAN, ABA routing numbers, and bank account numbers"
+        }
+      },
+      {
+        "guardrail_name": "pci-payment-system-credentials",
+        "litellm_params": {
+          "guardrail": "litellm_content_filter",
+          "mode": "pre_call",
+          "patterns": [
+            {
+              "pattern_type": "prebuilt",
+              "pattern_name": "aws_access_key",
+              "action": "BLOCK"
+            },
+            {
+              "pattern_type": "prebuilt",
+              "pattern_name": "aws_secret_key",
+              "action": "BLOCK"
+            },
+            {
+              "pattern_type": "prebuilt",
+              "pattern_name": "generic_api_key",
+              "action": "BLOCK"
+            },
+            {
+              "pattern_type": "regex",
+              "name": "stripe_api_key",
+              "pattern": "\\b[sr]k_(live|test)_[A-Za-z0-9]{24,}\\b",
+              "action": "BLOCK"
+            },
+            {
+              "pattern_type": "regex",
+              "name": "payment_gateway_token",
+              "pattern": "\\b(?:tok|pm|pi|ch|cus|sub)_[A-Za-z0-9]{14,}\\b",
+              "action": "BLOCK"
+            }
+          ],
+          "pattern_redaction_format": "[CREDENTIAL_BLOCKED]"
+        },
+        "guardrail_info": {
+          "description": "Blocks AWS keys, API keys, Stripe API keys, and payment gateway tokens to prevent credential leakage"
+        }
+      }
+    ],
+    "templateData": {
+      "policy_name": "pci-dss-v4-payment-card-protection",
+      "description": "PCI DSS v4.0 compliance — masks cardholder data, sensitive authentication data, bank identifiers, and blocks payment system credentials.",
+      "guardrails_add": [
+        "pci-cardholder-data-masking",
+        "pci-sensitive-auth-data",
+        "pci-bank-account-identifiers",
+        "pci-payment-system-credentials"
+      ],
+      "guardrails_remove": []
+    },
+    "tags": [
+      "Regulatory",
+      "PCI DSS",
+      "US"
+    ]
+  },
+  {
+    "id": "hipaa-phi-protection",
+    "title": "HIPAA/PHI — Protected Health Information",
+    "description": "Comprehensive HIPAA compliance for protected health information. Masks personal identifiers, contact information, medical record numbers, financial identifiers, and blocks credentials and unauthorized medical advice.",
+    "icon": "ShieldCheckIcon",
+    "iconColor": "text-blue-500",
+    "iconBg": "bg-blue-50",
+    "guardrails": [
+      "hipaa-personal-identifiers",
+      "hipaa-contact-information",
+      "hipaa-medical-identifiers",
+      "hipaa-financial-identifiers",
+      "hipaa-credentials-protection",
+      "hipaa-denied-medical-advice"
+    ],
+    "complexity": "High",
+    "guardrailDefinitions": [
+      {
+        "guardrail_name": "hipaa-personal-identifiers",
+        "litellm_params": {
+          "guardrail": "litellm_content_filter",
+          "mode": "pre_call",
+          "patterns": [
+            {
+              "pattern_type": "prebuilt",
+              "pattern_name": "us_ssn",
+              "action": "MASK"
+            },
+            {
+              "pattern_type": "prebuilt",
+              "pattern_name": "us_ssn_no_dash",
+              "action": "MASK"
+            },
+            {
+              "pattern_type": "prebuilt",
+              "pattern_name": "passport_us",
+              "action": "MASK"
+            }
+          ],
+          "pattern_redaction_format": "[PHI_IDENTIFIER_REDACTED]"
+        },
+        "guardrail_info": {
+          "description": "Masks Social Security Numbers and US passport numbers (HIPAA Safe Harbor de-identification)"
+        }
+      },
+      {
+        "guardrail_name": "hipaa-contact-information",
+        "litellm_params": {
+          "guardrail": "litellm_content_filter",
+          "mode": "pre_call",
+          "patterns": [
+            {
+              "pattern_type": "prebuilt",
+              "pattern_name": "email",
+              "action": "MASK"
+            },
+            {
+              "pattern_type": "prebuilt",
+              "pattern_name": "us_phone",
+              "action": "MASK"
+            },
+            {
+              "pattern_type": "prebuilt",
+              "pattern_name": "street_address",
+              "action": "MASK"
+            },
+            {
+              "pattern_type": "prebuilt",
+              "pattern_name": "url",
+              "action": "MASK"
+            },
+            {
+              "pattern_type": "prebuilt",
+              "pattern_name": "ipv4",
+              "action": "MASK"
+            }
+          ],
+          "pattern_redaction_format": "[PHI_CONTACT_REDACTED]"
+        },
+        "guardrail_info": {
+          "description": "Masks email, phone numbers, street addresses, URLs, and IP addresses per HIPAA Safe Harbor requirements"
+        }
+      },
+      {
+        "guardrail_name": "hipaa-medical-identifiers",
+        "litellm_params": {
+          "guardrail": "litellm_content_filter",
+          "mode": "pre_call",
+          "patterns": [
+            {
+              "pattern_type": "regex",
+              "name": "medical_record_number",
+              "pattern": "\\b(?:MRN|medical\\s*record(?:\\s*(?:number|no|#))?)[:\\s]*[A-Z0-9]{6,12}\\b",
+              "action": "MASK"
+            },
+            {
+              "pattern_type": "regex",
+              "name": "health_plan_beneficiary_id",
+              "pattern": "\\b(?:beneficiary(?:\\s*(?:ID|number|no|#))?|HICN|MBI)[:\\s]*[A-Z0-9]{8,12}\\b",
+              "action": "MASK"
+            },
+            {
+              "pattern_type": "regex",
+              "name": "dea_number",
+              "pattern": "\\b(?:DEA(?:\\s*(?:number|no|#))?[:\\s]*)?[A-Z][A-Z9][0-9]{7}\\b",
+              "action": "MASK"
+            },
+            {
+              "pattern_type": "regex",
+              "name": "npi_number",
+              "pattern": "\\b(?:NPI(?:\\s*(?:number|no|#))?[:\\s]*)?[12]\\d{9}\\b",
+              "action": "MASK"
+            }
+          ],
+          "pattern_redaction_format": "[MEDICAL_ID_REDACTED]"
+        },
+        "guardrail_info": {
+          "description": "Masks medical record numbers, health plan beneficiary IDs, DEA numbers, and NPI numbers"
+        }
+      },
+      {
+        "guardrail_name": "hipaa-financial-identifiers",
+        "litellm_params": {
+          "guardrail": "litellm_content_filter",
+          "mode": "pre_call",
+          "patterns": [
+            {
+              "pattern_type": "prebuilt",
+              "pattern_name": "credit_card",
+              "action": "MASK"
+            },
+            {
+              "pattern_type": "prebuilt",
+              "pattern_name": "iban",
+              "action": "MASK"
+            }
+          ],
+          "pattern_redaction_format": "[PHI_FINANCIAL_REDACTED]"
+        },
+        "guardrail_info": {
+          "description": "Masks credit card numbers and IBAN for financial identifier protection under HIPAA"
+        }
+      },
+      {
+        "guardrail_name": "hipaa-credentials-protection",
+        "litellm_params": {
+          "guardrail": "litellm_content_filter",
+          "mode": "pre_call",
+          "patterns": [
+            {
+              "pattern_type": "prebuilt",
+              "pattern_name": "aws_access_key",
+              "action": "BLOCK"
+            },
+            {
+              "pattern_type": "prebuilt",
+              "pattern_name": "aws_secret_key",
+              "action": "BLOCK"
+            },
+            {
+              "pattern_type": "prebuilt",
+              "pattern_name": "generic_api_key",
+              "action": "BLOCK"
+            }
+          ],
+          "pattern_redaction_format": "[CREDENTIAL_BLOCKED]"
+        },
+        "guardrail_info": {
+          "description": "Blocks AWS keys and API keys to prevent credential exposure in healthcare systems"
+        }
+      },
+      {
+        "guardrail_name": "hipaa-denied-medical-advice",
+        "litellm_params": {
+          "guardrail": "litellm_content_filter",
+          "mode": "pre_call",
+          "categories": [
+            {
+              "category": "hipaa_denied_medical_advice",
+              "category_file": "litellm/proxy/guardrails/guardrail_hooks/litellm_content_filter/policy_templates/hipaa_denied_medical_advice.yaml",
+              "enabled": true,
+              "action": "BLOCK",
+              "severity_threshold": "medium"
+            }
+          ]
+        },
+        "guardrail_info": {
+          "description": "Blocks AI from providing medical diagnoses, prescriptions, dosage changes, or clinical treatment advice"
+        }
+      }
+    ],
+    "templateData": {
+      "policy_name": "hipaa-phi-protection",
+      "description": "HIPAA compliance — masks PHI including personal identifiers, contact information, medical record numbers, and financial data. Blocks credentials and unauthorized medical advice.",
+      "guardrails_add": [
+        "hipaa-personal-identifiers",
+        "hipaa-contact-information",
+        "hipaa-medical-identifiers",
+        "hipaa-financial-identifiers",
+        "hipaa-credentials-protection",
+        "hipaa-denied-medical-advice"
+      ],
+      "guardrails_remove": []
+    },
+    "tags": [
+      "Regulatory",
+      "HIPAA",
+      "US"
+    ]
+  },
+  {
+    "id": "sec-reg-sp-financial-privacy",
+    "title": "SEC Regulation S-P — Financial Privacy",
+    "description": "SEC Regulation S-P compliance for safeguarding customer financial information. Masks personal identifiers, contact information, financial account data, industry-specific identifiers, and blocks credential exposure.",
+    "icon": "ShieldCheckIcon",
+    "iconColor": "text-indigo-500",
+    "iconBg": "bg-indigo-50",
+    "guardrails": [
+      "sec-sp-personal-identifiers",
+      "sec-sp-contact-information",
+      "sec-sp-financial-account-data",
+      "sec-sp-industry-identifiers",
+      "sec-sp-credentials-protection"
+    ],
+    "complexity": "Medium",
+    "guardrailDefinitions": [
+      {
+        "guardrail_name": "sec-sp-personal-identifiers",
+        "litellm_params": {
+          "guardrail": "litellm_content_filter",
+          "mode": "pre_call",
+          "patterns": [
+            {
+              "pattern_type": "prebuilt",
+              "pattern_name": "us_ssn",
+              "action": "MASK"
+            },
+            {
+              "pattern_type": "prebuilt",
+              "pattern_name": "us_ssn_no_dash",
+              "action": "MASK"
+            },
+            {
+              "pattern_type": "prebuilt",
+              "pattern_name": "passport_us",
+              "action": "MASK"
+            },
+            {
+              "pattern_type": "regex",
+              "name": "drivers_license_number",
+              "pattern": "\\b(?:driver'?s?\\s*license(?:\\s*(?:number|no|#))?|DL(?:\\s*(?:number|no|#))?)[:\\s]*[A-Z0-9]{5,15}\\b",
+              "action": "MASK"
+            }
+          ],
+          "pattern_redaction_format": "[SEC_SP_PII_REDACTED]"
+        },
+        "guardrail_info": {
+          "description": "Masks SSNs, US passports, and driver's license numbers per SEC Reg S-P nonpublic personal information requirements"
+        }
+      },
+      {
+        "guardrail_name": "sec-sp-contact-information",
+        "litellm_params": {
+          "guardrail": "litellm_content_filter",
+          "mode": "pre_call",
+          "patterns": [
+            {
+              "pattern_type": "prebuilt",
+              "pattern_name": "email",
+              "action": "MASK"
+            },
+            {
+              "pattern_type": "prebuilt",
+              "pattern_name": "us_phone",
+              "action": "MASK"
+            },
+            {
+              "pattern_type": "prebuilt",
+              "pattern_name": "street_address",
+              "action": "MASK"
+            }
+          ],
+          "pattern_redaction_format": "[SEC_SP_CONTACT_REDACTED]"
+        },
+        "guardrail_info": {
+          "description": "Masks email addresses, phone numbers, and street addresses"
+        }
+      },
+      {
+        "guardrail_name": "sec-sp-financial-account-data",
+        "litellm_params": {
+          "guardrail": "litellm_content_filter",
+          "mode": "pre_call",
+          "patterns": [
+            {
+              "pattern_type": "prebuilt",
+              "pattern_name": "credit_card",
+              "action": "MASK"
+            },
+            {
+              "pattern_type": "prebuilt",
+              "pattern_name": "iban",
+              "action": "MASK"
+            },
+            {
+              "pattern_type": "regex",
+              "name": "brokerage_account_number",
+              "pattern": "\\b(?:brokerage|trading|investment)\\s*(?:account|acct)(?:\\s*(?:number|no|#))?[:\\s]*[A-Z0-9]{6,14}\\b",
+              "action": "MASK"
+            },
+            {
+              "pattern_type": "regex",
+              "name": "aba_routing_number",
+              "pattern": "\\b(?:routing(?:\\s*(?:number|no|#))?[:\\s]*)?(0[0-9]|1[0-2]|2[1-9]|3[0-2]|6[1-9]|7[0-2]|80)\\d{7}\\b",
+              "action": "MASK"
+            },
+            {
+              "pattern_type": "regex",
+              "name": "bank_account_number",
+              "pattern": "\\b(?:account(?:\\s*(?:number|no|#))?[:\\s]*)\\d{8,17}\\b",
+              "action": "MASK"
+            }
+          ],
+          "pattern_redaction_format": "[SEC_SP_FINANCIAL_REDACTED]"
+        },
+        "guardrail_info": {
+          "description": "Masks credit cards, IBAN, brokerage account numbers, ABA routing numbers, and bank account numbers"
+        }
+      },
+      {
+        "guardrail_name": "sec-sp-industry-identifiers",
+        "litellm_params": {
+          "guardrail": "litellm_content_filter",
+          "mode": "pre_call",
+          "patterns": [
+            {
+              "pattern_type": "regex",
+              "name": "finra_crd_number",
+              "pattern": "\\b(?:CRD(?:\\s*(?:number|no|#))?[:\\s]*)\\d{4,8}\\b",
+              "action": "MASK"
+            },
+            {
+              "pattern_type": "regex",
+              "name": "sec_file_number",
+              "pattern": "\\b(?:SEC(?:\\s*(?:file|registration))?(?:\\s*(?:number|no|#))?[:\\s]*)\\d{3}-\\d{5,6}\\b",
+              "action": "MASK"
+            },
+            {
+              "pattern_type": "regex",
+              "name": "iard_number",
+              "pattern": "\\b(?:IARD(?:\\s*(?:number|no|#))?[:\\s]*)\\d{4,8}\\b",
+              "action": "MASK"
+            }
+          ],
+          "pattern_redaction_format": "[SEC_SP_INDUSTRY_ID_REDACTED]"
+        },
+        "guardrail_info": {
+          "description": "Masks FINRA CRD numbers, SEC file numbers, and IARD numbers"
+        }
+      },
+      {
+        "guardrail_name": "sec-sp-credentials-protection",
+        "litellm_params": {
+          "guardrail": "litellm_content_filter",
+          "mode": "pre_call",
+          "patterns": [
+            {
+              "pattern_type": "prebuilt",
+              "pattern_name": "aws_access_key",
+              "action": "BLOCK"
+            },
+            {
+              "pattern_type": "prebuilt",
+              "pattern_name": "aws_secret_key",
+              "action": "BLOCK"
+            },
+            {
+              "pattern_type": "prebuilt",
+              "pattern_name": "generic_api_key",
+              "action": "BLOCK"
+            }
+          ],
+          "pattern_redaction_format": "[CREDENTIAL_BLOCKED]"
+        },
+        "guardrail_info": {
+          "description": "Blocks AWS keys and API keys to prevent credential exposure in financial systems"
+        }
+      }
+    ],
+    "templateData": {
+      "policy_name": "sec-reg-sp-financial-privacy",
+      "description": "SEC Regulation S-P compliance — masks nonpublic personal information, financial account data, and industry identifiers. Blocks credential exposure.",
+      "guardrails_add": [
+        "sec-sp-personal-identifiers",
+        "sec-sp-contact-information",
+        "sec-sp-financial-account-data",
+        "sec-sp-industry-identifiers",
+        "sec-sp-credentials-protection"
+      ],
+      "guardrails_remove": []
+    },
+    "tags": [
+      "Regulatory",
+      "SEC",
+      "US"
+    ]
+  },
+  {
+    "id": "finra-broker-dealer-data-protection",
+    "title": "FINRA — Broker-Dealer Data Protection",
+    "description": "Comprehensive FINRA compliance for broker-dealer operations. Masks customer identifiers, financial account data, industry-specific identifiers, and protected class information. Blocks credentials and unauthorized financial advice.",
+    "icon": "CurrencyDollarIcon",
+    "iconColor": "text-green-500",
+    "iconBg": "bg-green-50",
+    "guardrails": [
+      "finra-customer-identifiers",
+      "finra-contact-information",
+      "finra-financial-account-data",
+      "finra-industry-identifiers",
+      "finra-credentials-protection",
+      "finra-fair-lending-protected-classes",
+      "finra-denied-financial-advice"
+    ],
+    "complexity": "High",
+    "guardrailDefinitions": [
+      {
+        "guardrail_name": "finra-customer-identifiers",
+        "litellm_params": {
+          "guardrail": "litellm_content_filter",
+          "mode": "pre_call",
+          "patterns": [
+            {
+              "pattern_type": "prebuilt",
+              "pattern_name": "us_ssn",
+              "action": "MASK"
+            },
+            {
+              "pattern_type": "prebuilt",
+              "pattern_name": "us_ssn_no_dash",
+              "action": "MASK"
+            },
+            {
+              "pattern_type": "prebuilt",
+              "pattern_name": "passport_us",
+              "action": "MASK"
+            },
+            {
+              "pattern_type": "regex",
+              "name": "drivers_license_number",
+              "pattern": "\\b(?:driver'?s?\\s*license(?:\\s*(?:number|no|#))?|DL(?:\\s*(?:number|no|#))?)[:\\s]*[A-Z0-9]{5,15}\\b",
+              "action": "MASK"
+            },
+            {
+              "pattern_type": "regex",
+              "name": "ein_tin_number",
+              "pattern": "\\b(?:EIN|TIN|employer\\s*identification(?:\\s*number)?|tax\\s*(?:ID|identification)(?:\\s*number)?)[:\\s]*\\d{2}-?\\d{7}\\b",
+              "action": "MASK"
+            }
+          ],
+          "pattern_redaction_format": "[FINRA_PII_REDACTED]"
+        },
+        "guardrail_info": {
+          "description": "Masks SSNs, US passports, driver's license numbers, and EIN/TIN numbers for customer identification program (CIP) compliance"
+        }
+      },
+      {
+        "guardrail_name": "finra-contact-information",
+        "litellm_params": {
+          "guardrail": "litellm_content_filter",
+          "mode": "pre_call",
+          "patterns": [
+            {
+              "pattern_type": "prebuilt",
+              "pattern_name": "email",
+              "action": "MASK"
+            },
+            {
+              "pattern_type": "prebuilt",
+              "pattern_name": "us_phone",
+              "action": "MASK"
+            },
+            {
+              "pattern_type": "prebuilt",
+              "pattern_name": "street_address",
+              "action": "MASK"
+            }
+          ],
+          "pattern_redaction_format": "[FINRA_CONTACT_REDACTED]"
+        },
+        "guardrail_info": {
+          "description": "Masks email addresses, phone numbers, and street addresses"
+        }
+      },
+      {
+        "guardrail_name": "finra-financial-account-data",
+        "litellm_params": {
+          "guardrail": "litellm_content_filter",
+          "mode": "pre_call",
+          "patterns": [
+            {
+              "pattern_type": "prebuilt",
+              "pattern_name": "visa",
+              "action": "MASK"
+            },
+            {
+              "pattern_type": "prebuilt",
+              "pattern_name": "mastercard",
+              "action": "MASK"
+            },
+            {
+              "pattern_type": "prebuilt",
+              "pattern_name": "amex",
+              "action": "MASK"
+            },
+            {
+              "pattern_type": "prebuilt",
+              "pattern_name": "discover",
+              "action": "MASK"
+            },
+            {
+              "pattern_type": "prebuilt",
+              "pattern_name": "credit_card",
+              "action": "MASK"
+            },
+            {
+              "pattern_type": "prebuilt",
+              "pattern_name": "iban",
+              "action": "MASK"
+            },
+            {
+              "pattern_type": "regex",
+              "name": "brokerage_account_number",
+              "pattern": "\\b(?:brokerage|trading|investment)\\s*(?:account|acct)(?:\\s*(?:number|no|#))?[:\\s]*[A-Z0-9]{6,14}\\b",
+              "action": "MASK"
+            },
+            {
+              "pattern_type": "regex",
+              "name": "aba_routing_number",
+              "pattern": "\\b(?:routing(?:\\s*(?:number|no|#))?[:\\s]*)?(0[0-9]|1[0-2]|2[1-9]|3[0-2]|6[1-9]|7[0-2]|80)\\d{7}\\b",
+              "action": "MASK"
+            }
+          ],
+          "pattern_redaction_format": "[FINRA_FINANCIAL_REDACTED]"
+        },
+        "guardrail_info": {
+          "description": "Masks all card brands, IBAN, brokerage account numbers, and ABA routing numbers"
+        }
+      },
+      {
+        "guardrail_name": "finra-industry-identifiers",
+        "litellm_params": {
+          "guardrail": "litellm_content_filter",
+          "mode": "pre_call",
+          "patterns": [
+            {
+              "pattern_type": "regex",
+              "name": "finra_crd_number",
+              "pattern": "\\b(?:CRD(?:\\s*(?:number|no|#))?[:\\s]*)\\d{4,8}\\b",
+              "action": "MASK"
+            },
+            {
+              "pattern_type": "regex",
+              "name": "sec_file_number",
+              "pattern": "\\b(?:SEC(?:\\s*(?:file|registration))?(?:\\s*(?:number|no|#))?[:\\s]*)\\d{3}-\\d{5,6}\\b",
+              "action": "MASK"
+            },
+            {
+              "pattern_type": "regex",
+              "name": "rep_code",
+              "pattern": "\\b(?:rep(?:resentative)?\\s*code|FA\\s*code)[:\\s]*[A-Z0-9]{3,6}\\b",
+              "action": "MASK"
+            },
+            {
+              "pattern_type": "regex",
+              "name": "mpid_code",
+              "pattern": "\\b(?:MPID|market\\s*participant(?:\\s*(?:ID|identifier))?)[:\\s]*[A-Z]{4}\\b",
+              "action": "MASK"
+            }
+          ],
+          "pattern_redaction_format": "[FINRA_INDUSTRY_ID_REDACTED]"
+        },
+        "guardrail_info": {
+          "description": "Masks FINRA CRD numbers, SEC file numbers, representative codes, and MPID codes"
+        }
+      },
+      {
+        "guardrail_name": "finra-credentials-protection",
+        "litellm_params": {
+          "guardrail": "litellm_content_filter",
+          "mode": "pre_call",
+          "patterns": [
+            {
+              "pattern_type": "prebuilt",
+              "pattern_name": "aws_access_key",
+              "action": "BLOCK"
+            },
+            {
+              "pattern_type": "prebuilt",
+              "pattern_name": "aws_secret_key",
+              "action": "BLOCK"
+            },
+            {
+              "pattern_type": "prebuilt",
+              "pattern_name": "github_token",
+              "action": "BLOCK"
+            },
+            {
+              "pattern_type": "prebuilt",
+              "pattern_name": "slack_token",
+              "action": "BLOCK"
+            },
+            {
+              "pattern_type": "prebuilt",
+              "pattern_name": "generic_api_key",
+              "action": "BLOCK"
+            }
+          ],
+          "pattern_redaction_format": "[CREDENTIAL_BLOCKED]"
+        },
+        "guardrail_info": {
+          "description": "Blocks AWS keys, GitHub tokens, Slack tokens, and API keys to prevent credential exposure"
+        }
+      },
+      {
+        "guardrail_name": "finra-fair-lending-protected-classes",
+        "litellm_params": {
+          "guardrail": "litellm_content_filter",
+          "mode": "pre_call",
+          "patterns": [
+            {
+              "pattern_type": "prebuilt",
+              "pattern_name": "gender_sexual_orientation",
+              "action": "MASK"
+            },
+            {
+              "pattern_type": "prebuilt",
+              "pattern_name": "race_ethnicity_national_origin",
+              "action": "MASK"
+            },
+            {
+              "pattern_type": "prebuilt",
+              "pattern_name": "religion",
+              "action": "MASK"
+            },
+            {
+              "pattern_type": "prebuilt",
+              "pattern_name": "age_discrimination",
+              "action": "MASK"
+            },
+            {
+              "pattern_type": "prebuilt",
+              "pattern_name": "disability",
+              "action": "MASK"
+            },
+            {
+              "pattern_type": "prebuilt",
+              "pattern_name": "marital_family_status",
+              "action": "MASK"
+            },
+            {
+              "pattern_type": "prebuilt",
+              "pattern_name": "military_status",
+              "action": "MASK"
+            },
+            {
+              "pattern_type": "prebuilt",
+              "pattern_name": "public_assistance",
+              "action": "MASK"
+            }
+          ],
+          "pattern_redaction_format": "[PROTECTED_CLASS_INFO_REDACTED]"
+        },
+        "guardrail_info": {
+          "description": "Masks all protected class information for fair lending compliance and anti-discrimination under FINRA Rule 2010"
+        }
+      },
+      {
+        "guardrail_name": "finra-denied-financial-advice",
+        "litellm_params": {
+          "guardrail": "litellm_content_filter",
+          "mode": "pre_call",
+          "categories": [
+            {
+              "category": "finra_denied_financial_advice",
+              "category_file": "litellm/proxy/guardrails/guardrail_hooks/litellm_content_filter/policy_templates/finra_denied_financial_advice.yaml",
+              "enabled": true,
+              "action": "BLOCK",
+              "severity_threshold": "medium"
+            }
+          ]
+        },
+        "guardrail_info": {
+          "description": "Blocks AI from providing personalized investment recommendations, guaranteed return claims, or insider trading tips"
+        }
+      }
+    ],
+    "templateData": {
+      "policy_name": "finra-broker-dealer-data-protection",
+      "description": "FINRA compliance — masks customer identifiers, financial accounts, industry IDs, and protected class data. Blocks credentials and unauthorized financial advice.",
+      "guardrails_add": [
+        "finra-customer-identifiers",
+        "finra-contact-information",
+        "finra-financial-account-data",
+        "finra-industry-identifiers",
+        "finra-credentials-protection",
+        "finra-fair-lending-protected-classes",
+        "finra-denied-financial-advice"
+      ],
+      "guardrails_remove": []
+    },
+    "tags": [
+      "Regulatory",
+      "FINRA",
+      "US"
+    ]
   }
 ]
