@@ -1412,9 +1412,28 @@ def mount_swagger_ui():
         display: inline-flex; align-items: center; gap: 6px;
     }
     .docs-navbar-console:hover { opacity: 0.9; }
+    .docs-info-bar {
+        display: flex; align-items: center; gap: 12px;
+        padding: 10px 24px; background: #f9fafb; border-bottom: 1px solid #e5e7eb;
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        font-size: 13px; color: #374151;
+    }
+    .docs-info-bar .docs-api-title { font-weight: 600; color: #111827; }
+    .docs-info-bar .docs-version-badge {
+        background: #dbeafe; color: #1d4ed8; font-size: 11px; font-weight: 600;
+        padding: 2px 8px; border-radius: 9999px;
+    }
+    .docs-info-bar .docs-oas-badge {
+        background: #e5e7eb; color: #374151; font-size: 11px; font-weight: 500;
+        padding: 2px 8px; border-radius: 9999px;
+    }
+    .docs-info-bar .docs-spec-link {
+        margin-left: auto; color: #0058DB; text-decoration: none; font-weight: 500;
+    }
+    .docs-info-bar .docs-spec-link:hover { text-decoration: underline; }
     """
 
-    _navbar_html = """
+    _navbar_html = f"""
     <div class="docs-accent-bar"></div>
     <nav class="docs-navbar">
       <div class="docs-navbar-inner">
@@ -1429,6 +1448,12 @@ def mount_swagger_ui():
         </div>
       </div>
     </nav>
+    <div class="docs-info-bar">
+      <span class="docs-api-title">{_title}</span>
+      <span class="docs-version-badge">v{version}</span>
+      <span class="docs-oas-badge">OAS 3.1</span>
+      <a class="docs-spec-link" href="/openapi.json" target="_blank">/openapi.json</a>
+    </div>
     """
 
     def swagger_monkey_patch(*args, **kwargs):
