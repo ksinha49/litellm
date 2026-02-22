@@ -1,5 +1,4 @@
 import React from "react";
-import { Card, Title } from "@tremor/react";
 import { Table, Tag } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import { ChartLoader } from "@/components/shared/chart_loader";
@@ -9,6 +8,7 @@ import { ApplicationMetrics } from "@/components/networking";
 interface ApplicationInventoryTableProps {
   loading: boolean;
   data: ApplicationMetrics[];
+  expanded?: boolean;
 }
 
 const columns: ColumnsType<ApplicationMetrics> = [
@@ -81,29 +81,30 @@ const columns: ColumnsType<ApplicationMetrics> = [
 const ApplicationInventoryTable: React.FC<ApplicationInventoryTableProps> = ({
   loading,
   data,
+  expanded = false,
 }) => {
+  if (loading) return <ChartLoader />;
+
+  if (data.length === 0) {
+    return (
+      <div className="flex items-center justify-center h-40">
+        <p className="text-sm" style={{ color: "#595959" }}>
+          No data available
+        </p>
+      </div>
+    );
+  }
+
   return (
-    <Card style={{ borderRadius: 8, border: "1px solid #cccccc" }}>
-      <Title>Application Inventory</Title>
-      {loading ? (
-        <ChartLoader />
-      ) : data.length === 0 ? (
-        <div className="flex items-center justify-center h-40">
-          <p className="text-sm" style={{ color: "#595959" }}>
-            No data available
-          </p>
-        </div>
-      ) : (
-        <Table
-          className="mt-4"
-          columns={columns}
-          dataSource={data}
-          rowKey="application_id"
-          size="small"
-          pagination={{ pageSize: 10, showSizeChanger: true }}
-        />
-      )}
-    </Card>
+    <Table
+      className="mt-4"
+      columns={columns}
+      dataSource={data}
+      rowKey="application_id"
+      size="small"
+      pagination={{ pageSize: expanded ? 25 : 10, showSizeChanger: true }}
+      scroll={expanded ? { y: 500 } : undefined}
+    />
   );
 };
 

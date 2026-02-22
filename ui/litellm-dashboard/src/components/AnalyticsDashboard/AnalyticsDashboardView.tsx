@@ -19,6 +19,7 @@ import TeamSpendChart from "./components/TeamSpendChart";
 import TopModelsChart from "./components/TopModelsChart";
 import CachePerformanceChart from "./components/CachePerformanceChart";
 import ApplicationInventoryTable from "./components/ApplicationInventoryTable";
+import ExpandableChartCard from "./components/ExpandableChartCard";
 import {
   KPIData,
   DailyActivity,
@@ -199,6 +200,8 @@ const AnalyticsDashboardView: React.FC<AnalyticsDashboardViewProps> = ({
     setDateValue(newValue);
   };
 
+  const isLoading = loading || isDateChanging;
+
   return (
     <div className="w-full p-6 space-y-6" style={{ maxWidth: 1400, margin: "0 auto" }}>
       {/* Header */}
@@ -216,32 +219,66 @@ const AnalyticsDashboardView: React.FC<AnalyticsDashboardViewProps> = ({
       <KPISummaryCards loading={loading} data={kpi} />
 
       {/* API Usage Trend */}
-      <AdoptionTrendChart loading={loading || isDateChanging} data={dailyActivity} />
+      <ExpandableChartCard title="API Usage Trend">
+        {(expanded) => (
+          <AdoptionTrendChart
+            loading={isLoading}
+            data={dailyActivity}
+            expanded={expanded}
+          />
+        )}
+      </ExpandableChartCard>
 
       {/* Provider Spend + Team Spend */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <SpendByProvider
-          loading={loading || isDateChanging}
+          loading={isLoading}
           isDateChanging={isDateChanging}
           providerSpend={providerSpend}
         />
-        <TeamSpendChart loading={loading || isDateChanging} data={teamSpend} />
+        <ExpandableChartCard title="Team Spend Breakdown">
+          {(expanded) => (
+            <TeamSpendChart
+              loading={isLoading}
+              data={teamSpend}
+              expanded={expanded}
+            />
+          )}
+        </ExpandableChartCard>
       </div>
 
       {/* Top Models + Cache Performance */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <TopModelsChart loading={loading || isDateChanging} data={topModels} />
-        <CachePerformanceChart
-          loading={loading || isDateChanging}
-          data={cacheActivity}
-        />
+        <ExpandableChartCard title="Top Models by Spend">
+          {(expanded) => (
+            <TopModelsChart
+              loading={isLoading}
+              data={topModels}
+              expanded={expanded}
+            />
+          )}
+        </ExpandableChartCard>
+        <ExpandableChartCard title="Cache Performance">
+          {(expanded) => (
+            <CachePerformanceChart
+              loading={isLoading}
+              data={cacheActivity}
+              expanded={expanded}
+            />
+          )}
+        </ExpandableChartCard>
       </div>
 
       {/* Application Inventory */}
-      <ApplicationInventoryTable
-        loading={loading || isDateChanging}
-        data={applications}
-      />
+      <ExpandableChartCard title="Application Inventory">
+        {(expanded) => (
+          <ApplicationInventoryTable
+            loading={isLoading}
+            data={applications}
+            expanded={expanded}
+          />
+        )}
+      </ExpandableChartCard>
     </div>
   );
 };
