@@ -8,6 +8,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { ModelDataTable } from "./model_dashboard/table";
 import NotificationsManager from "./molecules/notifications_manager";
 import Navbar from "./navbar";
+import ClaudeCodeMarketplaceTab from "./AIHub/ClaudeCodeMarketplaceTab";
 import {
   agentHubPublicModelsCall,
   getPublicModelHubInfo,
@@ -1434,8 +1435,7 @@ const PublicModelHub: React.FC<PublicModelHubProps> = ({ accessToken, isEmbedded
               </TabPane>
 
               {/* Agents Tab */}
-              {agentHubData && Array.isArray(agentHubData) && agentHubData.length > 0 && (
-                <TabPane tab="Agent Hub" key="agents">
+              <TabPane tab="Agent Hub" key="agents">
                   <div className="flex justify-between items-center mb-8">
                     <Title className="text-2xl font-semibold text-gray-900">Available Agents</Title>
                   </div>
@@ -1495,11 +1495,9 @@ const PublicModelHub: React.FC<PublicModelHubProps> = ({ accessToken, isEmbedded
                     </Text>
                   </div>
                 </TabPane>
-              )}
 
               {/* MCP Servers Tab */}
-              {mcpHubData && Array.isArray(mcpHubData) && mcpHubData.length > 0 && (
-                <TabPane tab="MCP Hub" key="mcp">
+              <TabPane tab="MCP Hub" key="mcp">
                   <div className="flex justify-between items-center mb-8">
                     <Title className="text-2xl font-semibold text-gray-900">Available MCP Servers</Title>
                   </div>
@@ -1559,7 +1557,11 @@ const PublicModelHub: React.FC<PublicModelHubProps> = ({ accessToken, isEmbedded
                     </Text>
                   </div>
                 </TabPane>
-              )}
+
+              {/* Claude Code Plugin Marketplace Tab */}
+              <TabPane tab="Claude Code Plugin Marketplace" key="marketplace">
+                <ClaudeCodeMarketplaceTab publicPage={true} />
+              </TabPane>
             </Tabs>
           </Card>
         </div>
