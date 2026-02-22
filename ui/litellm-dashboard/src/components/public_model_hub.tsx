@@ -113,7 +113,7 @@ const PublicModelHub: React.FC<PublicModelHubProps> = ({ accessToken, isEmbedded
   const [pageTitle, setPageTitle] = useState<string>(`${appName} Gateway`);
   const [customDocsDescription, setCustomDocsDescription] = useState<string>(defaultDocsDescription);
   const [litellmVersion, setLitellmVersion] = useState<string>("");
-  const [usefulLinks, setUsefulLinks] = useState<Record<string, string | { url: string; index: number }>>({});
+  const [usefulLinks, setUsefulLinks] = useState<Record<string, string | { url: string; index: number; description?: string }>>({});
   const [loading, setLoading] = useState<boolean>(true);
   const [agentLoading, setAgentLoading] = useState<boolean>(true);
   const [mcpLoading, setMcpLoading] = useState<boolean>(true);
@@ -1299,19 +1299,20 @@ const PublicModelHub: React.FC<PublicModelHubProps> = ({ accessToken, isEmbedded
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {Object.entries(usefulLinks || {})
                   .map(([title, value]) => {
-                    // Handle both old format (string) and new format ({url, index})
+                    // Handle both old format (string) and new format ({url, index, description})
                     const url = typeof value === "string" ? value : value.url;
                     const index = typeof value === "string" ? 0 : value.index ?? 0;
-                    return { title, url, index };
+                    const description = typeof value === "string" ? undefined : value.description;
+                    return { title, url, index, description };
                   })
                   .sort((a, b) => a.index - b.index)
-                  .map(({ title, url }) => (
+                  .map(({ title, url, description }) => (
                     <button
                       key={title}
                       onClick={() => window.open(url, "_blank")}
-                      className="flex items-center space-x-3 transition-colors p-3 border"
+                      className={`flex ${description ? "flex-col items-start p-4 border rounded-lg" : "items-center space-x-3 p-3 border"} transition-colors`}
                       style={{
-                        borderRadius: "9999px",
+                        borderRadius: description ? "8px" : "9999px",
                         borderColor: "#cccccc",
                         color: "#377dd0",
                         fontFamily: "'Source Sans Pro', 'Helvetica Neue', Arial, sans-serif",
@@ -1319,8 +1320,13 @@ const PublicModelHub: React.FC<PublicModelHubProps> = ({ accessToken, isEmbedded
                       onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.backgroundColor = "#f0f6fc"; }}
                       onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.backgroundColor = "transparent"; }}
                     >
-                      <ExternalLinkIcon className="w-4 h-4" />
-                      <Text className="text-sm font-medium">{title}</Text>
+                      <div className="flex items-center space-x-3">
+                        <ExternalLinkIcon className="w-4 h-4 flex-shrink-0" />
+                        <Text className="text-sm font-medium">{title}</Text>
+                      </div>
+                      {description && (
+                        <Text className="text-xs mt-2 text-left" style={{ color: "#666666" }}>{description}</Text>
+                      )}
                     </button>
                   ))}
               </div>
