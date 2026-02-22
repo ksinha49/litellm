@@ -206,7 +206,7 @@ const AnalyticsDashboardView: React.FC<AnalyticsDashboardViewProps> = ({
     <div className="w-full p-6 space-y-6" style={{ maxWidth: 1400, margin: "0 auto" }}>
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <Title style={{ color: "#333333", fontSize: "1.5rem", fontWeight: 700 }}>
+        <Title style={{ color: "#333333", fontSize: "1.5rem", fontWeight: 600 }}>
           AI Analytics Dashboard
         </Title>
         <AdvancedDatePicker

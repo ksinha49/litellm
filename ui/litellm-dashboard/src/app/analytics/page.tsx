@@ -33,7 +33,8 @@ function AnalyticsPageContent() {
   return (
     <QueryClientProvider client={queryClient}>
       <ThemeProvider accessToken={accessToken}>
-        <div className="min-h-screen bg-white">
+        <div className="min-h-screen" style={{ backgroundColor: "#F5F5F5" }}>
+          <div style={{ height: 3, backgroundColor: "#D3222A", width: "100%" }} />
           <Navbar
             userID={null}
             userEmail={null}
@@ -45,6 +46,7 @@ function AnalyticsPageContent() {
             isPublicPage={true}
             isDarkMode={false}
             toggleDarkMode={() => {}}
+            currentPath="/ui/analytics"
           />
           <AnalyticsDashboardView accessToken={accessToken} />
         </div>

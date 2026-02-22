@@ -20,7 +20,7 @@ const ExpandableChartCard: React.FC<ExpandableChartCardProps> = ({
     <>
       <Card
         className={className}
-        style={{ borderRadius: 8, border: "1px solid #cccccc" }}
+        style={{ borderRadius: 4, border: "1px solid #cccccc" }}
       >
         <div className="flex items-center justify-between mb-2">
           <Title>{title}</Title>

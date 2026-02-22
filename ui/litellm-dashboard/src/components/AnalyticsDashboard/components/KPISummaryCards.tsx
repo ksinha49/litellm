@@ -17,7 +17,7 @@ interface KPICardProps {
 const KPICard: React.FC<KPICardProps> = ({ label, value, subtitle }) => (
   <Card
     className="p-4"
-    style={{ borderRadius: 8, border: "1px solid #cccccc" }}
+    style={{ borderRadius: 4, border: "1px solid #cccccc", backgroundColor: "#FFFFFF" }}
   >
     <p
       className="text-xs font-semibold uppercase tracking-wide"
@@ -44,7 +44,7 @@ const KPISummaryCards: React.FC<KPISummaryCardsProps> = ({ loading, data }) => {
           <Card
             key={i}
             className="p-4 animate-pulse"
-            style={{ borderRadius: 8, border: "1px solid #cccccc" }}
+            style={{ borderRadius: 4, border: "1px solid #cccccc" }}
           >
             <div className="h-3 bg-gray-200 rounded w-20 mb-2" />
             <div className="h-7 bg-gray-200 rounded w-16" />

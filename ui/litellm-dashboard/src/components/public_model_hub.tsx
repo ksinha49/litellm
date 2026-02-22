@@ -978,18 +978,22 @@ const PublicModelHub: React.FC<PublicModelHubProps> = ({ accessToken, isEmbedded
       <div className={isEmbedded ? "w-full" : "min-h-screen bg-white"}>
         {/* Navigation - only show when not embedded */}
         {!isEmbedded && (
-          <Navbar
-            userID={null}
-            userEmail={null}
-            userRole={null}
-            premiumUser={false}
-            setProxySettings={setProxySettings}
-            proxySettings={proxySettings}
-            accessToken={accessToken || null}
-            isPublicPage={true}
-            isDarkMode={false}
-            toggleDarkMode={() => {}}
-          />
+          <>
+            <div style={{ height: 3, backgroundColor: "#D3222A", width: "100%" }} />
+            <Navbar
+              userID={null}
+              userEmail={null}
+              userRole={null}
+              premiumUser={false}
+              setProxySettings={setProxySettings}
+              proxySettings={proxySettings}
+              accessToken={accessToken || null}
+              isPublicPage={true}
+              isDarkMode={false}
+              toggleDarkMode={() => {}}
+              currentPath="/ui/hub/"
+            />
+          </>
         )}
 
         <div className={isEmbedded ? "w-full p-6" : "w-full px-8 py-12"}>
