@@ -638,7 +638,7 @@ else:
     )
 
 ### CUSTOM BRANDING [ENTERPRISE FEATURE] ###
-_title = os.getenv("DOCS_TITLE", "LLM API") if premium_user else "LLM API"
+_title = os.getenv("DOCS_TITLE", "Ameritas AI API") if premium_user else "Ameritas AI API"
 _description = os.getenv("DOCS_DESCRIPTION", "") if premium_user else ""
 
 
