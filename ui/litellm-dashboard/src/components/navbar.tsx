@@ -122,6 +122,13 @@ const Navbar: React.FC<NavbarProps> = ({
             {isPublicPage ? (
               <>
                 <a
+                  href="/ui/hub/"
+                  className="text-sm font-medium transition-colors"
+                  style={{ color: "#377dd0" }}
+                >
+                  Home
+                </a>
+                <a
                   href="/docs"
                   className="text-sm font-medium transition-colors"
                   style={{ color: "#377dd0" }}
