@@ -98,7 +98,7 @@ describe("Request Viewer", () => {
     expect(screen.getByText(TRUNCATED_REQUEST_ID)).toBeInTheDocument();
   });
 
-  it("should display LiteLLM Overhead when litellm_overhead_time_ms is present in metadata", () => {
+  it("should display Proxy Overhead when litellm_overhead_time_ms is present in metadata", () => {
     render(
       <RequestViewer
         row={createRow({
@@ -114,14 +114,14 @@ describe("Request Viewer", () => {
       />,
     );
 
-    expect(screen.getByText("LiteLLM Overhead:")).toBeInTheDocument();
+    expect(screen.getByText("Proxy Overhead:")).toBeInTheDocument();
     expect(screen.getByText("150 ms")).toBeInTheDocument();
   });
 
-  it("should not display LiteLLM Overhead when litellm_overhead_time_ms is not present in metadata", () => {
+  it("should not display Proxy Overhead when litellm_overhead_time_ms is not present in metadata", () => {
     render(<RequestViewer row={createRow()} />);
 
-    expect(screen.queryByText("LiteLLM Overhead:")).not.toBeInTheDocument();
+    expect(screen.queryByText("Proxy Overhead:")).not.toBeInTheDocument();
   });
 });
 
