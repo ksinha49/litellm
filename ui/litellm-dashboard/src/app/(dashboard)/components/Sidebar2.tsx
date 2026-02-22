@@ -22,6 +22,7 @@ import {
   AuditOutlined,
   RocketOutlined,
   ThunderboltOutlined,
+  DashboardOutlined,
 } from "@ant-design/icons";
 // import {
 //   all_admin_roles,
@@ -96,6 +97,8 @@ const routeFor = (slug: string): string => {
       return "organizations";
     case "applications":
       return "applications";
+    case "analytics":
+      return "analytics";
     case "ai-services":
       return "ai-services";
     case "users":
@@ -180,6 +183,13 @@ const menuItems: MenuItemCfg[] = [
     label: "Usage",
     icon: <BarChartOutlined style={{ fontSize: 18 }} />,
     roles: [...all_admin_roles, ...internalUserRoles],
+  },
+  {
+    key: "31",
+    page: "analytics",
+    label: "AI Analytics",
+    icon: <DashboardOutlined style={{ fontSize: 18 }} />,
+    roles: all_admin_roles,
   },
   { key: "6", page: "teams", label: "Teams", icon: <TeamOutlined style={{ fontSize: 18 }} /> },
   {

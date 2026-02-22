@@ -1148,6 +1148,31 @@ const PublicModelHub: React.FC<PublicModelHubProps> = ({ accessToken, isEmbedded
                       View API Docs
                     </a>
                     <a
+                      href="/ui/analytics"
+                      className="text-sm font-medium px-6 py-2 transition-all"
+                      style={{
+                        border: "2px solid rgba(255,255,255,0.8)",
+                        color: "#ffffff",
+                        borderRadius: "9999px",
+                        fontFamily: "'Source Sans Pro', 'Helvetica Neue', Arial, sans-serif",
+                        textDecoration: "none",
+                        backdropFilter: "blur(4px)",
+                        transition: "all 0.3s ease",
+                      }}
+                      onMouseEnter={e => {
+                        (e.currentTarget as HTMLAnchorElement).style.backgroundColor = "#ffffff";
+                        (e.currentTarget as HTMLAnchorElement).style.color = "#0758ac";
+                        (e.currentTarget as HTMLAnchorElement).style.borderColor = "#ffffff";
+                      }}
+                      onMouseLeave={e => {
+                        (e.currentTarget as HTMLAnchorElement).style.backgroundColor = "transparent";
+                        (e.currentTarget as HTMLAnchorElement).style.color = "#ffffff";
+                        (e.currentTarget as HTMLAnchorElement).style.borderColor = "rgba(255,255,255,0.8)";
+                      }}
+                    >
+                      AI Analytics
+                    </a>
+                    <a
                       href="/ui"
                       className="text-sm font-medium px-6 py-2 transition-all"
                       style={{

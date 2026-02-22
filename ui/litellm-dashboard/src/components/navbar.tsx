@@ -129,6 +129,13 @@ const Navbar: React.FC<NavbarProps> = ({
                   API Docs
                 </a>
                 <a
+                  href="/ui/analytics"
+                  className="text-sm font-medium transition-colors"
+                  style={{ color: "#377dd0" }}
+                >
+                  Analytics
+                </a>
+                <a
                   href="/ui"
                   className="text-sm font-medium px-4 py-2 transition-colors"
                   style={{
