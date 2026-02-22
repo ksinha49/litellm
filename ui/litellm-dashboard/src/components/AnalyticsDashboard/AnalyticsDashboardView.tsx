@@ -229,13 +229,15 @@ const AnalyticsDashboardView: React.FC<AnalyticsDashboardViewProps> = ({
         )}
       </ExpandableChartCard>
 
-      {/* Provider Spend + Team Spend */}
+      {/* Provider Spend — full width */}
+      <SpendByProvider
+        loading={isLoading}
+        isDateChanging={isDateChanging}
+        providerSpend={providerSpend}
+      />
+
+      {/* Team Spend + Top Models */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <SpendByProvider
-          loading={isLoading}
-          isDateChanging={isDateChanging}
-          providerSpend={providerSpend}
-        />
         <ExpandableChartCard title="Team Spend Breakdown">
           {(expanded) => (
             <TeamSpendChart
@@ -245,10 +247,6 @@ const AnalyticsDashboardView: React.FC<AnalyticsDashboardViewProps> = ({
             />
           )}
         </ExpandableChartCard>
-      </div>
-
-      {/* Top Models + Cache Performance */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <ExpandableChartCard title="Top Models by Spend">
           {(expanded) => (
             <TopModelsChart
@@ -258,16 +256,18 @@ const AnalyticsDashboardView: React.FC<AnalyticsDashboardViewProps> = ({
             />
           )}
         </ExpandableChartCard>
-        <ExpandableChartCard title="Cache Performance">
-          {(expanded) => (
-            <CachePerformanceChart
-              loading={isLoading}
-              data={cacheActivity}
-              expanded={expanded}
-            />
-          )}
-        </ExpandableChartCard>
       </div>
+
+      {/* Cache Performance */}
+      <ExpandableChartCard title="Cache Performance">
+        {(expanded) => (
+          <CachePerformanceChart
+            loading={isLoading}
+            data={cacheActivity}
+            expanded={expanded}
+          />
+        )}
+      </ExpandableChartCard>
 
       {/* Application Inventory */}
       <ExpandableChartCard title="Application Inventory">
