@@ -11,13 +11,13 @@ interface Pattern {
   name: string;
   display_name?: string;
   pattern?: string;
-  action: "BLOCK" | "MASK";
+  action: "BLOCK" | "MASK" | "MONITOR";
 }
 
 interface BlockedWord {
   id: string;
   keyword: string;
-  action: "BLOCK" | "MASK";
+  action: "BLOCK" | "MASK" | "MONITOR";
   description?: string;
 }
 
@@ -25,7 +25,7 @@ interface SelectedContentCategory {
   id: string;
   category: string;
   display_name: string;
-  action: "BLOCK" | "MASK";
+  action: "BLOCK" | "MASK" | "MONITOR";
   severity_threshold: "high" | "medium" | "low";
 }
 
@@ -118,7 +118,7 @@ const ContentFilterManager: React.FC<ContentFilterManagerProps> = ({
           id: `category-${index}`,
           category: c.category,
           display_name: meta?.display_name ?? c.category,
-          action: (c.action || "BLOCK") as "BLOCK" | "MASK",
+          action: (c.action || "BLOCK") as "BLOCK" | "MASK" | "MONITOR",
           severity_threshold: (c.severity_threshold || "medium") as "high" | "medium" | "low",
         };
       });

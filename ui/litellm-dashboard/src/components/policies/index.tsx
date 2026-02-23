@@ -434,6 +434,7 @@ const PoliciesPanel: React.FC<PoliciesPanelProps> = ({
                 accessToken={accessToken}
                 isAdmin={isAdmin}
                 getPolicy={getPolicyInfo}
+                availableGuardrails={guardrailsList}
               />
             ) : (
               <PolicyTable

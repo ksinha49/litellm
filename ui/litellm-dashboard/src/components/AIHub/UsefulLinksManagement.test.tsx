@@ -69,6 +69,30 @@ describe("UsefulLinksManagement", () => {
     expect(mockedNotifications.success).toHaveBeenCalledWith("Link added successfully");
   });
 
+  it("should add a new link with description", async () => {
+    const user = userEvent.setup();
+    render(<UsefulLinksManagement accessToken="token" userRole="Admin" />);
+
+    const displayNameInput = await screen.findByPlaceholderText("Friendly name");
+    const urlInput = screen.getByPlaceholderText("https://example.com");
+    const descriptionInput = screen.getByPlaceholderText("Brief description");
+
+    await user.type(displayNameInput, "API Docs");
+    await user.type(urlInput, "https://api.example.com");
+    await user.type(descriptionInput, "Full API reference documentation");
+    await user.click(screen.getByRole("button", { name: /add link/i }));
+
+    await waitFor(() =>
+      expect(mockedUpdateUsefulLinksCall).toHaveBeenCalledWith("token", {
+        "API Docs": { url: "https://api.example.com", index: 0, description: "Full API reference documentation" },
+      }),
+    );
+
+    expect(await screen.findByText("API Docs")).toBeInTheDocument();
+    expect(screen.getByText("Full API reference documentation")).toBeInTheDocument();
+    expect(mockedNotifications.success).toHaveBeenCalledWith("Link added successfully");
+  });
+
   it("should rearrange links and save the new order", async () => {
     const user = userEvent.setup();
     mockedGetPublicModelHubInfo.mockResolvedValue({
@@ -229,6 +253,22 @@ describe("UsefulLinksManagement", () => {
     const linksAfter = screen.getAllByText(/First Link|Second Link/);
     expect(linksAfter[0]).toHaveTextContent("First Link");
     expect(linksAfter[1]).toHaveTextContent("Second Link");
+  });
+
+  it("should display description from loaded links", async () => {
+    mockedGetPublicModelHubInfo.mockResolvedValue({
+      docs_title: "Docs",
+      custom_docs_description: null,
+      litellm_version: "1.0.0",
+      useful_links: {
+        "Test Link": { url: "https://test.example.com", index: 0, description: "A test link description" },
+      },
+    });
+
+    render(<UsefulLinksManagement accessToken="token" userRole="Admin" />);
+
+    await waitFor(() => expect(screen.getByText("Test Link")).toBeInTheDocument());
+    expect(screen.getByText("A test link description")).toBeInTheDocument();
   });
 
   it("should expand and collapse the component", async () => {

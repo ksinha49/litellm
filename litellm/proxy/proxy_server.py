@@ -637,26 +637,9 @@ else:
         global_max_parallel_request_retry_timeout_env
     )
 
-ui_link = f"{server_root_path}/ui"
-fallback_login_link = f"{server_root_path}/fallback/login"
-model_hub_link = f"{server_root_path}/ui/hub"
-ui_message = f"👉 [```LiteLLM Admin Panel on /ui```]({ui_link}). Create, Edit Keys with SSO. Having issues? Try [```Fallback Login```]({fallback_login_link})"
-ui_message += "\n\n💸 [```LiteLLM Model Cost Map```](https://models.litellm.ai/)."
-
-ui_message += f"\n\n🔎 [```Ameritas Model Hub```]({model_hub_link}). See available models on the proxy. [**Docs**](https://docs.litellm.ai/docs/proxy/ai_hub)"
-
-custom_swagger_message = "[**Customize Swagger Docs**](https://docs.litellm.ai/docs/proxy/enterprise#swagger-docs---custom-routes--branding)"
-
 ### CUSTOM BRANDING [ENTERPRISE FEATURE] ###
-_title = os.getenv("DOCS_TITLE", "Ameritas LLM API") if premium_user else "Ameritas LLM API"
-_description = (
-    os.getenv(
-        "DOCS_DESCRIPTION",
-        f"Enterprise Edition \n\nProxy Server to call 100+ LLMs in the OpenAI format. {custom_swagger_message}\n\n{ui_message}",
-    )
-    if premium_user
-    else f"Proxy Server to call 100+ LLMs in the OpenAI format. {custom_swagger_message}\n\n{ui_message}"
-)
+_title = os.getenv("DOCS_TITLE", "Ameritas AI API") if premium_user else "Ameritas AI API"
+_description = os.getenv("DOCS_DESCRIPTION", "") if premium_user else ""
 
 
 def cleanup_router_config_variables():
@@ -1390,6 +1373,8 @@ app.add_middleware(PrometheusAuthMiddleware)
 
 
 def mount_swagger_ui():
+    from fastapi.responses import HTMLResponse
+
     swagger_directory = os.path.join(current_dir, "swagger")
     swagger_path = "/" if server_root_path is None else server_root_path
     if not swagger_path.endswith("/"):
@@ -1398,14 +1383,93 @@ def mount_swagger_ui():
 
     app.mount("/swagger", StaticFiles(directory=swagger_directory), name="swagger")
 
+    _navbar_css = """
+    .swagger-ui .information-container { display: none; }
+    .docs-accent-bar { height: 3px; background-color: #D3222A; width: 100%; }
+    .docs-navbar {
+        position: sticky; top: 0; z-index: 1000;
+        background: #fff; border-bottom: 1px solid #e5e7eb;
+        height: 56px; display: flex; align-items: center;
+        padding: 0 24px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    }
+    .docs-navbar-inner {
+        display: flex; align-items: center; justify-content: space-between;
+        width: 100%; max-width: 100%;
+    }
+    .docs-navbar-logo { height: 32px; }
+    .docs-navbar-links { display: flex; align-items: center; gap: 24px; }
+    .docs-navbar-link {
+        color: #0058DB; font-size: 14px; font-weight: 500;
+        text-decoration: none; padding: 16px 0;
+    }
+    .docs-navbar-link:hover { opacity: 0.8; }
+    .docs-navbar-link.active {
+        font-weight: 700; border-bottom: 2px solid #0058DB; color: #0058DB;
+    }
+    .docs-navbar-console {
+        background-color: #0058DB; color: #fff; font-size: 14px; font-weight: 600;
+        padding: 8px 16px; border-radius: 6px; text-decoration: none;
+        display: inline-flex; align-items: center; gap: 6px;
+    }
+    .docs-navbar-console:hover { opacity: 0.9; }
+    .docs-info-bar {
+        display: flex; align-items: center; gap: 12px;
+        padding: 10px 24px; background: #f9fafb; border-bottom: 1px solid #e5e7eb;
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        font-size: 13px; color: #374151;
+    }
+    .docs-info-bar .docs-api-title { font-weight: 600; color: #111827; }
+    .docs-info-bar .docs-version-badge {
+        background: #dbeafe; color: #1d4ed8; font-size: 11px; font-weight: 600;
+        padding: 2px 8px; border-radius: 9999px;
+    }
+    .docs-info-bar .docs-oas-badge {
+        background: #e5e7eb; color: #374151; font-size: 11px; font-weight: 500;
+        padding: 2px 8px; border-radius: 9999px;
+    }
+    .docs-info-bar .docs-spec-link {
+        margin-left: auto; color: #0058DB; text-decoration: none; font-weight: 500;
+    }
+    .docs-info-bar .docs-spec-link:hover { text-decoration: underline; }
+    """
+
+    _navbar_html = f"""
+    <div class="docs-accent-bar"></div>
+    <nav class="docs-navbar">
+      <div class="docs-navbar-inner">
+        <a href="/ui/hub/">
+          <img class="docs-navbar-logo" src="/ui/assets/logos/ameritas_logo.png" alt="Logo" />
+        </a>
+        <div class="docs-navbar-links">
+          <a class="docs-navbar-link" href="/ui/hub/">Home</a>
+          <a class="docs-navbar-link active" href="/docs">API Docs</a>
+          <a class="docs-navbar-link" href="/ui/analytics">Analytics</a>
+          <a class="docs-navbar-console" href="/ui">Console &rarr;</a>
+        </div>
+      </div>
+    </nav>
+    <div class="docs-info-bar">
+      <span class="docs-api-title">{_title}</span>
+      <span class="docs-version-badge">v{version}</span>
+      <span class="docs-oas-badge">OAS 3.1</span>
+      <a class="docs-spec-link" href="/openapi.json" target="_blank">/openapi.json</a>
+    </div>
+    """
+
     def swagger_monkey_patch(*args, **kwargs):
-        return get_swagger_ui_html(
+        resp = get_swagger_ui_html(
             *args,
             **kwargs,
             swagger_js_url=f"{custom_root_path_swagger_path}/swagger-ui-bundle.js",
             swagger_css_url=f"{custom_root_path_swagger_path}/swagger-ui.css",
             swagger_favicon_url=f"{custom_root_path_swagger_path}/favicon.png",
         )
+        html = resp.body.decode("utf-8")
+        # Inject CSS into <head>
+        html = html.replace("</head>", f"<style>{_navbar_css}</style></head>", 1)
+        # Inject navbar after <body>
+        html = html.replace("<body>", f"<body>{_navbar_html}", 1)
+        return HTMLResponse(content=html)
 
     applications.get_swagger_ui_html = swagger_monkey_patch
 

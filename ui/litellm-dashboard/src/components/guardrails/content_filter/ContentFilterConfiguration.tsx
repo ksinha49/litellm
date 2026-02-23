@@ -25,13 +25,13 @@ interface Pattern {
   name: string;
   display_name?: string;
   pattern?: string;
-  action: "BLOCK" | "MASK";
+  action: "BLOCK" | "MASK" | "MONITOR";
 }
 
 interface BlockedWord {
   id: string;
   keyword: string;
-  action: "BLOCK" | "MASK";
+  action: "BLOCK" | "MASK" | "MONITOR";
   description?: string;
 }
 
@@ -46,7 +46,7 @@ interface SelectedContentCategory {
   id: string;
   category: string;
   display_name: string;
-  action: "BLOCK" | "MASK";
+  action: "BLOCK" | "MASK" | "MONITOR";
   severity_threshold: "high" | "medium" | "low";
 }
 
@@ -57,7 +57,7 @@ interface ContentFilterConfigurationProps {
   blockedWords: BlockedWord[];
   onPatternAdd: (pattern: Pattern) => void;
   onPatternRemove: (id: string) => void;
-  onPatternActionChange: (id: string, action: "BLOCK" | "MASK") => void;
+  onPatternActionChange: (id: string, action: "BLOCK" | "MASK" | "MONITOR") => void;
   onBlockedWordAdd: (word: BlockedWord) => void;
   onBlockedWordRemove: (id: string) => void;
   onBlockedWordUpdate: (id: string, field: string, value: any) => void;
@@ -100,12 +100,12 @@ const ContentFilterConfiguration: React.FC<ContentFilterConfigurationProps> = ({
   const [customPatternModalVisible, setCustomPatternModalVisible] = useState(false);
 
   const [selectedPatternName, setSelectedPatternName] = useState<string>("");
-  const [patternAction, setPatternAction] = useState<"BLOCK" | "MASK">("BLOCK");
+  const [patternAction, setPatternAction] = useState<"BLOCK" | "MASK" | "MONITOR">("BLOCK");
   const [customPatternName, setCustomPatternName] = useState<string>("");
   const [customPatternRegex, setCustomPatternRegex] = useState<string>("");
-  const [customPatternAction, setCustomPatternAction] = useState<"BLOCK" | "MASK">("BLOCK");
+  const [customPatternAction, setCustomPatternAction] = useState<"BLOCK" | "MASK" | "MONITOR">("BLOCK");
   const [newKeyword, setNewKeyword] = useState<string>("");
-  const [newKeywordAction, setNewKeywordAction] = useState<"BLOCK" | "MASK">("BLOCK");
+  const [newKeywordAction, setNewKeywordAction] = useState<"BLOCK" | "MASK" | "MONITOR">("BLOCK");
   const [newKeywordDescription, setNewKeywordDescription] = useState<string>("");
   const [uploadValidating, setUploadValidating] = useState(false);
 
@@ -294,7 +294,7 @@ const ContentFilterConfiguration: React.FC<ContentFilterConfigurationProps> = ({
         selectedPatternName={selectedPatternName}
         patternAction={patternAction}
         onPatternNameChange={setSelectedPatternName}
-        onActionChange={(value) => setPatternAction(value as "BLOCK" | "MASK")}
+        onActionChange={(value) => setPatternAction(value as "BLOCK" | "MASK" | "MONITOR")}
         onAdd={handleAddPrebuiltPattern}
         onCancel={() => {
           setPatternModalVisible(false);
@@ -310,7 +310,7 @@ const ContentFilterConfiguration: React.FC<ContentFilterConfigurationProps> = ({
         patternAction={customPatternAction}
         onNameChange={setCustomPatternName}
         onRegexChange={setCustomPatternRegex}
-        onActionChange={(value) => setCustomPatternAction(value as "BLOCK" | "MASK")}
+        onActionChange={(value) => setCustomPatternAction(value as "BLOCK" | "MASK" | "MONITOR")}
         onAdd={handleAddCustomPattern}
         onCancel={() => {
           setCustomPatternModalVisible(false);
@@ -326,7 +326,7 @@ const ContentFilterConfiguration: React.FC<ContentFilterConfigurationProps> = ({
         action={newKeywordAction}
         description={newKeywordDescription}
         onKeywordChange={setNewKeyword}
-        onActionChange={(value) => setNewKeywordAction(value as "BLOCK" | "MASK")}
+        onActionChange={(value) => setNewKeywordAction(value as "BLOCK" | "MASK" | "MONITOR")}
         onDescriptionChange={setNewKeywordDescription}
         onAdd={handleAddKeyword}
         onCancel={() => {

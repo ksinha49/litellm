@@ -8,10 +8,10 @@ interface CustomPatternModalProps {
   visible: boolean;
   patternName: string;
   patternRegex: string;
-  patternAction: "BLOCK" | "MASK";
+  patternAction: "BLOCK" | "MASK" | "MONITOR";
   onNameChange: (name: string) => void;
   onRegexChange: (regex: string) => void;
-  onActionChange: (action: "BLOCK" | "MASK") => void;
+  onActionChange: (action: "BLOCK" | "MASK" | "MONITOR") => void;
   onAdd: () => void;
   onCancel: () => void;
 }
@@ -71,6 +71,7 @@ const CustomPatternModal: React.FC<CustomPatternModalProps> = ({
           >
             <Option value="BLOCK">Block</Option>
             <Option value="MASK">Mask</Option>
+            <Option value="MONITOR">Monitor</Option>
           </Select>
         </div>
       </Space>

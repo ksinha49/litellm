@@ -17,7 +17,7 @@ interface SelectedCategory {
   id: string;
   category: string;
   display_name: string;
-  action: "BLOCK" | "MASK";
+  action: "BLOCK" | "MASK" | "MONITOR";
   severity_threshold: "high" | "medium" | "low";
 }
 
@@ -72,7 +72,7 @@ const ContentCategoryConfiguration: React.FC<ContentCategoryConfigurationProps> 
       id: `category-${Date.now()}`,
       category: category.name,
       display_name: category.display_name,
-      action: category.default_action as "BLOCK" | "MASK",
+      action: category.default_action as "BLOCK" | "MASK" | "MONITOR",
       severity_threshold: "medium",
     });
 
@@ -196,7 +196,10 @@ const ContentCategoryConfiguration: React.FC<ContentCategoryConfigurationProps> 
             <Tag color="red">BLOCK</Tag>
           </Option>
           <Option value="MASK">
-            <Tag color="orange">MASK</Tag>
+            <Tag color="blue">MASK</Tag>
+          </Option>
+          <Option value="MONITOR">
+            <Tag color="orange">MONITOR</Tag>
           </Option>
         </Select>
       ),

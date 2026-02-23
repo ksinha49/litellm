@@ -562,8 +562,8 @@ export interface PublicModelHubInfo {
   docs_title: string;
   custom_docs_description: string | null;
   litellm_version: string;
-  // Supports both old format (Record<string, string>) and new format (Record<string, {url: string, index: number}>)
-  useful_links: Record<string, string | { url: string; index: number }>;
+  // Supports both old format (Record<string, string>) and new format (Record<string, {url: string, index: number, description?: string}>)
+  useful_links: Record<string, string | { url: string; index: number; description?: string }>;
 }
 
 export interface LiteLLMWellKnownUiConfig {
@@ -2585,7 +2585,7 @@ export const deleteAllowedIP = async (accessToken: string, ip: string) => {
 
 export const updateUsefulLinksCall = async (
   accessToken: string,
-  useful_links: Record<string, string | { url: string; index: number }>,
+  useful_links: Record<string, string | { url: string; index: number; description?: string }>,
 ) => {
   try {
     const url = proxyBaseUrl ? `${proxyBaseUrl}/model_hub/update_useful_links` : `/model_hub/update_useful_links`;

@@ -10,13 +10,13 @@ interface Pattern {
   name: string;
   display_name?: string;
   pattern?: string;
-  action: "BLOCK" | "MASK";
+  action: "BLOCK" | "MASK" | "MONITOR";
 }
 
 interface BlockedWord {
   id: string;
   keyword: string;
-  action: "BLOCK" | "MASK";
+  action: "BLOCK" | "MASK" | "MONITOR";
   description?: string;
 }
 
@@ -24,7 +24,7 @@ interface ContentCategory {
   id: string;
   category: string;
   display_name: string;
-  action: "BLOCK" | "MASK";
+  action: "BLOCK" | "MASK" | "MONITOR";
   severity_threshold: "high" | "medium" | "low";
 }
 
@@ -33,11 +33,11 @@ interface ContentFilterDisplayProps {
   blockedWords: BlockedWord[];
   categories?: ContentCategory[];
   readOnly?: boolean;
-  onPatternActionChange?: (id: string, action: "BLOCK" | "MASK") => void;
+  onPatternActionChange?: (id: string, action: "BLOCK" | "MASK" | "MONITOR") => void;
   onPatternRemove?: (id: string) => void;
   onBlockedWordUpdate?: (id: string, field: string, value: any) => void;
   onBlockedWordRemove?: (id: string) => void;
-  onCategoryActionChange?: (id: string, action: "BLOCK" | "MASK") => void;
+  onCategoryActionChange?: (id: string, action: "BLOCK" | "MASK" | "MONITOR") => void;
   onCategorySeverityChange?: (id: string, severity: "high" | "medium" | "low") => void;
   onCategoryRemove?: (id: string) => void;
 }

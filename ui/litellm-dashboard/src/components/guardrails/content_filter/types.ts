@@ -15,13 +15,13 @@ export interface Pattern {
   name: string;
   display_name?: string;
   pattern?: string;
-  action: "BLOCK" | "MASK";
+  action: "BLOCK" | "MASK" | "MONITOR";
 }
 
 export interface BlockedWord {
   id: string;
   keyword: string;
-  action: "BLOCK" | "MASK";
+  action: "BLOCK" | "MASK" | "MONITOR";
   description?: string;
 }
 
@@ -39,7 +39,7 @@ export interface ContentFilterConfigurationProps {
   blockedWordsFile?: string;
   onPatternAdd: (pattern: Pattern) => void;
   onPatternRemove: (id: string) => void;
-  onPatternActionChange: (id: string, action: "BLOCK" | "MASK") => void;
+  onPatternActionChange: (id: string, action: "BLOCK" | "MASK" | "MONITOR") => void;
   onBlockedWordAdd: (word: BlockedWord) => void;
   onBlockedWordRemove: (id: string) => void;
   onBlockedWordUpdate: (id: string, field: string, value: any) => void;

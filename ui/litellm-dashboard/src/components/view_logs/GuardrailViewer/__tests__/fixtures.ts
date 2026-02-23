@@ -19,6 +19,15 @@ export interface GuardrailEntity {
   recognition_metadata: RecognitionMetadata;
 }
 
+export interface MatchDetail {
+  type: string;
+  detection_method?: string;
+  action_taken?: string;
+  snippet?: string;
+  category?: string;
+  position?: number;
+}
+
 export interface GuardrailInformation {
   duration: number;
   end_time: number;
@@ -26,9 +35,18 @@ export interface GuardrailInformation {
   guardrail_mode: string;
   guardrail_name: string;
   guardrail_status: string;
-  guardrail_response: GuardrailEntity[] | BedrockGuardrailResponse;
+  guardrail_response: GuardrailEntity[] | BedrockGuardrailResponse | any;
   masked_entity_count: Record<string, number>;
   guardrail_provider?: string;
+  guardrail_id?: string;
+  policy_template?: string;
+  detection_method?: string;
+  confidence_score?: number;
+  classification?: Record<string, any>;
+  match_details?: MatchDetail[];
+  patterns_checked?: number;
+  alert_recipients?: string[];
+  risk_score?: number;
 }
 
 // ===== Builders =====
@@ -102,10 +120,10 @@ export const makeBedrockResponse = (overrides: Partial<BedrockGuardrailResponse>
 
 export const makeGuardrailInformation = (overrides: Partial<GuardrailInformation> = {}): GuardrailInformation => ({
   guardrail_name: "pii-rail",
-  guardrail_mode: "post",
+  guardrail_mode: "post_call",
   guardrail_status: "success",
   start_time: 1_700_000_000,
-  end_time: 1_700_000_123,
+  end_time: 1_700_000_000.123,
   duration: 0.123456,
   guardrail_response: [makeEntity()],
   masked_entity_count: makeMaskedCounts(),

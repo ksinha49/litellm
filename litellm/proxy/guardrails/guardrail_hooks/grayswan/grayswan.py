@@ -488,6 +488,9 @@ class GraySwanGuardrail(CustomGuardrail):
             verbose_proxy_logger.info(
                 "Gray Swan Guardrail: Monitoring mode - allowing flagged content"
             )
+            # Set status override so _process_response logs guardrail_monitored
+            _metadata = request_data.get("metadata") or request_data.get("litellm_metadata") or {}
+            _metadata["_guardrail_status_override"] = "guardrail_monitored"
             return inputs
         elif self.on_flagged_action == "passthrough":
             # Replace content with violation message

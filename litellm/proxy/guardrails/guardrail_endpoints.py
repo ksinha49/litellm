@@ -761,7 +761,7 @@ async def get_guardrail_ui_settings():
         content_filter_settings={
             "prebuilt_patterns": get_pattern_metadata(),
             "pattern_categories": list(PATTERN_CATEGORIES.keys()),
-            "supported_actions": ["BLOCK", "MASK"],
+            "supported_actions": ["BLOCK", "MASK", "MONITOR"],
             "content_categories": get_available_content_categories(),
         },
     )

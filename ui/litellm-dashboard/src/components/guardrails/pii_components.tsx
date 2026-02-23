@@ -17,6 +17,8 @@ export const getActionIcon = (action: string) => {
       return <EyeInvisibleOutlined style={{ marginRight: 4 }} />;
     case "BLOCK":
       return <StopOutlined style={{ marginRight: 4 }} />;
+    case "MONITOR":
+      return <FilterOutlined style={{ marginRight: 4 }} />;
     default:
       return null;
   }
@@ -91,7 +93,7 @@ export const QuickActions: React.FC<QuickActionsProps> = ({ onSelectAll, onUnsel
           Unselect All
         </Button>
       </div>
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-3 gap-4">
         <Button
           color="primary"
           variant="outlined"
@@ -111,6 +113,15 @@ export const QuickActions: React.FC<QuickActionsProps> = ({ onSelectAll, onUnsel
           icon={<StopOutlined />}
         >
           Select All & Block
+        </Button>
+        <Button
+          variant="outlined"
+          onClick={() => onSelectAll("MONITOR")}
+          className="h-10"
+          block
+          icon={<FilterOutlined />}
+        >
+          Select All & Monitor
         </Button>
       </div>
     </div>

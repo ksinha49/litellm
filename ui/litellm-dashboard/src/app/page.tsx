@@ -38,6 +38,7 @@ import UserDashboard from "@/components/user_dashboard";
 import { AccessGroupsPage } from "@/components/AccessGroups/AccessGroupsPage";
 import VectorStoreManagement from "@/components/vector_store_management";
 import ApplicationsView from "@/app/(dashboard)/applications/ApplicationsView";
+import AnalyticsDashboardView from "@/components/AnalyticsDashboard/AnalyticsDashboardView";
 import { applicationConfigCall, ApplicationConfig } from "@/components/networking";
 import SpendLogsTable from "@/components/view_logs";
 import ViewUserDashboard from "@/components/view_users";
@@ -517,6 +518,8 @@ function CreateKeyPageContent() {
                       userRole={userRole}
                       config={{ departments: [], lines_of_business: [] }}
                     />
+                  ) : page == "analytics" ? (
+                    <AnalyticsDashboardView accessToken={accessToken} />
                   ) : page == "access-groups" ? (
                     <AccessGroupsPage />
                   ) : page == "vector-stores" ? (

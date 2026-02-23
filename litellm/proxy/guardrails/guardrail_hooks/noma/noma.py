@@ -204,6 +204,10 @@ class NomaGuardrail(CustomGuardrail):
         # Determine guardrail status based on response
         guardrail_status = self._determine_guardrail_status(response_json)
 
+        # In monitor mode, report monitored instead of intervened
+        if self.monitor_mode and guardrail_status == "guardrail_intervened":
+            guardrail_status = "guardrail_monitored"
+
         # Always log guardrail information for consistency
         self.add_standard_logging_guardrail_information_to_request_data(
             guardrail_provider="noma",
@@ -285,6 +289,10 @@ class NomaGuardrail(CustomGuardrail):
 
         # Determine guardrail status based on response
         guardrail_status = self._determine_guardrail_status(response_json)
+
+        # In monitor mode, report monitored instead of intervened
+        if self.monitor_mode and guardrail_status == "guardrail_intervened":
+            guardrail_status = "guardrail_monitored"
 
         # Always log guardrail information for consistency
         self.add_standard_logging_guardrail_information_to_request_data(

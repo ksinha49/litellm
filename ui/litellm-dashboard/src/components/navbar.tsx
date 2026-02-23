@@ -30,6 +30,7 @@ interface NavbarProps {
   onToggleSidebar?: () => void;
   isDarkMode: boolean;
   toggleDarkMode: () => void;
+  currentPath?: string;
 }
 
 const Navbar: React.FC<NavbarProps> = ({
@@ -44,7 +45,8 @@ const Navbar: React.FC<NavbarProps> = ({
   sidebarCollapsed = false,
   onToggleSidebar,
   isDarkMode,
-  toggleDarkMode
+  toggleDarkMode,
+  currentPath,
 }) => {
   const baseUrl = getProxyBaseUrl();
   const [logoutUrl, setLogoutUrl] = useState("");
@@ -121,23 +123,38 @@ const Navbar: React.FC<NavbarProps> = ({
           <div className="flex items-center space-x-5 ml-auto">
             {isPublicPage ? (
               <>
-                <a
-                  href="/docs"
-                  className="text-sm font-medium transition-colors"
-                  style={{ color: "#377dd0" }}
-                >
-                  API Docs
-                </a>
+                {[
+                  { href: "/ui/hub/", label: "Home" },
+                  { href: "/docs", label: "API Docs" },
+                  { href: "/ui/analytics", label: "Analytics" },
+                ].map(({ href, label }) => {
+                  const isActive = currentPath === href;
+                  return (
+                    <a
+                      key={href}
+                      href={href}
+                      className="text-sm font-semibold transition-colors"
+                      style={{
+                        color: "#0058DB",
+                        ...(isActive
+                          ? { fontWeight: 700, borderBottom: "2px solid #0058DB", paddingBottom: 2 }
+                          : {}),
+                      }}
+                    >
+                      {label}
+                    </a>
+                  );
+                })}
                 <a
                   href="/ui"
-                  className="text-sm font-medium px-4 py-2 transition-colors"
+                  className="text-sm font-semibold px-4 py-2 transition-colors"
                   style={{
-                    backgroundColor: "#377dd0",
+                    backgroundColor: "#0058DB",
                     color: "#ffffff",
-                    borderRadius: "9999px",
+                    borderRadius: "4px",
                   }}
-                  onMouseEnter={e => { (e.currentTarget as HTMLAnchorElement).style.backgroundColor = "#0758ac"; }}
-                  onMouseLeave={e => { (e.currentTarget as HTMLAnchorElement).style.backgroundColor = "#377dd0"; }}
+                  onMouseEnter={e => { (e.currentTarget as HTMLAnchorElement).style.backgroundColor = "#004D9D"; }}
+                  onMouseLeave={e => { (e.currentTarget as HTMLAnchorElement).style.backgroundColor = "#0058DB"; }}
                 >
                   Console
                 </a>

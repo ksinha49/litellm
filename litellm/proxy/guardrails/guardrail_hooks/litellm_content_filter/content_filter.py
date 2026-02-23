@@ -1079,6 +1079,10 @@ class ContentFilterGuardrail(CustomGuardrail):
             verbose_proxy_logger.warning(
                 f"Conditional match '{matched_phrase}' from {category_name} detected but MASK action not supported for conditional categories"
             )
+        elif action == ContentFilterAction.MONITOR:
+            verbose_proxy_logger.warning(
+                f"MONITOR: {category_name} conditional match '{matched_phrase}' detected (severity: {severity})"
+            )
 
     def _handle_category_keyword_match(
         self,
@@ -1126,6 +1130,10 @@ class ContentFilterGuardrail(CustomGuardrail):
             verbose_proxy_logger.info(
                 f"Masked category keyword '{keyword}' from {category_name} (severity: {severity})"
             )
+        elif action == ContentFilterAction.MONITOR:
+            verbose_proxy_logger.warning(
+                f"MONITOR: {category_name} category keyword '{keyword}' detected (severity: {severity})"
+            )
 
         return text
 
@@ -1160,6 +1168,10 @@ class ContentFilterGuardrail(CustomGuardrail):
             text = self._mask_spans(text, spans, redaction_tag)
             verbose_proxy_logger.info(
                 f"Masked all {pattern_name} matches in content"
+            )
+        elif action == ContentFilterAction.MONITOR:
+            verbose_proxy_logger.warning(
+                f"MONITOR: {pattern_name} pattern detected"
             )
 
         return text
@@ -1208,6 +1220,11 @@ class ContentFilterGuardrail(CustomGuardrail):
                 flags=re.IGNORECASE,
             )
             verbose_proxy_logger.info(f"Masked keyword '{keyword}' in content")
+        elif action == ContentFilterAction.MONITOR:
+            msg = f"MONITOR: keyword '{keyword}' detected"
+            if description:
+                msg += f" ({description})"
+            verbose_proxy_logger.warning(msg)
 
         return text
 
@@ -1574,6 +1591,12 @@ class ContentFilterGuardrail(CustomGuardrail):
 
             # Count masked entities by type
             self._count_masked_entities(detections, masked_entity_count)
+
+            # If we have detections but no BLOCK raised and no MASK entities,
+            # check if any detections were MONITOR-only
+            if detections and status == "success" and not masked_entity_count:
+                if any(d.get("action") == "MONITOR" for d in detections):
+                    status = "guardrail_monitored"
 
             return inputs
         except HTTPException:

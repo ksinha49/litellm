@@ -277,7 +277,7 @@ const AddGuardrailForm: React.FC<AddGuardrailFormProps> = ({ visible, onClose, a
         id: `category-${Date.now()}`,
         category: category.name,
         display_name: category.display_name,
-        action: category.default_action as "BLOCK" | "MASK",
+        action: category.default_action as "BLOCK" | "MASK" | "MONITOR",
         severity_threshold: "medium",
       },
     ]);

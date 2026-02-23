@@ -8,6 +8,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { ModelDataTable } from "./model_dashboard/table";
 import NotificationsManager from "./molecules/notifications_manager";
 import Navbar from "./navbar";
+import ClaudeCodeMarketplaceTab from "./AIHub/ClaudeCodeMarketplaceTab";
 import {
   agentHubPublicModelsCall,
   getPublicModelHubInfo,
@@ -112,7 +113,7 @@ const PublicModelHub: React.FC<PublicModelHubProps> = ({ accessToken, isEmbedded
   const [pageTitle, setPageTitle] = useState<string>(`${appName} Gateway`);
   const [customDocsDescription, setCustomDocsDescription] = useState<string>(defaultDocsDescription);
   const [litellmVersion, setLitellmVersion] = useState<string>("");
-  const [usefulLinks, setUsefulLinks] = useState<Record<string, string | { url: string; index: number }>>({});
+  const [usefulLinks, setUsefulLinks] = useState<Record<string, string | { url: string; index: number; description?: string }>>({});
   const [loading, setLoading] = useState<boolean>(true);
   const [agentLoading, setAgentLoading] = useState<boolean>(true);
   const [mcpLoading, setMcpLoading] = useState<boolean>(true);
@@ -977,18 +978,22 @@ const PublicModelHub: React.FC<PublicModelHubProps> = ({ accessToken, isEmbedded
       <div className={isEmbedded ? "w-full" : "min-h-screen bg-white"}>
         {/* Navigation - only show when not embedded */}
         {!isEmbedded && (
-          <Navbar
-            userID={null}
-            userEmail={null}
-            userRole={null}
-            premiumUser={false}
-            setProxySettings={setProxySettings}
-            proxySettings={proxySettings}
-            accessToken={accessToken || null}
-            isPublicPage={true}
-            isDarkMode={false}
-            toggleDarkMode={() => {}}
-          />
+          <>
+            <div style={{ height: 3, backgroundColor: "#D3222A", width: "100%" }} />
+            <Navbar
+              userID={null}
+              userEmail={null}
+              userRole={null}
+              premiumUser={false}
+              setProxySettings={setProxySettings}
+              proxySettings={proxySettings}
+              accessToken={accessToken || null}
+              isPublicPage={true}
+              isDarkMode={false}
+              toggleDarkMode={() => {}}
+              currentPath="/ui/hub/"
+            />
+          </>
         )}
 
         <div className={isEmbedded ? "w-full p-6" : "w-full px-8 py-12"}>
@@ -1147,6 +1152,31 @@ const PublicModelHub: React.FC<PublicModelHubProps> = ({ accessToken, isEmbedded
                       View API Docs
                     </a>
                     <a
+                      href="/ui/analytics"
+                      className="text-sm font-medium px-6 py-2 transition-all"
+                      style={{
+                        border: "2px solid rgba(255,255,255,0.8)",
+                        color: "#ffffff",
+                        borderRadius: "9999px",
+                        fontFamily: "'Source Sans Pro', 'Helvetica Neue', Arial, sans-serif",
+                        textDecoration: "none",
+                        backdropFilter: "blur(4px)",
+                        transition: "all 0.3s ease",
+                      }}
+                      onMouseEnter={e => {
+                        (e.currentTarget as HTMLAnchorElement).style.backgroundColor = "#ffffff";
+                        (e.currentTarget as HTMLAnchorElement).style.color = "#0758ac";
+                        (e.currentTarget as HTMLAnchorElement).style.borderColor = "#ffffff";
+                      }}
+                      onMouseLeave={e => {
+                        (e.currentTarget as HTMLAnchorElement).style.backgroundColor = "transparent";
+                        (e.currentTarget as HTMLAnchorElement).style.color = "#ffffff";
+                        (e.currentTarget as HTMLAnchorElement).style.borderColor = "rgba(255,255,255,0.8)";
+                      }}
+                    >
+                      AI Analytics
+                    </a>
+                    <a
                       href="/ui"
                       className="text-sm font-medium px-6 py-2 transition-all"
                       style={{
@@ -1269,19 +1299,20 @@ const PublicModelHub: React.FC<PublicModelHubProps> = ({ accessToken, isEmbedded
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {Object.entries(usefulLinks || {})
                   .map(([title, value]) => {
-                    // Handle both old format (string) and new format ({url, index})
+                    // Handle both old format (string) and new format ({url, index, description})
                     const url = typeof value === "string" ? value : value.url;
                     const index = typeof value === "string" ? 0 : value.index ?? 0;
-                    return { title, url, index };
+                    const description = typeof value === "string" ? undefined : value.description;
+                    return { title, url, index, description };
                   })
                   .sort((a, b) => a.index - b.index)
-                  .map(({ title, url }) => (
+                  .map(({ title, url, description }) => (
                     <button
                       key={title}
                       onClick={() => window.open(url, "_blank")}
-                      className="flex items-center space-x-3 transition-colors p-3 border"
+                      className={`flex ${description ? "flex-col items-start p-4 border rounded-lg" : "items-center space-x-3 p-3 border"} transition-colors`}
                       style={{
-                        borderRadius: "9999px",
+                        borderRadius: description ? "8px" : "9999px",
                         borderColor: "#cccccc",
                         color: "#377dd0",
                         fontFamily: "'Source Sans Pro', 'Helvetica Neue', Arial, sans-serif",
@@ -1289,8 +1320,13 @@ const PublicModelHub: React.FC<PublicModelHubProps> = ({ accessToken, isEmbedded
                       onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.backgroundColor = "#f0f6fc"; }}
                       onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.backgroundColor = "transparent"; }}
                     >
-                      <ExternalLinkIcon className="w-4 h-4" />
-                      <Text className="text-sm font-medium">{title}</Text>
+                      <div className="flex items-center space-x-3">
+                        <ExternalLinkIcon className="w-4 h-4 flex-shrink-0" />
+                        <Text className="text-sm font-medium">{title}</Text>
+                      </div>
+                      {description && (
+                        <Text className="text-xs mt-2 text-left" style={{ color: "#666666" }}>{description}</Text>
+                      )}
                     </button>
                   ))}
               </div>
@@ -1434,8 +1470,7 @@ const PublicModelHub: React.FC<PublicModelHubProps> = ({ accessToken, isEmbedded
               </TabPane>
 
               {/* Agents Tab */}
-              {agentHubData && Array.isArray(agentHubData) && agentHubData.length > 0 && (
-                <TabPane tab="Agent Hub" key="agents">
+              <TabPane tab="Agent Hub" key="agents">
                   <div className="flex justify-between items-center mb-8">
                     <Title className="text-2xl font-semibold text-gray-900">Available Agents</Title>
                   </div>
@@ -1495,11 +1530,9 @@ const PublicModelHub: React.FC<PublicModelHubProps> = ({ accessToken, isEmbedded
                     </Text>
                   </div>
                 </TabPane>
-              )}
 
               {/* MCP Servers Tab */}
-              {mcpHubData && Array.isArray(mcpHubData) && mcpHubData.length > 0 && (
-                <TabPane tab="MCP Hub" key="mcp">
+              <TabPane tab="MCP Hub" key="mcp">
                   <div className="flex justify-between items-center mb-8">
                     <Title className="text-2xl font-semibold text-gray-900">Available MCP Servers</Title>
                   </div>
@@ -1559,7 +1592,11 @@ const PublicModelHub: React.FC<PublicModelHubProps> = ({ accessToken, isEmbedded
                     </Text>
                   </div>
                 </TabPane>
-              )}
+
+              {/* Claude Code Plugin Marketplace Tab */}
+              <TabPane tab="Claude Code Plugin Marketplace" key="marketplace">
+                <ClaudeCodeMarketplaceTab publicPage={true} />
+              </TabPane>
             </Tabs>
           </Card>
         </div>

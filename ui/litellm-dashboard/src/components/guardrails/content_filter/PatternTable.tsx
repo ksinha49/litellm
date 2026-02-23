@@ -11,12 +11,12 @@ interface Pattern {
   name: string;
   display_name?: string;
   pattern?: string;
-  action: "BLOCK" | "MASK";
+  action: "BLOCK" | "MASK" | "MONITOR";
 }
 
 interface PatternTableProps {
   patterns: Pattern[];
-  onActionChange: (id: string, action: "BLOCK" | "MASK") => void;
+  onActionChange: (id: string, action: "BLOCK" | "MASK" | "MONITOR") => void;
   onRemove: (id: string) => void;
 }
 
@@ -57,12 +57,13 @@ const PatternTable: React.FC<PatternTableProps> = ({
       render: (action: string, record: Pattern) => (
         <Select
           value={action}
-          onChange={(value) => onActionChange(record.id, value as "BLOCK" | "MASK")}
+          onChange={(value) => onActionChange(record.id, value as "BLOCK" | "MASK" | "MONITOR")}
           style={{ width: 120 }}
           size="small"
         >
           <Option value="BLOCK">Block</Option>
           <Option value="MASK">Mask</Option>
+          <Option value="MONITOR">Monitor</Option>
         </Select>
       ),
     },

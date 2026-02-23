@@ -2593,7 +2593,11 @@ class GuardrailMode(TypedDict, total=False):
 
 
 GuardrailStatus = Literal[
-    "success", "guardrail_intervened", "guardrail_failed_to_respond", "not_run"
+    "success",
+    "guardrail_intervened",
+    "guardrail_monitored",
+    "guardrail_failed_to_respond",
+    "not_run",
 ]
 
 

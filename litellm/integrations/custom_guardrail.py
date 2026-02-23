@@ -652,10 +652,15 @@ class CustomGuardrail(CustomLogger):
 
         verbose_logger.debug(f"Guardrail response: {response}")
 
+        # Check for status override from monitor mode (set by providers)
+        metadata = request_data.get("metadata") or request_data.get("litellm_metadata") or {}
+        status_override = metadata.pop("_guardrail_status_override", None)
+        guardrail_status = status_override or "success"
+
         self.add_standard_logging_guardrail_information_to_request_data(
             guardrail_json_response=guardrail_response,
             request_data=request_data,
-            guardrail_status="success",
+            guardrail_status=guardrail_status,
             duration=duration,
             start_time=start_time,
             end_time=end_time,

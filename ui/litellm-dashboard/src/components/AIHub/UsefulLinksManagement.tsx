@@ -16,12 +16,13 @@ interface Link {
   id: string;
   displayName: string;
   url: string;
+  description?: string;
   index?: number;
 }
 
 const UsefulLinksManagement: React.FC<UsefulLinksManagementProps> = ({ accessToken, userRole }) => {
   const [links, setLinks] = useState<Link[]>([]);
-  const [newLink, setNewLink] = useState({ url: "", displayName: "" });
+  const [newLink, setNewLink] = useState({ url: "", displayName: "", description: "" });
   const [editingLink, setEditingLink] = useState<Link | null>(null);
   const [loading, setLoading] = useState(false);
   const [isExpanded, setIsExpanded] = useState(true);
@@ -48,6 +49,7 @@ const UsefulLinksManagement: React.FC<UsefulLinksManagementProps> = ({ accessTok
                 id: `${(value as any).index ?? 0}-${displayName}`,
                 displayName,
                 url: (value as any).url as string,
+                description: (value as any).description as string | undefined,
                 index: (value as any).index ?? 0,
               };
             } else {
@@ -92,13 +94,17 @@ const UsefulLinksManagement: React.FC<UsefulLinksManagementProps> = ({ accessTok
 
     try {
       // Convert array back to object format with index for ordering
-      // New format: { "displayName": { "url": "...", "index": 0 } }
-      const linksObject: Record<string, { url: string; index: number }> = {};
+      // New format: { "displayName": { "url": "...", "index": 0, "description": "..." } }
+      const linksObject: Record<string, { url: string; index: number; description?: string }> = {};
       updatedLinks.forEach((link, index) => {
-        linksObject[link.displayName] = {
+        const entry: { url: string; index: number; description?: string } = {
           url: link.url,
           index: index,
         };
+        if (link.description) {
+          entry.description = link.description;
+        }
+        linksObject[link.displayName] = entry;
       });
 
       await updateUsefulLinksCall(accessToken, linksObject);
@@ -132,13 +138,14 @@ const UsefulLinksManagement: React.FC<UsefulLinksManagementProps> = ({ accessTok
       id: `${Date.now()}-${newLink.displayName}`,
       displayName: newLink.displayName,
       url: newLink.url,
+      description: newLink.description || undefined,
     };
 
     const updatedLinks = [...links, newLinkObj];
 
     if (await saveLinksToBackend(updatedLinks)) {
       setLinks(updatedLinks);
-      setNewLink({ url: "", displayName: "" });
+      setNewLink({ url: "", displayName: "" , description: "" });
       NotificationsManager.success("Link added successfully");
     }
   };
@@ -248,7 +255,7 @@ const UsefulLinksManagement: React.FC<UsefulLinksManagementProps> = ({ accessTok
         <div className="mt-4">
           <div className="mb-6">
             <Text className="text-sm font-medium text-gray-700 mb-2">Add New Link</Text>
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid grid-cols-4 gap-4">
               <div>
                 <label className="block text-xs text-gray-500 mb-1">Display Name</label>
                 <input
@@ -276,6 +283,21 @@ const UsefulLinksManagement: React.FC<UsefulLinksManagementProps> = ({ accessTok
                     })
                   }
                   placeholder="https://example.com"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+                />
+              </div>
+              <div>
+                <label className="block text-xs text-gray-500 mb-1">Description (optional)</label>
+                <input
+                  type="text"
+                  value={newLink.description}
+                  onChange={(e) =>
+                    setNewLink({
+                      ...newLink,
+                      description: e.target.value,
+                    })
+                  }
+                  placeholder="Brief description"
                   className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
                 />
               </div>
@@ -336,6 +358,7 @@ const UsefulLinksManagement: React.FC<UsefulLinksManagementProps> = ({ accessTok
                   <TableRow>
                     <TableHeaderCell className="py-1 h-8">Display Name</TableHeaderCell>
                     <TableHeaderCell className="py-1 h-8">URL</TableHeaderCell>
+                    <TableHeaderCell className="py-1 h-8">Description</TableHeaderCell>
                     <TableHeaderCell className="py-1 h-8">Actions</TableHeaderCell>
                   </TableRow>
                 </TableHead>
@@ -370,6 +393,20 @@ const UsefulLinksManagement: React.FC<UsefulLinksManagementProps> = ({ accessTok
                               className="w-full px-2 py-1 border border-gray-300 rounded-md text-sm"
                             />
                           </TableCell>
+                          <TableCell className="py-0.5">
+                            <input
+                              type="text"
+                              value={editingLink.description || ""}
+                              onChange={(e) =>
+                                setEditingLink({
+                                  ...editingLink,
+                                  description: e.target.value,
+                                })
+                              }
+                              placeholder="Brief description"
+                              className="w-full px-2 py-1 border border-gray-300 rounded-md text-sm"
+                            />
+                          </TableCell>
                           <TableCell className="py-0.5 whitespace-nowrap">
                             <div className="flex space-x-2">
                               <button
@@ -391,6 +428,7 @@ const UsefulLinksManagement: React.FC<UsefulLinksManagementProps> = ({ accessTok
                         <>
                           <TableCell className="py-0.5 text-sm text-gray-900">{link.displayName}</TableCell>
                           <TableCell className="py-0.5 text-sm text-gray-500">{link.url}</TableCell>
+                          <TableCell className="py-0.5 text-sm text-gray-500">{link.description || "—"}</TableCell>
                           <TableCell className="py-0.5 whitespace-nowrap">
                             {isRearranging ? (
                               <div className="flex space-x-2">
@@ -440,7 +478,7 @@ const UsefulLinksManagement: React.FC<UsefulLinksManagementProps> = ({ accessTok
                   ))}
                   {links.length === 0 && (
                     <TableRow>
-                      <TableCell colSpan={3} className="py-0.5 text-sm text-gray-500 text-center">
+                      <TableCell colSpan={4} className="py-0.5 text-sm text-gray-500 text-center">
                         No links added yet. Add a new link above.
                       </TableCell>
                     </TableRow>
