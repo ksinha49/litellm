@@ -157,23 +157,25 @@ async def create_missing_views(db: _db):  # noqa: PLR0915
 
         print("MonthlyGlobalSpendPerUserPerKey Created!")  # noqa
 
-    try:
-        await db.query_raw("""SELECT 1 FROM "DailyTagSpend" LIMIT 1""")
-        print("DailyTagSpend Exists!")  # noqa
-    except Exception:
-        sql_query = """
-        CREATE OR REPLACE VIEW "DailyTagSpend" AS
-        SELECT
-            jsonb_array_elements_text(request_tags) AS individual_request_tag,
-            DATE(s."startTime") AS spend_date,
-            COUNT(*) AS log_count,
-            SUM(spend) AS total_spend
-        FROM "LiteLLM_SpendLogs" s
-        GROUP BY individual_request_tag, DATE(s."startTime");
-        """
-        await db.execute_raw(query=sql_query)
+    # Always recreate DailyTagSpend so a previously-installed version without the
+    # 30-day date filter is corrected on every proxy restart.  Using an unconditional
+    # CREATE OR REPLACE VIEW (no try/except gate) is the only reliable way to
+    # self-heal the view definition; the try/except pattern silently skips the
+    # fix if the view already exists with the wrong definition.
+    sql_query = """
+    CREATE OR REPLACE VIEW "DailyTagSpend" AS
+    SELECT
+        jsonb_array_elements_text(request_tags) AS individual_request_tag,
+        DATE(s."startTime") AS spend_date,
+        COUNT(*) AS log_count,
+        SUM(spend) AS total_spend
+    FROM "LiteLLM_SpendLogs" s
+    WHERE DATE(s."startTime") >= CURRENT_DATE - INTERVAL '30 days'
+    GROUP BY individual_request_tag, DATE(s."startTime");
+    """
+    await db.execute_raw(query=sql_query)
 
-        print("DailyTagSpend Created!")  # noqa
+    print("DailyTagSpend Created/Updated!")  # noqa
 
     try:
         await db.query_raw("""SELECT 1 FROM "Last30dTopEndUsersSpend" LIMIT 1""")
@@ -192,6 +194,63 @@ async def create_missing_views(db: _db):  # noqa: PLR0915
         await db.execute_raw(query=sql_query)
 
         print("Last30dTopEndUsersSpend Created!")  # noqa
+
+    try:
+        await db.query_raw("""SELECT 1 FROM "CalendarMonthGlobalSpend" LIMIT 1""")
+        print("CalendarMonthGlobalSpend Exists!")  # noqa
+    except Exception:
+        sql_query = """
+        CREATE OR REPLACE VIEW "CalendarMonthGlobalSpend" AS
+        SELECT DATE("startTime") AS date, SUM("spend") AS spend
+        FROM "LiteLLM_SpendLogs"
+        WHERE "startTime" >= DATE_TRUNC('month', CURRENT_DATE)
+        GROUP BY DATE("startTime");
+        """
+        await db.execute_raw(query=sql_query)
+
+        print("CalendarMonthGlobalSpend Created!")  # noqa
+
+    # Ensure the synthetic 'litellm-dashboard' team row exists so dashboard-internal
+    # keys are never orphaned (e.g. after a fresh install or DB restore).
+    # INSERT ... ON CONFLICT DO NOTHING is idempotent and safe to run every startup.
+    await db.execute_raw(
+        """
+        INSERT INTO "LiteLLM_TeamTable" (
+            team_id,
+            team_alias,
+            admins,
+            members,
+            members_with_roles,
+            metadata,
+            spend,
+            models,
+            blocked,
+            created_at,
+            updated_at,
+            model_spend,
+            model_max_budget,
+            team_member_permissions
+        ) VALUES (
+            'litellm-dashboard',
+            'LiteLLM Dashboard (Internal)',
+            ARRAY[]::text[],
+            ARRAY[]::text[],
+            '{}'::jsonb,
+            '{"note": "auto-created by create_missing_views to resolve orphaned key references"}'::jsonb,
+            0.0,
+            ARRAY[]::text[],
+            false,
+            NOW(),
+            NOW(),
+            '{}'::jsonb,
+            '{}'::jsonb,
+            ARRAY[]::text[]
+        )
+        ON CONFLICT (team_id) DO NOTHING;
+        """
+    )
+
+    print("litellm-dashboard team ensured!")  # noqa
 
     return
 
