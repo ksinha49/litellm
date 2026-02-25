@@ -100,6 +100,7 @@ collect_params() {
 
   echo -e "\n  ${BOLD}Application${NC}"
   prompt_default APP_NAME          "UI display name"                "Ameritas LiteLLM"
+  prompt_default PROXY_BASE_URL    "Proxy base URL"                 "https://api.ai.inbison.com"
   prompt_default CONFIG_PATH       "litellm_config.yaml path"       "${REPO_ROOT}/litellm_config.yaml"
   prompt_default PROMETHEUS_CONFIG "prometheus.yml path"            "${REPO_ROOT}/prometheus.yml"
 
@@ -198,6 +199,7 @@ confirm_proceed() {
   printf "  %-24s %s\n" "Host → container:"      "${HOST_PORT} → 4000"
   printf "  %-24s %s\n" "Prometheus port:"       "${PROMETHEUS_PORT} → 9090"
   printf "  %-24s %s\n" "App name:"              "${APP_NAME}"
+  printf "  %-24s %s\n" "Proxy base URL:"        "${PROXY_BASE_URL}"
   printf "  %-24s %s\n" "DB host:"               "${DB_HOST}:${DB_PORT}/${DB_NAME} (schema: ${DB_SCHEMA})"
   printf "  %-24s %s\n" "DB user:"               "${DB_USER}"
   printf "  %-24s %s\n" "DB password:"           "****"
@@ -331,6 +333,7 @@ start_litellm() {
     -p "${HOST_PORT}:4000" \
     -e UI_APP_NAME="${APP_NAME}" \
     -e NEXT_PUBLIC_APP_NAME="${APP_NAME}" \
+    -e PROXY_BASE_URL="${PROXY_BASE_URL}" \
     -e DATABASE_URL="${DATABASE_URL}" \
     -e LITELLM_MASTER_KEY="${LITELLM_MASTER_KEY}" \
     -e LITELLM_SALT_KEY="${LITELLM_SALT_KEY}" \

@@ -88,6 +88,7 @@ collect_credentials() {
   prompt_default HOST_PORT            "Host port → container 4000"   "8080"
   prompt_default PROMETHEUS_PORT      "Prometheus host port"         "9090"
   prompt_default APP_NAME             "UI display name"              "Ameritas LiteLLM"
+  prompt_default PROXY_BASE_URL       "Proxy base URL"               "https://api.ai.inbison.com"
   prompt_default CONFIG_PATH          "litellm_config.yaml path"     "${REPO_ROOT}/litellm_config.yaml"
   prompt_default PROMETHEUS_CONFIG    "prometheus.yml path"          "${REPO_ROOT}/prometheus.yml"
   prompt_default HTTP_PROXY_URL       "HTTP/HTTPS proxy"             "http://proxy.ameritas.com:8080"
@@ -191,7 +192,7 @@ run_deploy() {
   # deploy.sh uses the same source → prompt chain; exported vars satisfy it.
   export IMAGE_TAG LITELLM_CONTAINER PROMETHEUS_CONTAINER DOCKER_NETWORK
   export HOST_PORT PROMETHEUS_PORT APP_NAME CONFIG_PATH PROMETHEUS_CONFIG
-  export HTTP_PROXY_URL NO_PROXY_LIST
+  export HTTP_PROXY_URL NO_PROXY_LIST PROXY_BASE_URL
   export DB_HOST DB_PORT DB_NAME DB_SCHEMA DB_USER DB_PASSWORD
   export LITELLM_MASTER_KEY LITELLM_SALT_KEY
 
