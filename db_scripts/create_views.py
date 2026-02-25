@@ -167,23 +167,45 @@ async def check_view_exists():  # noqa: PLR0915
 
         print("MonthlyGlobalSpendPerUserPerKey Created!")  # noqa
 
+    # DailyTagSpend — always recreate with OR REPLACE to ensure the 30-day
+    # rolling filter is applied.  The original definition had no date filter,
+    # causing it to accumulate all historical spend (Aug 2025 onward) while
+    # every other view filters to the last 30 days.
+    sql_query = """
+    CREATE OR REPLACE VIEW "DailyTagSpend" AS
+    SELECT
+        jsonb_array_elements_text(request_tags) AS individual_request_tag,
+        DATE(s."startTime") AS spend_date,
+        COUNT(*) AS log_count,
+        SUM(spend) AS total_spend
+    FROM "LiteLLM_SpendLogs" s
+    WHERE DATE(s."startTime") >= CURRENT_DATE - INTERVAL '30 days'
+    GROUP BY individual_request_tag, DATE(s."startTime");
+    """
+    await db.execute_raw(query=sql_query)
+
+    print("DailyTagSpend recreated with 30-day filter!")  # noqa
+
+    # CalendarMonthGlobalSpend — anchored to the 1st of the current calendar
+    # month, matching what budget enforcement actually enforces.
+    # MonthlyGlobalSpend is misnamed (rolling 30d); this view gives the true
+    # calendar-month figure.
     try:
-        await db.query_raw("""SELECT 1 FROM "DailyTagSpend" LIMIT 1""")
-        print("DailyTagSpend Exists!")  # noqa
+        await db.query_raw("""SELECT 1 FROM "CalendarMonthGlobalSpend" LIMIT 1""")
+        print("CalendarMonthGlobalSpend Exists!")  # noqa
     except Exception:
         sql_query = """
-        CREATE OR REPLACE VIEW "DailyTagSpend" AS
+        CREATE OR REPLACE VIEW "CalendarMonthGlobalSpend" AS
         SELECT
-            jsonb_array_elements_text(request_tags) AS individual_request_tag,
-            DATE(s."startTime") AS spend_date,
-            COUNT(*) AS log_count,
-            SUM(spend) AS total_spend
-        FROM "LiteLLM_SpendLogs" s
-        GROUP BY individual_request_tag, DATE(s."startTime");
+            DATE("startTime") AS date,
+            SUM("spend") AS spend
+        FROM "LiteLLM_SpendLogs"
+        WHERE "startTime" >= DATE_TRUNC('month', CURRENT_DATE)
+        GROUP BY DATE("startTime");
         """
         await db.execute_raw(query=sql_query)
 
-        print("DailyTagSpend Created!")  # noqa
+        print("CalendarMonthGlobalSpend Created!")  # noqa
 
     try:
         await db.query_raw("""SELECT 1 FROM "Last30dTopEndUsersSpend" LIMIT 1""")
