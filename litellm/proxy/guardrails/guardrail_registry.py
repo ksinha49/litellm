@@ -422,6 +422,21 @@ class InMemoryGuardrailHandler:
         verbose_proxy_logger.debug("litellm_params= %s", litellm_params_data)
 
         if isinstance(litellm_params_data, dict):
+            # Decrypt `mode` before constructing LitellmParams.  The
+            # normalize_lowercase validator would corrupt an encrypted base64
+            # ciphertext (by lowercasing it), making later decryption
+            # impossible.  decrypt_value_helper with return_original_value=True
+            # is a safe no-op when the field is already plaintext.
+            raw_mode = litellm_params_data.get("mode")
+            if raw_mode is not None:
+                decrypted_mode = decrypt_value_helper(
+                    value=raw_mode,
+                    key="mode",
+                    exception_type="debug",
+                    return_original_value=True,
+                )
+                if decrypted_mode != raw_mode:
+                    litellm_params_data = {**litellm_params_data, "mode": decrypted_mode}
             litellm_params = LitellmParams(**litellm_params_data)
         else:
             litellm_params = litellm_params_data
