@@ -422,21 +422,24 @@ class InMemoryGuardrailHandler:
         verbose_proxy_logger.debug("litellm_params= %s", litellm_params_data)
 
         if isinstance(litellm_params_data, dict):
-            # Decrypt `mode` before constructing LitellmParams.  The
-            # normalize_lowercase validator would corrupt an encrypted base64
-            # ciphertext (by lowercasing it), making later decryption
-            # impossible.  decrypt_value_helper with return_original_value=True
-            # is a safe no-op when the field is already plaintext.
-            raw_mode = litellm_params_data.get("mode")
-            if raw_mode is not None:
-                decrypted_mode = decrypt_value_helper(
-                    value=raw_mode,
-                    key="mode",
-                    exception_type="debug",
-                    return_original_value=True,
-                )
-                if decrypted_mode != raw_mode:
-                    litellm_params_data = {**litellm_params_data, "mode": decrypted_mode}
+            # Decrypt all encrypted string fields before constructing LitellmParams.
+            # Guardrail params stored via the UI are encrypted with encrypt_value_helper
+            # (format: "{prefix}:{b64}").  This must happen before LitellmParams
+            # construction because validators like normalize_lowercase would corrupt
+            # base64 ciphertext (e.g. for "mode").  Using return_original_value=True
+            # makes this a safe no-op for any field that is already plaintext.
+            decrypted_params = {}
+            for k, v in litellm_params_data.items():
+                if isinstance(v, str):
+                    decrypted_params[k] = decrypt_value_helper(
+                        value=v,
+                        key=k,
+                        exception_type="debug",
+                        return_original_value=True,
+                    )
+                else:
+                    decrypted_params[k] = v
+            litellm_params_data = decrypted_params
             litellm_params = LitellmParams(**litellm_params_data)
         else:
             litellm_params = litellm_params_data
