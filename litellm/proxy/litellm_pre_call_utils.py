@@ -1716,7 +1716,7 @@ def add_guardrails_from_policy_engine(
     _apply_resolved_guardrails_to_metadata(data, metadata_variable_name, context)
 
     # Log summary of applied guardrails for monitoring
-    guardrails_list = data.get(_metadata_variable_name, {}).get("guardrails", [])
+    guardrails_list = data.get(metadata_variable_name, {}).get("guardrails", [])
     if len(guardrails_list) > 0:
         guardrail_names = [g.get("guardrail_name") for g in guardrails_list if isinstance(g, dict)]
         verbose_proxy_logger.info(
