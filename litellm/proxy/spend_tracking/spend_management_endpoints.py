@@ -850,9 +850,12 @@ async def get_global_spend_provider(
             sql_query = """
             SELECT
             model_id,
-            SUM(spend) AS spend
+            SUM(spend) AS spend,
+            COUNT(*) AS total_requests,
+            SUM(CASE WHEN LOWER(status) = \'success\' THEN 1 ELSE 0 END) AS successful_requests,
+            SUM(total_tokens) AS tokens
             FROM "LiteLLM_SpendLogs"
-            WHERE "startTime" >= $1::timestamptz AND "startTime" < ($2::timestamptz + INTERVAL \'1 day\') 
+            WHERE "startTime" >= $1::timestamptz AND "startTime" < ($2::timestamptz + INTERVAL \'1 day\')
             AND length(model_id) > 0
             AND "user" = $3
             GROUP BY model_id
@@ -864,7 +867,10 @@ async def get_global_spend_provider(
             sql_query = """
             SELECT
             model_id,
-            SUM(spend) AS spend
+            SUM(spend) AS spend,
+            COUNT(*) AS total_requests,
+            SUM(CASE WHEN LOWER(status) = \'success\' THEN 1 ELSE 0 END) AS successful_requests,
+            SUM(total_tokens) AS tokens
             FROM "LiteLLM_SpendLogs"
             WHERE "startTime" >= $1::timestamptz AND "startTime" < ($2::timestamptz + INTERVAL \'1 day\') AND length(model_id) > 0
             GROUP BY model_id
@@ -882,7 +888,9 @@ async def get_global_spend_provider(
 
         # we use the in memory router for this
         ui_response = []
-        provider_spend_mapping: defaultdict = defaultdict(int)
+        provider_spend_mapping: defaultdict = defaultdict(
+            lambda: {"spend": 0, "requests": 0, "successful_requests": 0, "tokens": 0}
+        )
         for row in db_response:
             _model_id = row["model_id"]
             _provider = "Unknown"
@@ -896,12 +904,22 @@ async def get_global_spend_provider(
                             api_base=_deployment.litellm_params.api_base,
                             litellm_params=_deployment.litellm_params,
                         )
-                        provider_spend_mapping[_provider] += row["spend"]
+                        provider_spend_mapping[_provider]["spend"] += row["spend"]
+                        provider_spend_mapping[_provider]["requests"] += row["total_requests"]
+                        provider_spend_mapping[_provider]["successful_requests"] += row["successful_requests"]
+                        provider_spend_mapping[_provider]["tokens"] += row["tokens"]
                     except Exception:
                         pass
 
-        for provider, spend in provider_spend_mapping.items():
-            ui_response.append({"provider": provider, "spend": spend})
+        for provider, data in provider_spend_mapping.items():
+            ui_response.append({
+                "provider": provider,
+                "spend": data["spend"],
+                "requests": data["requests"],
+                "successful_requests": data["successful_requests"],
+                "failed_requests": data["requests"] - data["successful_requests"],
+                "tokens": data["tokens"],
+            })
 
         return ui_response
 
@@ -2762,10 +2780,10 @@ async def global_spend_per_team():
         # only add first 10 elements to total_spend_per_team_ui
         if len(total_spend_per_team_ui) >= 10:
             break
-        if team_id is None:
-            team_id = "Unassigned"
+        _team_spend = total_spend_per_team[team_id]
+        _team_alias = team_id if team_id is not None else "Unassigned"
         total_spend_per_team_ui.append(
-            {"team_id": team_id, "total_spend": total_spend_per_team[team_id]}
+            {"team_alias": _team_alias, "total_spend": _team_spend}
         )
 
     # sort spend_by_date by it's key (which is a date)

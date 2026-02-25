@@ -15,7 +15,7 @@ export interface DailyActivity {
 }
 
 export interface TeamSpend {
-  team_id: string;
+  team_id?: string;
   team_alias?: string | null;
   total_spend: number;
 }
