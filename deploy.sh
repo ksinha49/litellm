@@ -170,7 +170,7 @@ check_prereqs() {
     fi
   fi
 
-  [[ $fail -ne 0 ]] && { error "Pre-flight failed — aborting."; exit 1; }
+  if [[ $fail -ne 0 ]]; then error "Pre-flight failed — aborting."; exit 1; fi
 }
 
 # ── git info (informational only) ─────────────────────────────────────────────
