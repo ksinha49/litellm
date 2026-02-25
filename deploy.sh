@@ -335,6 +335,9 @@ start_litellm() {
     -e LITELLM_MASTER_KEY="${LITELLM_MASTER_KEY}" \
     -e LITELLM_SALT_KEY="${LITELLM_SALT_KEY}" \
     -e STORE_MODEL_IN_DB=true \
+    -e HTTP_PROXY="${HTTP_PROXY_URL}" \
+    -e HTTPS_PROXY="${HTTP_PROXY_URL}" \
+    -e NO_PROXY="${NO_PROXY_LIST}" \
     -v "${CONFIG_PATH}:/app/config/config.yaml:ro" \
     "${IMAGE_TAG}" \
     --config /app/config/config.yaml

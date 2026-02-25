@@ -13,6 +13,7 @@ from litellm.integrations.custom_guardrail import CustomGuardrail
 from litellm.litellm_core_utils.safe_json_dumps import safe_dumps
 from litellm.proxy.utils import PrismaClient
 from litellm.proxy.types_utils.utils import get_instance_fn
+from litellm.proxy.common_utils.encrypt_decrypt_utils import decrypt_value_helper
 from litellm.secret_managers.main import get_secret
 from litellm.types.guardrails import (
     Guardrail,
@@ -442,7 +443,22 @@ class InMemoryGuardrailHandler:
         ):
             litellm_params.api_base = str(get_secret(litellm_params.api_base))
 
-        guardrail_type = litellm_params.guardrail
+        raw_guardrail_type = litellm_params.guardrail
+        # Defensively decrypt the guardrail type — if it was stored as an
+        # encrypted value (e.g. after a salt-key rotation) this resolves it
+        # back to the plain type string.  If the value is already plaintext or
+        # decryption fails, return_original_value=True ensures we fall through
+        # to the existing "Unsupported guardrail" error path unchanged.
+        guardrail_type = (
+            decrypt_value_helper(
+                value=raw_guardrail_type,
+                key="guardrail",
+                exception_type="debug",
+                return_original_value=True,
+            )
+            if raw_guardrail_type is not None
+            else raw_guardrail_type
+        )
 
         if guardrail_type is None:
             raise ValueError("guardrail_type is required")
