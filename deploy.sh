@@ -372,15 +372,14 @@ start_litellm() {
   # Wait for the liveliness endpoint (up to 90 s)
   info "Waiting for LiteLLM to become healthy..."
   local attempt=0 max=18
-  until docker exec "${LITELLM_CONTAINER}" \
-        wget -q --spider http://localhost:4000/health/liveliness &>/dev/null; do
+  until curl -fsS "http://localhost:${HOST_PORT}/health/liveliness" &>/dev/null; do
     attempt=$(( attempt + 1 ))
     [[ $attempt -ge $max ]] && { warn "Health check timed out — check: docker logs ${LITELLM_CONTAINER}"; break; }
     printf '.'
     sleep 5
   done
   echo ""
-  [[ $attempt -lt $max ]] && success "LiteLLM is healthy."
+  if [[ $attempt -lt $max ]]; then success "LiteLLM is healthy."; fi
 }
 
 # ── post-deploy: backfill spend_at_last_reset baseline ────────────────────────

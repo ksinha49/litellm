@@ -272,18 +272,44 @@ model LiteLLM_MCPServerTable {
 
 // AI Application Registry — governance metadata for first-class application entities
 model LiteLLM_ApplicationTable {
-    application_id   String   @id @default(uuid())
-    application_name String   @unique
-    application_type String   // "platform" | "dev_tool" | "custom_integration"
-    department       String
-    lob              String
-    team_id          String?
-    description      String?
-    labels           Json?    @default("{}")
-    created_at       DateTime @default(now()) @map("created_at")
-    updated_at       DateTime @default(now()) @updatedAt @map("updated_at")
-    created_by       String?
-    updated_by       String?
+    application_id       String    @id @default(uuid())
+    application_name     String    @unique
+    application_type     String    // "platform" | "dev_tool" | "custom_integration"
+    department           String
+    lob                  String
+    team_id              String?
+    description          String?
+    labels               Json?     @default("{}")
+    health_check_url     String?
+    health_status        String?   @default("unknown")  // "healthy" | "unhealthy" | "unknown"
+    last_health_check_at DateTime?
+    created_at           DateTime  @default(now()) @map("created_at")
+    updated_at           DateTime  @default(now()) @updatedAt @map("updated_at")
+    created_by           String?
+    updated_by           String?
+}
+
+// Async AI Service Request Tracking
+model LiteLLM_AIServiceRequest {
+    request_id    String   @id
+    service_type  String?
+    path          String?
+    status        String   @default("accepted")
+    request_body  Json?    @default("{}")
+    response_body Json?
+    error         String?
+    api_key       String   @default("")
+    user_id       String?
+    team_id       String?
+    org_id        String?
+    cost          Float?   @default(0.0)
+    created_at    DateTime @default(now()) @map("created_at")
+    updated_at    DateTime @default(now()) @updatedAt @map("updated_at")
+
+    @@index([status])
+    @@index([user_id])
+    @@index([team_id])
+    @@index([created_at])
 }
 
 // Generate Tokens for Proxy
