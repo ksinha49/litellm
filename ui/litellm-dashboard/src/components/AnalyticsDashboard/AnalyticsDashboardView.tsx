@@ -4,7 +4,6 @@ import AdvancedDatePicker from "@/components/shared/advanced_date_picker";
 import {
   adminGlobalActivity,
   adminspendByProvider,
-  adminTopKeysCall,
   adminTopModelsCall,
   applicationHealthCall,
   getTotalSpendCall,
@@ -87,13 +86,12 @@ const AnalyticsDashboardView: React.FC<AnalyticsDashboardViewProps> = ({
       adminGlobalActivity(token, startTime, endTime),           // 0
       getTotalSpendCall(token, startTime, endTime),               // 1
       adminTopModelsCall(token),                                 // 2
-      adminTopKeysCall(token),                                   // 3
-      adminspendByProvider(token, null, startTime, endTime),     // 4
-      teamSpendLogsCall(token),                                  // 5
+      adminspendByProvider(token, null, startTime, endTime),     // 3
+      teamSpendLogsCall(token),                                  // 4
       applicationHealthCall(token, {
         start_date: startTime,
         end_date: endTime,
-      }),                                                        // 6
+      }),                                                        // 5
     ]);
 
     // Helper to safely extract fulfilled values
@@ -117,24 +115,21 @@ const AnalyticsDashboardView: React.FC<AnalyticsDashboardViewProps> = ({
       );
     }
 
-    // Total spend
-    const spendData = val<{ spend: number; max_budget: number }>(1);
+    // Total spend + active keys count (both from /global/spend)
+    const spendData = val<{ spend: number; max_budget: number; active_keys: number }>(1);
 
     // Top models
     const modelsData = val<TopModel[]>(2);
     if (modelsData) setTopModels(modelsData);
 
-    // Top keys (for active keys count)
-    const keysData = val<{ api_key: string; total_spend: number }[]>(3);
-
     // Provider spend
-    const providerData = val<ProviderSpendData[]>(4);
+    const providerData = val<ProviderSpendData[]>(3);
     if (providerData) setProviderSpend(providerData);
 
     // Team spend — backend wraps data in { total_spend_per_team: [...] }
     const teamsResponse = val<{
       total_spend_per_team: TeamSpend[];
-    }>(5);
+    }>(4);
     if (teamsResponse?.total_spend_per_team) {
       setTeamSpend(teamsResponse.total_spend_per_team);
     }
@@ -144,14 +139,14 @@ const AnalyticsDashboardView: React.FC<AnalyticsDashboardViewProps> = ({
       applications: ApplicationMetrics[];
       total_apps: number;
       active_apps: number;
-    }>(6);
+    }>(5);
     if (appData?.applications) setApplications(appData.applications);
 
     // Compute KPI summary
     const currentTeamSpend = teamsResponse?.total_spend_per_team ?? [];
     setKpi({
       totalModels: modelsData?.length ?? 0,
-      activeKeys: keysData?.length ?? 0,
+      activeKeys: spendData?.active_keys ?? 0,
       monthlySpend: spendData?.spend ?? 0,
       totalRequests: activityData?.sum_api_requests ?? 0,
       activeTeams: currentTeamSpend.filter((t) => t.total_spend > 0).length,

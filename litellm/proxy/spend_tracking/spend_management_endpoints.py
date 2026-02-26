@@ -2593,11 +2593,15 @@ async def global_spend(
         if prisma_client is None:
             raise HTTPException(status_code=500, detail={"error": "No db connected"})
 
+        active_keys = 0
+
         if start_date and end_date:
             start_date_obj = datetime.strptime(start_date, "%Y-%m-%d")
             end_date_obj = datetime.strptime(end_date, "%Y-%m-%d")
             sql_query = """
-            SELECT SUM(spend) as total_spend
+            SELECT
+                SUM(spend) as total_spend,
+                COUNT(DISTINCT api_key) as active_keys
             FROM "LiteLLM_SpendLogs"
             WHERE "startTime" >= $1::timestamptz
               AND "startTime" < ($2::timestamptz + INTERVAL '1 day')
@@ -2606,14 +2610,20 @@ async def global_spend(
                 sql_query, start_date_obj, end_date_obj
             )
         else:
-            sql_query = """SELECT SUM(spend) as total_spend FROM "MonthlyGlobalSpend";"""
+            sql_query = """
+            SELECT
+                SUM(spend) as total_spend,
+                COUNT(DISTINCT api_key) as active_keys
+            FROM "MonthlyGlobalSpend";
+            """
             response = await prisma_client.db.query_raw(query=sql_query)
 
         if response is not None:
             if isinstance(response, list) and len(response) > 0:
                 total_spend = response[0].get("total_spend", 0.0) or 0.0
+                active_keys = response[0].get("active_keys", 0) or 0
 
-        return {"spend": total_spend, "max_budget": litellm.max_budget}
+        return {"spend": total_spend, "max_budget": litellm.max_budget, "active_keys": active_keys}
     except Exception as e:
         error_trace = traceback.format_exc()
         error_str = str(e) + "\n" + error_trace
