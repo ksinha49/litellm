@@ -85,9 +85,9 @@ const AnalyticsDashboardView: React.FC<AnalyticsDashboardViewProps> = ({
     const results = await Promise.allSettled([
       adminGlobalActivity(token, startTime, endTime),           // 0
       getTotalSpendCall(token, startTime, endTime),               // 1
-      adminTopModelsCall(token),                                 // 2
+      adminTopModelsCall(token, startTime, endTime),             // 2
       adminspendByProvider(token, null, startTime, endTime),     // 3
-      teamSpendLogsCall(token),                                  // 4
+      teamSpendLogsCall(token, startTime, endTime),               // 4
       applicationHealthCall(token, {
         start_date: startTime,
         end_date: endTime,

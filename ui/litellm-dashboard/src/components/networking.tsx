@@ -2706,9 +2706,16 @@ export const keySpendLogsCall = async (accessToken: string, token: string) => {
   }
 };
 
-export const teamSpendLogsCall = async (accessToken: string) => {
+export const teamSpendLogsCall = async (
+  accessToken: string,
+  startTime?: string,
+  endTime?: string
+) => {
   try {
-    const url = proxyBaseUrl ? `${proxyBaseUrl}/global/spend/teams` : `/global/spend/teams`;
+    let url = proxyBaseUrl ? `${proxyBaseUrl}/global/spend/teams` : `/global/spend/teams`;
+    if (startTime && endTime) {
+      url += `?start_date=${encodeURIComponent(startTime)}&end_date=${encodeURIComponent(endTime)}`;
+    }
     console.log("in teamSpendLogsCall:", url);
     const response = await fetch(`${url}`, {
       method: "GET",
@@ -3340,9 +3347,16 @@ export const adminGlobalActivityExceptionsPerDeployment = async (
   }
 };
 
-export const adminTopModelsCall = async (accessToken: string) => {
+export const adminTopModelsCall = async (
+  accessToken: string,
+  startTime?: string,
+  endTime?: string
+) => {
   try {
     let url = proxyBaseUrl ? `${proxyBaseUrl}/global/spend/models?limit=5` : `/global/spend/models?limit=5`;
+    if (startTime && endTime) {
+      url += `&start_date=${encodeURIComponent(startTime)}&end_date=${encodeURIComponent(endTime)}`;
+    }
 
     //NotificationsManager.info("Making top models request");
     const response = await fetch(url, {

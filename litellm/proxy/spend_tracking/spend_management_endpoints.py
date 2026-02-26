@@ -2749,7 +2749,16 @@ async def global_spend_keys(
     dependencies=[Depends(user_api_key_auth)],
     include_in_schema=False,
 )
-async def global_spend_per_team():
+async def global_spend_per_team(
+    start_date: Optional[str] = fastapi.Query(
+        default=None,
+        description="Start date for the query (YYYY-MM-DD). When omitted, defaults to the last 30 days.",
+    ),
+    end_date: Optional[str] = fastapi.Query(
+        default=None,
+        description="End date for the query (YYYY-MM-DD). When omitted, defaults to the last 30 days.",
+    ),
+):
     """
     [BETA] This is a beta endpoint. It will change.
 
@@ -2759,24 +2768,46 @@ async def global_spend_per_team():
 
     if prisma_client is None:
         raise HTTPException(status_code=500, detail={"error": "No db connected"})
-    sql_query = """
-        SELECT
-            t.team_alias as team_alias,
-            DATE(s."startTime") AS spend_date,
-            SUM(s.spend) AS total_spend
-        FROM
-            "LiteLLM_SpendLogs" s
-        LEFT JOIN
-            "LiteLLM_TeamTable" t ON s.team_id = t.team_id
-        WHERE
-            s."startTime" >= CURRENT_DATE - INTERVAL '30 days'
-        GROUP BY
-            t.team_alias,
-            DATE(s."startTime")
-        ORDER BY
-            spend_date;
-        """
-    response = await prisma_client.db.query_raw(query=sql_query)
+
+    if start_date is not None and end_date is not None:
+        sql_query = """
+            SELECT
+                t.team_alias as team_alias,
+                DATE(s."startTime") AS spend_date,
+                SUM(s.spend) AS total_spend
+            FROM
+                "LiteLLM_SpendLogs" s
+            LEFT JOIN
+                "LiteLLM_TeamTable" t ON s.team_id = t.team_id
+            WHERE
+                s."startTime" >= $1::date
+                AND s."startTime" < ($2::date + INTERVAL '1 day')
+            GROUP BY
+                t.team_alias,
+                DATE(s."startTime")
+            ORDER BY
+                spend_date;
+            """
+        response = await prisma_client.db.query_raw(sql_query, start_date, end_date)
+    else:
+        sql_query = """
+            SELECT
+                t.team_alias as team_alias,
+                DATE(s."startTime") AS spend_date,
+                SUM(s.spend) AS total_spend
+            FROM
+                "LiteLLM_SpendLogs" s
+            LEFT JOIN
+                "LiteLLM_TeamTable" t ON s.team_id = t.team_id
+            WHERE
+                s."startTime" >= CURRENT_DATE - INTERVAL '30 days'
+            GROUP BY
+                t.team_alias,
+                DATE(s."startTime")
+            ORDER BY
+                spend_date;
+            """
+        response = await prisma_client.db.query_raw(query=sql_query)
 
     # transform the response for the Admin UI
     spend_by_date = {}
@@ -2965,6 +2996,14 @@ async def global_spend_models(
         default=10,
         description="Number of models to get. Will return Top 'n' models.",
     ),
+    start_date: Optional[str] = fastapi.Query(
+        default=None,
+        description="Start date for the query (YYYY-MM-DD). When omitted, uses the Last30dModelsBySpend view.",
+    ),
+    end_date: Optional[str] = fastapi.Query(
+        default=None,
+        description="End date for the query (YYYY-MM-DD). When omitted, uses the Last30dModelsBySpend view.",
+    ),
     user_api_key_dict: UserAPIKeyAuth = Depends(user_api_key_auth),
 ):
     """
@@ -2989,9 +3028,23 @@ async def global_spend_models(
     if prisma_client is None:
         raise HTTPException(status_code=500, detail={"error": "No db connected"})
 
-    sql_query = """SELECT * FROM "Last30dModelsBySpend" LIMIT $1 ;"""
-
-    response = await prisma_client.db.query_raw(sql_query, int(limit))
+    if start_date is not None and end_date is not None:
+        sql_query = """
+            SELECT model, SUM(spend) AS total_spend
+            FROM "LiteLLM_SpendLogs"
+            WHERE "startTime" >= $1::date
+              AND "startTime" < ($2::date + INTERVAL '1 day')
+              AND model != ''
+            GROUP BY model
+            ORDER BY total_spend DESC
+            LIMIT $3;
+        """
+        response = await prisma_client.db.query_raw(
+            sql_query, start_date, end_date, int(limit)
+        )
+    else:
+        sql_query = """SELECT * FROM "Last30dModelsBySpend" LIMIT $1 ;"""
+        response = await prisma_client.db.query_raw(sql_query, int(limit))
 
     return response
 
