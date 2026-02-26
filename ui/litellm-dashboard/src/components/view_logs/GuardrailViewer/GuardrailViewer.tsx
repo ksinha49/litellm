@@ -687,26 +687,25 @@ const GuardrailViewer = ({ data, accessToken, logEntry }: GuardrailViewerProps) 
         </div>
       )}
 
-      {/* ── Body: two columns ──────────────────────────────────── */}
-      <div className="flex">
-        {/* Left column: Request Lifecycle */}
-        <div className="w-[340px] flex-shrink-0 border-r border-gray-100 px-6 py-5">
-          <RequestLifecycle entries={guardrailEntries} />
-        </div>
+      {/* ── Body: stacked rows ─────────────────────────────────── */}
 
-        {/* Right column: Evaluation Details */}
-        <div className="flex-1 px-6 py-5 min-w-0">
-          <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-4">
-            Evaluation Details
-          </h4>
-          <div className="space-y-3">
-            {guardrailEntries.map((entry, index) => (
-              <EvaluationCard
-                key={`${entry.guardrail_name ?? "guardrail"}-${index}`}
-                entry={entry}
-              />
-            ))}
-          </div>
+      {/* Row 1: Request Lifecycle */}
+      <div className="px-6 py-5 border-b border-gray-100">
+        <RequestLifecycle entries={guardrailEntries} />
+      </div>
+
+      {/* Row 2: Evaluation Details */}
+      <div className="px-6 py-5">
+        <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-4">
+          Evaluation Details
+        </h4>
+        <div className="space-y-3">
+          {guardrailEntries.map((entry, index) => (
+            <EvaluationCard
+              key={`${entry.guardrail_name ?? "guardrail"}-${index}`}
+              entry={entry}
+            />
+          ))}
         </div>
       </div>
     </div>
