@@ -133,6 +133,20 @@ async def anthropic_messages(
 
     # Extract modified parameters
     tools = request_kwargs.pop("tools", tools)
+    # Normalize OpenAI-style tool format to Anthropic-style before forwarding.
+    # OpenAI: {"type":"function","function":{"name":…,"description":…,"parameters":{…}}}
+    # Anthropic custom: {"type":"custom","name":…,"description":…,"input_schema":{…}}
+    if tools:
+        for tool in tools:
+            if isinstance(tool, dict) and tool.get("type") == "function":
+                fn = tool.pop("function", {})
+                tool["type"] = "custom"
+                if "name" not in tool and "name" in fn:
+                    tool["name"] = fn["name"]
+                if "description" not in tool and "description" in fn:
+                    tool["description"] = fn["description"]
+                if "input_schema" not in tool and "parameters" in fn:
+                    tool["input_schema"] = fn["parameters"]
     stream = request_kwargs.pop("stream", stream)
     # Remove litellm_params from kwargs (only needed for hooks)
     request_kwargs.pop("litellm_params", None)
