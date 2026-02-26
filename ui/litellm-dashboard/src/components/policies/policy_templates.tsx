@@ -6,6 +6,8 @@ import {
   BeakerIcon,
   CurrencyDollarIcon,
   CheckCircleIcon,
+  ChevronUpIcon,
+  ChevronDownIcon,
 } from "@heroicons/react/outline";
 import { getPolicyTemplates } from "../networking";
 
@@ -123,6 +125,7 @@ const PolicyTemplateCard: React.FC<PolicyTemplateCardProps> = ({
   complexity,
   onUseTemplate,
 }) => {
+  const [isExpanded, setIsExpanded] = useState(true);
   const defsMap = useMemo(() => buildDefsMap(guardrailDefinitions), [guardrailDefinitions]);
 
   const getComplexityStyle = () => {
@@ -151,130 +154,145 @@ const PolicyTemplateCard: React.FC<PolicyTemplateCardProps> = ({
 
   return (
     <Card
-      className="h-full hover:shadow-md transition-shadow"
-      bodyStyle={{ display: "flex", flexDirection: "column", height: "100%" }}
+      className="hover:shadow-md transition-shadow"
+      bodyStyle={{ display: "flex", flexDirection: "column" }}
     >
-      <div className="flex items-start justify-between mb-4">
-        <div className={`p-2 rounded-lg ${iconBg}`}>
-          <Icon className={`h-6 w-6 ${iconColor}`} />
+      {/* ── Header row: always visible ─────────────────────────── */}
+      <div className="flex items-center gap-3">
+        <div className={`p-2 rounded-lg flex-shrink-0 ${iconBg}`}>
+          <Icon className={`h-5 w-5 ${iconColor}`} />
         </div>
-        <span
-          className={`px-2.5 py-0.5 rounded-full text-xs font-medium border ${getComplexityStyle()}`}
-        >
-          {complexity} Complexity
-        </span>
-      </div>
 
-      <h3 className="text-base font-semibold text-gray-900 mb-2">{title}</h3>
-      <p className="text-sm text-gray-500 mb-4 flex-grow">{description}</p>
-
-      {tags.length > 0 && (
-        <div className="flex flex-wrap gap-1.5 mb-4">
-          {tags.map((tag) => (
-            <span
-              key={tag}
-              className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-50 text-blue-700 border border-blue-100"
-            >
-              {tag}
-            </span>
-          ))}
-        </div>
-      )}
-
-      {inherits && (
-        <div className="mb-4 text-xs">
-          <span className="text-gray-500">Inherits from: </span>
-          <span className="font-medium text-gray-700 bg-gray-100 px-2 py-0.5 rounded">
-            {inherits}
+        <div className="flex-1 min-w-0">
+          <h3 className="text-sm font-semibold text-gray-900 truncate">{title}</h3>
+          <span
+            className={`inline-block mt-0.5 px-2 py-0 rounded-full text-xs font-medium border ${getComplexityStyle()}`}
+          >
+            {complexity}
           </span>
         </div>
-      )}
 
-      <div className="mb-6">
-        <span className="text-xs font-medium text-gray-500 uppercase tracking-wider block mb-2">
-          Included Guardrails
-        </span>
-
-        {hasAnyDefs ? (
-          /* Collapsible guardrails with detail */
-          <Collapse
-            ghost
-            size="small"
-            expandIconPosition="start"
-            style={{ margin: "0 -12px" }}
-            items={guardrails.map((name) => {
-              const def = defsMap[name];
-              const hasDetail =
-                def &&
-                (def.guardrail_info?.description ||
-                  (def.litellm_params?.patterns?.length ?? 0) > 0 ||
-                  (def.litellm_params?.blocked_words?.length ?? 0) > 0 ||
-                  (def.litellm_params?.categories?.length ?? 0) > 0);
-
-              const mode = def?.litellm_params?.mode;
-              const patternCount = def?.litellm_params?.patterns?.length || 0;
-              const keywordCount = def?.litellm_params?.blocked_words?.length || 0;
-              const categoryCount = def?.litellm_params?.categories?.length || 0;
-
-              return {
-                key: name,
-                collapsible: hasDetail ? ("header" as const) : ("disabled" as const),
-                showArrow: !!hasDetail,
-                label: (
-                  <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
-                    <span style={{ fontWeight: 500, fontSize: 12 }}>{name}</span>
-                    {mode && (
-                      <Tag
-                        color="blue"
-                        style={{ margin: 0, fontSize: 10, lineHeight: "16px", padding: "0 4px" }}
-                      >
-                        {mode}
-                      </Tag>
-                    )}
-                    {patternCount > 0 && (
-                      <Tag style={{ margin: 0, fontSize: 10, lineHeight: "16px", padding: "0 4px" }}>
-                        {patternCount} pattern{patternCount !== 1 ? "s" : ""}
-                      </Tag>
-                    )}
-                    {categoryCount > 0 && (
-                      <Tag style={{ margin: 0, fontSize: 10, lineHeight: "16px", padding: "0 4px" }}>
-                        {categoryCount} categor{categoryCount !== 1 ? "ies" : "y"}
-                      </Tag>
-                    )}
-                    {keywordCount > 0 && (
-                      <Tag style={{ margin: 0, fontSize: 10, lineHeight: "16px", padding: "0 4px" }}>
-                        {keywordCount} keyword{keywordCount !== 1 ? "s" : ""}
-                      </Tag>
-                    )}
-                  </div>
-                ),
-                children: hasDetail && def ? <GuardrailSummary def={def} /> : null,
-              };
-            })}
-          />
-        ) : (
-          /* Flat spans fallback (no definitions available) */
-          <div className="flex flex-wrap gap-2">
-            {guardrails.map((g) => (
-              <span
-                key={g}
-                className="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-gray-50 text-gray-700 border border-gray-200"
-              >
-                {g}
-              </span>
-            ))}
-          </div>
-        )}
+        <div className="flex items-center gap-2 flex-shrink-0">
+          <Button type="primary" size="small" onClick={onUseTemplate}>
+            Use
+          </Button>
+          <button
+            onClick={() => setIsExpanded((v) => !v)}
+            className="p-1 rounded hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition-colors"
+            title={isExpanded ? "Collapse" : "Expand"}
+          >
+            {isExpanded
+              ? <ChevronUpIcon className="h-4 w-4" />
+              : <ChevronDownIcon className="h-4 w-4" />}
+          </button>
+        </div>
       </div>
 
-      <Button
-        type="primary"
-        block
-        className="mt-auto"
-        onClick={onUseTemplate}
-      >
-        Use Template
-      </Button>
+      {/* ── Expandable body ─────────────────────────────────────── */}
+      {isExpanded && (
+        <div className="mt-4">
+          <p className="text-sm text-gray-500 mb-4">{description}</p>
+
+          {tags.length > 0 && (
+            <div className="flex flex-wrap gap-1.5 mb-4">
+              {tags.map((tag) => (
+                <span
+                  key={tag}
+                  className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-50 text-blue-700 border border-blue-100"
+                >
+                  {tag}
+                </span>
+              ))}
+            </div>
+          )}
+
+          {inherits && (
+            <div className="mb-4 text-xs">
+              <span className="text-gray-500">Inherits from: </span>
+              <span className="font-medium text-gray-700 bg-gray-100 px-2 py-0.5 rounded">
+                {inherits}
+              </span>
+            </div>
+          )}
+
+          <div>
+            <span className="text-xs font-medium text-gray-500 uppercase tracking-wider block mb-2">
+              Included Guardrails
+            </span>
+
+            {hasAnyDefs ? (
+              /* Collapsible guardrails with detail */
+              <Collapse
+                ghost
+                size="small"
+                expandIconPosition="start"
+                style={{ margin: "0 -12px" }}
+                items={guardrails.map((name) => {
+                  const def = defsMap[name];
+                  const hasDetail =
+                    def &&
+                    (def.guardrail_info?.description ||
+                      (def.litellm_params?.patterns?.length ?? 0) > 0 ||
+                      (def.litellm_params?.blocked_words?.length ?? 0) > 0 ||
+                      (def.litellm_params?.categories?.length ?? 0) > 0);
+
+                  const mode = def?.litellm_params?.mode;
+                  const patternCount = def?.litellm_params?.patterns?.length || 0;
+                  const keywordCount = def?.litellm_params?.blocked_words?.length || 0;
+                  const categoryCount = def?.litellm_params?.categories?.length || 0;
+
+                  return {
+                    key: name,
+                    collapsible: hasDetail ? ("header" as const) : ("disabled" as const),
+                    showArrow: !!hasDetail,
+                    label: (
+                      <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+                        <span style={{ fontWeight: 500, fontSize: 12 }}>{name}</span>
+                        {mode && (
+                          <Tag
+                            color="blue"
+                            style={{ margin: 0, fontSize: 10, lineHeight: "16px", padding: "0 4px" }}
+                          >
+                            {mode}
+                          </Tag>
+                        )}
+                        {patternCount > 0 && (
+                          <Tag style={{ margin: 0, fontSize: 10, lineHeight: "16px", padding: "0 4px" }}>
+                            {patternCount} pattern{patternCount !== 1 ? "s" : ""}
+                          </Tag>
+                        )}
+                        {categoryCount > 0 && (
+                          <Tag style={{ margin: 0, fontSize: 10, lineHeight: "16px", padding: "0 4px" }}>
+                            {categoryCount} categor{categoryCount !== 1 ? "ies" : "y"}
+                          </Tag>
+                        )}
+                        {keywordCount > 0 && (
+                          <Tag style={{ margin: 0, fontSize: 10, lineHeight: "16px", padding: "0 4px" }}>
+                            {keywordCount} keyword{keywordCount !== 1 ? "s" : ""}
+                          </Tag>
+                        )}
+                      </div>
+                    ),
+                    children: hasDetail && def ? <GuardrailSummary def={def} /> : null,
+                  };
+                })}
+              />
+            ) : (
+              /* Flat spans fallback (no definitions available) */
+              <div className="flex flex-wrap gap-2">
+                {guardrails.map((g) => (
+                  <span
+                    key={g}
+                    className="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-gray-50 text-gray-700 border border-gray-200"
+                  >
+                    {g}
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </Card>
   );
 };
@@ -429,7 +447,7 @@ const PolicyTemplates: React.FC<PolicyTemplatesProps> = ({ onUseTemplate, access
               Showing {filteredTemplates.length} of {templates.length} templates
             </div>
           )}
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
             {filteredTemplates.map((template, index) => (
               <PolicyTemplateCard
                 key={template.id || index}
