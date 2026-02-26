@@ -2156,12 +2156,20 @@ export const agentDailyActivityCall = async (
   });
 };
 
-export const getTotalSpendCall = async (accessToken: string) => {
+export const getTotalSpendCall = async (
+  accessToken: string,
+  startTime?: string,
+  endTime?: string,
+) => {
   /**
-   * Get all models on proxy
+   * Get total spend across all proxy keys, optionally filtered by date range.
    */
   try {
-    let url = proxyBaseUrl ? `${proxyBaseUrl}/global/spend` : `/global/spend`;
+    const params = new URLSearchParams();
+    if (startTime) params.set("start_date", startTime);
+    if (endTime) params.set("end_date", endTime);
+    const base = proxyBaseUrl ? `${proxyBaseUrl}/global/spend` : `/global/spend`;
+    let url = params.toString() ? `${base}?${params}` : base;
 
     //NotificationsManager.info("Requesting model data");
     const response = await fetch(url, {

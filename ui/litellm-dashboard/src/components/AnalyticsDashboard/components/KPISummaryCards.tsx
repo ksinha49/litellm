@@ -65,7 +65,7 @@ const KPISummaryCards: React.FC<KPISummaryCardsProps> = ({ loading, data }) => {
         value={formatNumberWithCommas(data.activeKeys)}
       />
       <KPICard
-        label="Monthly Spend"
+        label="Total Spend"
         value={`$${formatNumberWithCommas(data.monthlySpend, 2)}`}
       />
       <KPICard
@@ -73,9 +73,8 @@ const KPISummaryCards: React.FC<KPISummaryCardsProps> = ({ loading, data }) => {
         value={formatNumberWithCommas(data.totalRequests, 0, true)}
       />
       <KPICard
-        label="Adoption Rate"
-        value={`${data.adoptionRate.toFixed(0)}%`}
-        subtitle={`${data.activeApps} of ${data.totalApps} apps active`}
+        label="Active Teams"
+        value={formatNumberWithCommas(data.activeTeams)}
       />
     </Grid>
   );

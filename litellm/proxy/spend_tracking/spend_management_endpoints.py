@@ -2573,11 +2573,15 @@ async def global_spend_logs(
     dependencies=[Depends(user_api_key_auth)],
     include_in_schema=False,
 )
-async def global_spend():
+async def global_spend(
+    start_date: Optional[str] = fastapi.Query(default=None),
+    end_date: Optional[str] = fastapi.Query(default=None),
+):
     """
     [BETA] This is a beta endpoint. It will change.
 
-    View total spend across all proxy keys
+    View total spend across all proxy keys.
+    Accepts optional start_date / end_date (YYYY-MM-DD) to filter by date range.
     """
     import traceback
 
@@ -2588,11 +2592,26 @@ async def global_spend():
 
         if prisma_client is None:
             raise HTTPException(status_code=500, detail={"error": "No db connected"})
-        sql_query = """SELECT SUM(spend) as total_spend FROM "MonthlyGlobalSpend";"""
-        response = await prisma_client.db.query_raw(query=sql_query)
+
+        if start_date and end_date:
+            start_date_obj = datetime.strptime(start_date, "%Y-%m-%d")
+            end_date_obj = datetime.strptime(end_date, "%Y-%m-%d")
+            sql_query = """
+            SELECT SUM(spend) as total_spend
+            FROM "LiteLLM_SpendLogs"
+            WHERE "startTime" >= $1::timestamptz
+              AND "startTime" < ($2::timestamptz + INTERVAL '1 day')
+            """
+            response = await prisma_client.db.query_raw(
+                sql_query, start_date_obj, end_date_obj
+            )
+        else:
+            sql_query = """SELECT SUM(spend) as total_spend FROM "MonthlyGlobalSpend";"""
+            response = await prisma_client.db.query_raw(query=sql_query)
+
         if response is not None:
             if isinstance(response, list) and len(response) > 0:
-                total_spend = response[0].get("total_spend", 0.0)
+                total_spend = response[0].get("total_spend", 0.0) or 0.0
 
         return {"spend": total_spend, "max_budget": litellm.max_budget}
     except Exception as e:
@@ -2682,8 +2701,11 @@ async def global_spend_keys(
     from litellm.proxy.proxy_server import prisma_client
 
     if (
-        user_api_key_dict.user_role == LitellmUserRoles.INTERNAL_USER
-        or user_api_key_dict.user_role == LitellmUserRoles.INTERNAL_USER_VIEW_ONLY
+        (
+            user_api_key_dict.user_role == LitellmUserRoles.INTERNAL_USER
+            or user_api_key_dict.user_role == LitellmUserRoles.INTERNAL_USER_VIEW_ONLY
+        )
+        and user_api_key_dict.user_id is not None
     ):
         response = await global_spend_key_internal_user(
             user_api_key_dict=user_api_key_dict

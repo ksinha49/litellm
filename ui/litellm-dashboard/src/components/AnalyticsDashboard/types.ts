@@ -3,9 +3,7 @@ export interface KPIData {
   activeKeys: number;
   monthlySpend: number;
   totalRequests: number;
-  adoptionRate: number;
-  totalApps: number;
-  activeApps: number;
+  activeTeams: number;
 }
 
 export interface DailyActivity {

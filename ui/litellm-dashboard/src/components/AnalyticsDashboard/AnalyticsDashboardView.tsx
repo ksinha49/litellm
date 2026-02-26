@@ -3,7 +3,6 @@ import { DateRangePickerValue, Title } from "@tremor/react";
 import AdvancedDatePicker from "@/components/shared/advanced_date_picker";
 import {
   adminGlobalActivity,
-  adminGlobalCacheActivity,
   adminspendByProvider,
   adminTopKeysCall,
   adminTopModelsCall,
@@ -17,7 +16,7 @@ import KPISummaryCards from "./components/KPISummaryCards";
 import AdoptionTrendChart from "./components/AdoptionTrendChart";
 import TeamSpendChart from "./components/TeamSpendChart";
 import TopModelsChart from "./components/TopModelsChart";
-import CachePerformanceChart from "./components/CachePerformanceChart";
+import OrgConsumptionChart from "./components/OrgConsumptionChart";
 import ApplicationInventoryTable from "./components/ApplicationInventoryTable";
 import ExpandableChartCard from "./components/ExpandableChartCard";
 import {
@@ -25,7 +24,6 @@ import {
   DailyActivity,
   TeamSpend,
   TopModel,
-  CacheActivity,
   ProviderSpendData,
 } from "./types";
 
@@ -38,9 +36,7 @@ const defaultKPI: KPIData = {
   activeKeys: 0,
   monthlySpend: 0,
   totalRequests: 0,
-  adoptionRate: 0,
-  totalApps: 0,
-  activeApps: 0,
+  activeTeams: 0,
 };
 
 const getDefaultDateRange = (): DateRangePickerValue => {
@@ -73,7 +69,6 @@ const AnalyticsDashboardView: React.FC<AnalyticsDashboardViewProps> = ({
   const [providerSpend, setProviderSpend] = useState<ProviderSpendData[]>([]);
   const [teamSpend, setTeamSpend] = useState<TeamSpend[]>([]);
   const [topModels, setTopModels] = useState<TopModel[]>([]);
-  const [cacheActivity, setCacheActivity] = useState<CacheActivity[]>([]);
   const [applications, setApplications] = useState<ApplicationMetrics[]>([]);
 
   const accessToken = accessTokenProp ?? null;
@@ -90,16 +85,15 @@ const AnalyticsDashboardView: React.FC<AnalyticsDashboardViewProps> = ({
     const token = accessToken ?? "";
     const results = await Promise.allSettled([
       adminGlobalActivity(token, startTime, endTime),           // 0
-      getTotalSpendCall(token),                                  // 1
+      getTotalSpendCall(token, startTime, endTime),               // 1
       adminTopModelsCall(token),                                 // 2
       adminTopKeysCall(token),                                   // 3
       adminspendByProvider(token, null, startTime, endTime),     // 4
       teamSpendLogsCall(token),                                  // 5
-      adminGlobalCacheActivity(token, startTime, endTime),       // 6
       applicationHealthCall(token, {
         start_date: startTime,
         end_date: endTime,
-      }),                                                              // 7
+      }),                                                        // 6
     ]);
 
     // Helper to safely extract fulfilled values
@@ -145,42 +139,22 @@ const AnalyticsDashboardView: React.FC<AnalyticsDashboardViewProps> = ({
       setTeamSpend(teamsResponse.total_spend_per_team);
     }
 
-    // Cache activity — backend returns [{api_key, total_rows, cache_hit_true_rows, ...}]
-    const cacheData = val<
-      { api_key: string; total_rows: number; cache_hit_true_rows: number }[]
-    >(6);
-    if (cacheData && Array.isArray(cacheData)) {
-      // Aggregate across all keys into a single summary
-      let totalHits = 0;
-      let totalMisses = 0;
-      for (const row of cacheData) {
-        totalHits += row.cache_hit_true_rows ?? 0;
-        totalMisses += (row.total_rows ?? 0) - (row.cache_hit_true_rows ?? 0);
-      }
-      setCacheActivity([
-        { date: "Total", cache_hits: totalHits, cache_misses: totalMisses },
-      ]);
-    }
-
     // Application health
     const appData = val<{
       applications: ApplicationMetrics[];
       total_apps: number;
       active_apps: number;
-    }>(7);
+    }>(6);
     if (appData?.applications) setApplications(appData.applications);
 
     // Compute KPI summary
-    const totalApps = appData?.total_apps ?? 0;
-    const activeApps = appData?.active_apps ?? 0;
+    const currentTeamSpend = teamsResponse?.total_spend_per_team ?? [];
     setKpi({
       totalModels: modelsData?.length ?? 0,
       activeKeys: keysData?.length ?? 0,
       monthlySpend: spendData?.spend ?? 0,
       totalRequests: activityData?.sum_api_requests ?? 0,
-      adoptionRate: totalApps > 0 ? (activeApps / totalApps) * 100 : 0,
-      totalApps,
-      activeApps,
+      activeTeams: currentTeamSpend.filter((t) => t.total_spend > 0).length,
     });
 
     setLoading(false);
@@ -254,14 +228,10 @@ const AnalyticsDashboardView: React.FC<AnalyticsDashboardViewProps> = ({
         </ExpandableChartCard>
       </div>
 
-      {/* Cache Performance */}
-      <ExpandableChartCard title="Cache Performance">
-        {(expanded) => (
-          <CachePerformanceChart
-            loading={isLoading}
-            data={cacheActivity}
-            expanded={expanded}
-          />
+      {/* Organizational Consumption Distribution */}
+      <ExpandableChartCard title="Organizational Consumption Distribution">
+        {(_expanded) => (
+          <OrgConsumptionChart loading={isLoading} data={teamSpend} />
         )}
       </ExpandableChartCard>
 
