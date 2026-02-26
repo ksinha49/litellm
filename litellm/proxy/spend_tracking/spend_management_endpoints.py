@@ -283,8 +283,12 @@ async def get_global_activity(
             )
 
         if (
-            user_api_key_dict.user_role == LitellmUserRoles.INTERNAL_USER
-            or user_api_key_dict.user_role == LitellmUserRoles.INTERNAL_USER_VIEW_ONLY
+            (
+                user_api_key_dict.user_role == LitellmUserRoles.INTERNAL_USER
+                or user_api_key_dict.user_role
+                == LitellmUserRoles.INTERNAL_USER_VIEW_ONLY
+            )
+            and user_api_key_dict.user_id is not None
         ):
             db_response = await get_global_activity_internal_user(
                 user_api_key_dict, start_date_obj, end_date_obj

@@ -581,6 +581,18 @@ class LiteLLMRoutes(enum.Enum):
             "/public/agent_hub",
             "/public/mcp_hub",
             "/public/litellm_model_cost_map",
+            # Analytics / global spend — public admin dashboard
+            "/global/spend",
+            "/global/spend/keys",
+            "/global/spend/teams",
+            "/global/spend/end_users",
+            "/global/spend/models",
+            "/global/spend/provider",
+            "/global/spend/tags",
+            "/global/spend/logs",
+            "/global/spend/report",
+            "/global/activity",
+            "/global/activity/cache_hits",
         ]
     )
 

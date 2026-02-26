@@ -79,11 +79,6 @@ const AnalyticsDashboardView: React.FC<AnalyticsDashboardViewProps> = ({
   const accessToken = accessTokenProp ?? null;
 
   const fetchData = useCallback(async () => {
-    if (!accessToken) {
-      setLoading(false);
-      return;
-    }
-
     const isRefresh = !loading;
     if (isRefresh) setIsDateChanging(true);
     else setLoading(true);
@@ -92,15 +87,16 @@ const AnalyticsDashboardView: React.FC<AnalyticsDashboardViewProps> = ({
     const startTime = dateValue.from ? formatDateParam(dateValue.from) : undefined;
     const endTime = dateValue.to ? formatDateParam(dateValue.to) : undefined;
 
+    const token = accessToken ?? "";
     const results = await Promise.allSettled([
-      adminGlobalActivity(accessToken, startTime, endTime),           // 0
-      getTotalSpendCall(accessToken),                                  // 1
-      adminTopModelsCall(accessToken),                                 // 2
-      adminTopKeysCall(accessToken),                                   // 3
-      adminspendByProvider(accessToken, null, startTime, endTime),     // 4
-      teamSpendLogsCall(accessToken),                                  // 5
-      adminGlobalCacheActivity(accessToken, startTime, endTime),       // 6
-      applicationHealthCall(accessToken, {
+      adminGlobalActivity(token, startTime, endTime),           // 0
+      getTotalSpendCall(token),                                  // 1
+      adminTopModelsCall(token),                                 // 2
+      adminTopKeysCall(token),                                   // 3
+      adminspendByProvider(token, null, startTime, endTime),     // 4
+      teamSpendLogsCall(token),                                  // 5
+      adminGlobalCacheActivity(token, startTime, endTime),       // 6
+      applicationHealthCall(token, {
         start_date: startTime,
         end_date: endTime,
       }),                                                              // 7
