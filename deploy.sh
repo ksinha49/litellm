@@ -383,6 +383,89 @@ start_litellm() {
   [[ $attempt -lt $max ]] && success "LiteLLM is healthy."
 }
 
+# ── post-deploy: backfill spend_at_last_reset baseline ────────────────────────
+# One-time data migration: for every API key with an active budget period, set
+#   spend_at_last_reset = spend - SUM(daily_spend_in_current_period)
+# so that period_spend = spend - spend_at_last_reset reflects only the current
+# billing window, not all-time cumulative spend.
+#
+# Idempotency guard: a completion flag is stored in LiteLLM_Config under the key
+# 'spend_at_last_reset_backfill_v1'. If that row exists, the function exits
+# immediately on every subsequent deploy.
+backfill_spend_at_last_reset() {
+  step "Post-deploy: spend_at_last_reset backfill"
+
+  if ! command -v psql &>/dev/null; then
+    warn "psql not found on host — skipping spend_at_last_reset backfill. Run manually if needed."
+    return
+  fi
+
+  # Strip ?schema=... query param — psql doesn't support Prisma-style URL params
+  local psql_url="${DATABASE_URL%%\?*}"
+
+  # Guard: check if completion flag is already recorded in LiteLLM_Config
+  local already_done
+  already_done="$(psql "$psql_url" -tAq -c "
+    SET search_path TO litellm;
+    SELECT param_value::text FROM \"LiteLLM_Config\"
+    WHERE param_name = 'spend_at_last_reset_backfill_v1'
+    LIMIT 1;
+  " 2>/dev/null || true)"
+  already_done="${already_done// /}"
+
+  if [[ -n "$already_done" ]]; then
+    info "spend_at_last_reset backfill already applied — skipping."
+    return
+  fi
+
+  info "Running spend_at_last_reset backfill for active budget-tracked keys..."
+
+  local updated
+  updated="$(psql "$psql_url" -tAq -c "
+    SET search_path TO litellm;
+    WITH updated AS (
+      UPDATE \"LiteLLM_VerificationToken\" vt
+      SET spend_at_last_reset = GREATEST(0, vt.spend - COALESCE(
+          (SELECT SUM(dus.spend)
+           FROM \"LiteLLM_DailyUserSpend\" dus
+           WHERE dus.api_key = vt.token
+             AND dus.date >= CASE
+                 WHEN vt.budget_duration ILIKE '%mo%' OR vt.budget_duration ILIKE '%month%'
+                     THEN TO_CHAR(vt.budget_reset_at - INTERVAL '1 month', 'YYYY-MM-DD')
+                 WHEN vt.budget_duration = '30d'
+                     THEN TO_CHAR(vt.budget_reset_at - INTERVAL '30 days', 'YYYY-MM-DD')
+                 WHEN vt.budget_duration IN ('7d', '1w')
+                     THEN TO_CHAR(vt.budget_reset_at - INTERVAL '7 days', 'YYYY-MM-DD')
+                 WHEN vt.budget_duration = '1d'
+                     THEN TO_CHAR(vt.budget_reset_at - INTERVAL '1 day', 'YYYY-MM-DD')
+                 WHEN vt.budget_duration = '1y'
+                     THEN TO_CHAR(vt.budget_reset_at - INTERVAL '1 year', 'YYYY-MM-DD')
+                 ELSE TO_CHAR(vt.budget_reset_at - INTERVAL '1 month', 'YYYY-MM-DD')
+             END
+          ), 0)
+      )
+      WHERE vt.budget_duration IS NOT NULL
+        AND vt.budget_reset_at > NOW()
+        AND vt.spend_at_last_reset = 0
+      RETURNING 1
+    )
+    SELECT COUNT(*) FROM updated;
+  " 2>/dev/null || echo "0")"
+  updated="${updated// /}"
+
+  # Record completion flag so future deploys skip this step
+  local ts
+  ts="$(date -u '+%Y-%m-%dT%H:%M:%SZ')"
+  psql "$psql_url" -c "
+    SET search_path TO litellm;
+    INSERT INTO \"LiteLLM_Config\" (param_name, param_value)
+    VALUES ('spend_at_last_reset_backfill_v1', to_jsonb('${ts}'::text))
+    ON CONFLICT (param_name) DO NOTHING;
+  " &>/dev/null || warn "Could not record backfill completion flag in LiteLLM_Config."
+
+  success "spend_at_last_reset backfill complete — ${updated} key(s) updated."
+}
+
 # ── step 4: start Prometheus ──────────────────────────────────────────────────
 # prometheus.yml scrapes 'litellm:4000' — both containers share DOCKER_NETWORK
 # and LiteLLM is aliased as 'litellm' on that network, so discovery works.
@@ -419,6 +502,7 @@ main() {
   remove_container "${LITELLM_CONTAINER}"
   remove_container "${PROMETHEUS_CONTAINER}"
   start_litellm
+  backfill_spend_at_last_reset
   start_prometheus
 
   # Done
