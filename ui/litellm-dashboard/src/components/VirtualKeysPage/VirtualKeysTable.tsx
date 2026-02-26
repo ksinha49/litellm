@@ -83,6 +83,7 @@ export function VirtualKeysTable({ teams, organizations, onSortChange, currentSo
   } = useKeys(tablePagination.pageIndex + 1, tablePagination.pageSize, {
     sortBy: sortBy || undefined,
     sortOrder: sortOrder || undefined,
+    expand: "user",
   });
   const totalCount = keys?.total_count || 0;
   const [expandedAccordions, setExpandedAccordions] = useState<Record<string, boolean>>({});
@@ -226,11 +227,26 @@ export function VirtualKeysTable({ teams, organizations, onSortChange, currentSo
     },
     {
       id: "organization_id",
-      accessorKey: "organization_id",
-      header: "Organization ID",
-      size: 140,
+      accessorKey: "org_id",
+      header: "Organization",
+      size: 160,
       enableSorting: false,
-      cell: (info) => (info.getValue() ? info.renderValue() : "-"),
+      cell: (info) => {
+        // Resolve org_id: use key's own org_id, or derive from the key's team
+        const orgId = (info.getValue() as string | null | undefined)
+          || teams?.find((t) => t.team_id === info.row.original.team_id)?.organization_id;
+        if (!orgId) return "-";
+        // Show org alias (human-readable name) if we have the orgs list
+        const orgAlias = organizations?.find((o) => o.organization_id === orgId)?.organization_alias;
+        const display = orgAlias || orgId;
+        return (
+          <Tooltip title={orgId}>
+            <span className="font-mono text-xs truncate block" style={{ maxWidth: 160, overflow: "hidden" }}>
+              {display}
+            </span>
+          </Tooltip>
+        );
+      },
     },
     {
       id: "user_email",
@@ -325,10 +341,25 @@ export function VirtualKeysTable({ teams, organizations, onSortChange, currentSo
     {
       id: "spend",
       accessorKey: "spend",
-      header: "Spend (USD)",
-      size: 100,
+      header: "All-Time Spend (USD)",
+      size: 130,
       enableSorting: true,
-      cell: (info) => formatNumberWithCommas(info.getValue() as number, 4),
+      cell: (info) => `$${formatNumberWithCommas(info.getValue() as number, 4)}`,
+    },
+    {
+      id: "period_spend",
+      accessorKey: "spend",
+      header: "Period Spend (USD)",
+      size: 130,
+      enableSorting: false,
+      cell: (info) => {
+        const row = info.row.original as KeyResponse;
+        if (!row.budget_duration) {
+          return "—";
+        }
+        const periodSpend = (row.spend || 0) - (row.spend_at_last_reset || 0);
+        return `$${formatNumberWithCommas(Math.max(0, periodSpend), 4)}`;
+      },
     },
     {
       id: "max_budget",

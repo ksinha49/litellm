@@ -23,6 +23,7 @@ export interface KeyResponse {
   key_name: string;
   key_alias: string;
   spend: number;
+  spend_at_last_reset: number;
   max_budget: number;
   expires: string;
   models: string[];
@@ -45,7 +46,8 @@ export interface KeyResponse {
   soft_budget_cooldown: boolean;
   blocked: boolean;
   litellm_budget_table: Record<string, unknown>;
-  organization_id: string | null;
+  org_id: string | null;
+  organization_id?: string | null; // alias kept for backwards compat
   created_at: string;
   updated_at: string;
   team_spend: number;

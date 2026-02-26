@@ -393,9 +393,9 @@ export function KeyEditView({
 
       <Form.Item label="Reset Budget" name="budget_duration">
         <Select placeholder="n/a">
-          <Select.Option value="daily">Daily</Select.Option>
-          <Select.Option value="weekly">Weekly</Select.Option>
-          <Select.Option value="monthly">Monthly</Select.Option>
+          <Select.Option value="24h">Daily</Select.Option>
+          <Select.Option value="7d">Weekly (resets every Monday)</Select.Option>
+          <Select.Option value="30d">Monthly (resets on 1st of month)</Select.Option>
         </Select>
       </Form.Item>
 

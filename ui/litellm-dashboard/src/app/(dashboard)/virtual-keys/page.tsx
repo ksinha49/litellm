@@ -1,18 +1,25 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import useKeyList from "@/components/key_team_helpers/key_list";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import useAuthorized from "@/app/(dashboard)/hooks/useAuthorized";
 import UserDashboard from "@/components/user_dashboard";
 import useTeams from "@/app/(dashboard)/hooks/useTeams";
-import { Organization } from "@/components/networking";
+import { Organization, organizationListCall } from "@/components/networking";
 
 const VirtualKeysPage = () => {
   const { accessToken, userRole, userId, premiumUser, userEmail } = useAuthorized();
   const { teams, setTeams } = useTeams();
   const [createClicked, setCreateClicked] = useState<boolean>(false);
   const [organizations, setOrganizations] = useState<Organization[]>([]);
+
+  useEffect(() => {
+    if (!accessToken) return;
+    organizationListCall(accessToken)
+      .then((data) => setOrganizations(Array.isArray(data) ? data : []))
+      .catch(() => {});
+  }, [accessToken]);
 
   const queryClient = new QueryClient();
 
