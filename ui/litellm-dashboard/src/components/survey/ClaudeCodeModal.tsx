@@ -8,7 +8,7 @@ interface ClaudeCodeModalProps {
   onComplete: () => void;
 }
 
-const GOOGLE_FORM_URL = "https://forms.gle/LZeJQ3XytBakckYa9";
+const GOOGLE_FORM_URL = "https://forms.office.com/r/RzpqxYhLbv";
 
 export function ClaudeCodeModal({ isOpen, onClose, onComplete }: ClaudeCodeModalProps) {
   if (!isOpen) return null;

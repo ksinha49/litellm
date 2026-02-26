@@ -15,5 +15,9 @@ ALTER TABLE "LiteLLM_TeamTable"
   ADD COLUMN IF NOT EXISTS "spend_at_last_reset" DOUBLE PRECISION NOT NULL DEFAULT 0;
 
 -- AlterTable
+ALTER TABLE "LiteLLM_DeletedTeamTable"
+  ADD COLUMN IF NOT EXISTS "spend_at_last_reset" DOUBLE PRECISION NOT NULL DEFAULT 0;
+
+-- AlterTable
 ALTER TABLE "LiteLLM_ApplicationTable"
   ADD COLUMN IF NOT EXISTS "health_check_url" TEXT;

@@ -152,6 +152,7 @@ model LiteLLM_DeletedTeamTable {
     max_budget              Float?
     soft_budget             Float?
     spend                   Float    @default(0.0)
+    spend_at_last_reset     Float    @default(0.0)
     models                  String[]
     max_parallel_requests   Int?
     tpm_limit               BigInt?
