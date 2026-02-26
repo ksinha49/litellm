@@ -242,8 +242,8 @@ const TeamsView: React.FC<TeamProps> = ({
   };
 
   return (
-    <div className="w-full mx-4 h-[75vh]">
-      <Grid numItems={1} className="gap-2 p-8 w-full mt-2">
+    <div className="w-full p-8">
+      <Grid numItems={1} className="gap-2 w-full mt-2">
         <Col numColSpan={1} className="flex flex-col gap-2">
           {(userRole == "Admin" || userRole == "Org Admin") && (
             <Button className="w-fit" onClick={() => setIsTeamModalVisible(true)}>
@@ -288,9 +288,9 @@ const TeamsView: React.FC<TeamProps> = ({
                 <Text>
                   Click on &ldquo;Team ID&rdquo; to view team details <b>and</b> manage team members.
                 </Text>
-                <Grid numItems={1} className="gap-2 pt-2 pb-2 h-[75vh] w-full mt-2">
+                <Grid numItems={1} className="gap-2 pt-2 pb-2 w-full mt-2">
                   <Col numColSpan={1}>
-                    <Card className="w-full mx-auto flex-auto overflow-hidden overflow-y-auto max-h-[50vh]">
+                    <Card className="w-full mx-auto">
                       <div className="border-b px-6 py-4">
                         <div className="flex flex-col space-y-4">
                           <TeamsFilters
