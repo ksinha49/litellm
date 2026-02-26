@@ -78,10 +78,12 @@ COPY --from=builder /wheels/ /wheels/
 # Install the built wheel using pip; again using a wildcard if it's the only file
 RUN pip install *.whl /wheels/* --no-index --find-links=/wheels/ && rm -f *.whl && rm -rf /wheels
 
-# Override litellm_proxy_extras schema.prisma with local version containing custom schema changes
-# (litellm_proxy_extras is installed from PyPI, so its schema.prisma would otherwise miss our changes)
-RUN cp /app/litellm-proxy-extras/litellm_proxy_extras/schema.prisma \
-    "$(python3 -c 'import litellm_proxy_extras, os; print(os.path.dirname(litellm_proxy_extras.__file__))')/schema.prisma"
+# Override litellm_proxy_extras schema.prisma and migrations with local versions.
+# (litellm_proxy_extras is installed from PyPI, so its schema.prisma and migrations
+#  would otherwise miss our custom schema additions like health_status.)
+RUN PKG_DIR="$(python3 -c 'import litellm_proxy_extras, os; print(os.path.dirname(litellm_proxy_extras.__file__))')" && \
+    cp /app/litellm-proxy-extras/litellm_proxy_extras/schema.prisma "$PKG_DIR/schema.prisma" && \
+    cp -r /app/litellm-proxy-extras/litellm_proxy_extras/migrations/. "$PKG_DIR/migrations/"
 
 # Replace the nodejs-wheel-binaries bundled node with the system node (fixes CVE-2025-55130)
 RUN NODEJS_WHEEL_NODE=$(find /usr/lib -path "*/nodejs_wheel/bin/node" 2>/dev/null) && \

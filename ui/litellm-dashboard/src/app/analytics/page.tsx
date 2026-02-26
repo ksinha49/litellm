@@ -2,6 +2,7 @@
 
 import React, { Suspense, useEffect, useState } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { jwtDecode } from "jwt-decode";
 import { ThemeProvider } from "@/contexts/ThemeContext";
 import Navbar from "@/components/navbar";
 import AnalyticsDashboardView from "@/components/AnalyticsDashboard/AnalyticsDashboardView";
@@ -26,7 +27,16 @@ function AnalyticsPageContent() {
   useEffect(() => {
     const token = getCookie("token");
     if (token) {
-      setAccessToken(token);
+      try {
+        const decoded: any = jwtDecode(token);
+        if (decoded?.key) {
+          setAccessToken(decoded.key);
+        } else {
+          setAccessToken(token);
+        }
+      } catch {
+        setAccessToken(token);
+      }
     }
   }, []);
 

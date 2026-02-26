@@ -282,7 +282,9 @@ model LiteLLM_ApplicationTable {
     team_id          String?
     description      String?
     labels           Json?    @default("{}")
-    health_check_url String?
+    health_check_url     String?
+    health_status        String?  @default("unknown")  // "healthy" | "unhealthy" | "unknown"
+    last_health_check_at DateTime?
     created_at       DateTime @default(now()) @map("created_at")
     updated_at       DateTime @default(now()) @updatedAt @map("updated_at")
     created_by       String?

@@ -331,7 +331,7 @@ ensure_network() {
 # ── stop and remove a container (idempotent) ──────────────────────────────────
 remove_container() {
   local name="$1"
-  if docker inspect "$name" &>/dev/null 2>&1; then
+  if docker container inspect "$name" &>/dev/null 2>&1; then
     info "Stopping ${name}..."
     docker stop "$name" >/dev/null
     docker rm   "$name" >/dev/null
