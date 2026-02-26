@@ -842,18 +842,19 @@ async def get_global_spend_provider(
             )
 
         if (
-            user_api_key_dict.user_role == LitellmUserRoles.INTERNAL_USER
-            or user_api_key_dict.user_role == LitellmUserRoles.INTERNAL_USER_VIEW_ONLY
+            (
+                user_api_key_dict.user_role == LitellmUserRoles.INTERNAL_USER
+                or user_api_key_dict.user_role
+                == LitellmUserRoles.INTERNAL_USER_VIEW_ONLY
+            )
+            and user_api_key_dict.user_id is not None
         ):
             user_id = user_api_key_dict.user_id
-            if user_id is None:
-                raise HTTPException(
-                    status_code=400, detail={"error": "No user_id found"}
-                )
 
             sql_query = """
             SELECT
             model_id,
+            MIN(model) AS model,
             SUM(spend) AS spend,
             COUNT(*) AS total_requests,
             SUM(CASE WHEN LOWER(status) = \'success\' THEN 1 ELSE 0 END) AS successful_requests,
@@ -871,6 +872,7 @@ async def get_global_spend_provider(
             sql_query = """
             SELECT
             model_id,
+            MIN(model) AS model,
             SUM(spend) AS spend,
             COUNT(*) AS total_requests,
             SUM(CASE WHEN LOWER(status) = \'success\' THEN 1 ELSE 0 END) AS successful_requests,
@@ -890,40 +892,38 @@ async def get_global_spend_provider(
         # Convert model_id -> to Provider #
         ###################################
 
-        # we use the in memory router for this
         ui_response = []
         provider_spend_mapping: defaultdict = defaultdict(
             lambda: {"spend": 0, "requests": 0, "successful_requests": 0, "tokens": 0}
         )
         for row in db_response:
-            _model_id = row["model_id"]
+            _model_name = row.get("model") or ""
             _provider = "Unknown"
-            if llm_router is not None:
-                _deployment = llm_router.get_deployment(model_id=_model_id)
-                if _deployment is not None:
-                    try:
-                        _, _provider, _, _ = litellm.get_llm_provider(
-                            model=_deployment.litellm_params.model,
-                            custom_llm_provider=_deployment.litellm_params.custom_llm_provider,
-                            api_base=_deployment.litellm_params.api_base,
-                            litellm_params=_deployment.litellm_params,
-                        )
-                        provider_spend_mapping[_provider]["spend"] += row["spend"]
-                        provider_spend_mapping[_provider]["requests"] += row["total_requests"]
-                        provider_spend_mapping[_provider]["successful_requests"] += row["successful_requests"]
-                        provider_spend_mapping[_provider]["tokens"] += row["tokens"]
-                    except Exception:
-                        pass
+            # Derive provider directly from the stored model name
+            if _model_name:
+                try:
+                    _, _provider, _, _ = litellm.get_llm_provider(model=_model_name)
+                except Exception:
+                    pass
+            # Always record the spend so it is never silently dropped
+            provider_spend_mapping[_provider]["spend"] += row["spend"]
+            provider_spend_mapping[_provider]["requests"] += row["total_requests"]
+            provider_spend_mapping[_provider]["successful_requests"] += row[
+                "successful_requests"
+            ]
+            provider_spend_mapping[_provider]["tokens"] += row["tokens"]
 
         for provider, data in provider_spend_mapping.items():
-            ui_response.append({
-                "provider": provider,
-                "spend": data["spend"],
-                "requests": data["requests"],
-                "successful_requests": data["successful_requests"],
-                "failed_requests": data["requests"] - data["successful_requests"],
-                "tokens": data["tokens"],
-            })
+            ui_response.append(
+                {
+                    "provider": provider,
+                    "spend": data["spend"],
+                    "requests": data["requests"],
+                    "successful_requests": data["successful_requests"],
+                    "failed_requests": data["requests"] - data["successful_requests"],
+                    "tokens": data["tokens"],
+                }
+            )
 
         return ui_response
 
@@ -2943,8 +2943,11 @@ async def global_spend_models(
     from litellm.proxy.proxy_server import prisma_client
 
     if (
-        user_api_key_dict.user_role == LitellmUserRoles.INTERNAL_USER
-        or user_api_key_dict.user_role == LitellmUserRoles.INTERNAL_USER_VIEW_ONLY
+        (
+            user_api_key_dict.user_role == LitellmUserRoles.INTERNAL_USER
+            or user_api_key_dict.user_role == LitellmUserRoles.INTERNAL_USER_VIEW_ONLY
+        )
+        and user_api_key_dict.user_id is not None
     ):
         response = await global_spend_models_internal_user(
             user_api_key_dict=user_api_key_dict, limit=limit

@@ -36,12 +36,13 @@ const TeamSpendChart: React.FC<TeamSpendChartProps> = ({
 
   return (
     <BarChart
-      className={expanded ? "mt-4 h-[500px]" : "mt-4 h-64"}
+      className={expanded ? "mt-4 h-[500px]" : "mt-4 h-96"}
       data={chartData}
       index="team"
       categories={["Spend"]}
       colors={["cyan"]}
       layout="vertical"
+      yAxisWidth={160}
       valueFormatter={(v) => `$${formatNumberWithCommas(v, 2)}`}
       showAnimation
       showGridLines={true}
