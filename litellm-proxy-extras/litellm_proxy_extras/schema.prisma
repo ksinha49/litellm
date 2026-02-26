@@ -1000,3 +1000,13 @@ model LiteLLM_AccessGroupTable {
   updated_at         DateTime @default(now()) @updatedAt
   updated_by         String?
 }
+
+// Generic key-value metadata store for internal bookkeeping
+// (e.g. one-time migration flags, salt key hash, feature toggles)
+model LiteLLM_MetadataTable {
+  metadata_id  String   @id @default(uuid())
+  key          String   @unique
+  value        String
+  created_at   DateTime @default(now())
+  updated_at   DateTime @updatedAt
+}
