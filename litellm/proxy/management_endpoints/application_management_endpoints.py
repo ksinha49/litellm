@@ -18,6 +18,7 @@ All /application management endpoints
 """
 
 import json
+import os
 import traceback
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
@@ -200,6 +201,60 @@ async def _compute_app_metrics(
         app.last_health_check_at.isoformat() if app.last_health_check_at else None
     )
     return metrics
+
+
+# ─── cache helpers ──────────────────────────────────────────────────────────
+
+_CACHE_STALENESS_SECONDS = int(
+    os.environ.get("APPLICATION_METRICS_CACHE_STALENESS", 360)
+)  # 6 min default
+
+
+def _is_30d_window(start_dt: datetime, end_dt: datetime) -> bool:
+    """
+    Return True when the requested window is approximately the rolling 30-day
+    window ending today — i.e. what the cache stores.
+
+    Matches the UI's 'Last 30 days' preset (and any equivalent custom range).
+    end_date must land on today or yesterday; window must be 28–32 days.
+    """
+    try:
+        today = datetime.now(tz=timezone.utc).date()
+        end_date = end_dt.date() if hasattr(end_dt, "date") else end_dt
+        if abs((end_date - today).days) > 1:
+            return False
+        # Normalise to UTC-aware before subtraction to avoid TypeError when one
+        # operand is naive (e.g. fromisoformat("2026-01-27")) and the other is
+        # tz-aware (e.g. datetime.now(tz=utc)).
+        _utc = timezone.utc
+
+        def _as_aware(dt: datetime) -> datetime:
+            return dt if dt.tzinfo is not None else dt.replace(tzinfo=_utc)
+
+        window_days = (_as_aware(end_dt) - _as_aware(start_dt)).days
+        return 28 <= window_days <= 32
+    except Exception:
+        return False
+
+
+async def _get_cached_app_metrics(
+    prisma_client: Any, app_ids: List[str]
+) -> Optional[Dict[str, Any]]:
+    """
+    Return a dict keyed by application_id if a fresh cache exists for ALL
+    requested apps.  Returns None if cache is stale or incomplete — caller
+    falls back to live compute.
+    """
+    cutoff = datetime.now(timezone.utc) - timedelta(seconds=_CACHE_STALENESS_SECONDS)
+    rows = await prisma_client.db.litellm_applicationmetricscache.find_many(
+        where={
+            "application_id": {"in": app_ids},
+            "computed_at": {"gte": cutoff},
+        }
+    )
+    if len(rows) < len(app_ids):
+        return None  # incomplete — some apps not yet cached
+    return {r.application_id: r for r in rows}
 
 
 # ─── CRUD endpoints ─────────────────────────────────────────────────────────
@@ -819,6 +874,37 @@ async def application_metrics(
         )
         active_since = now - timedelta(hours=24)
 
+        # Attempt cache hit for ~30-day windows
+        if _is_30d_window(start_dt, end_dt):
+            try:
+                cache = await _get_cached_app_metrics(prisma_client, [app_id])
+            except Exception:
+                cache = None
+            if cache is not None:
+                row = cache[app_id]
+                metrics = ApplicationMetrics(
+                    application_id=app.application_id,
+                    application_name=app.application_name,
+                    application_type=app.application_type,
+                    department=app.department,
+                    lob=app.lob,
+                    team_id=app.team_id,
+                    total_tokens=int(row.total_tokens),
+                    total_cost=float(row.total_cost),
+                    avg_latency_ms=float(row.avg_latency_ms),
+                    error_rate=float(row.error_rate),
+                    is_active=bool(row.is_active),
+                    key_count=int(row.key_count),
+                )
+                metrics.health_check_url = app.health_check_url
+                metrics.health_status = app.health_status or "unknown"
+                metrics.last_health_check_at = (
+                    app.last_health_check_at.isoformat()
+                    if app.last_health_check_at
+                    else None
+                )
+                return metrics
+
         metrics = await _compute_app_metrics(
             prisma_client, app, start_dt, end_dt, active_since
         )
@@ -915,6 +1001,48 @@ async def application_health(
         apps = await prisma_client.db.litellm_applicationtable.find_many(where=where)
 
         app_metrics: List[ApplicationMetrics] = []
+
+        # Attempt cache hit for ~30-day windows (all apps must be present + fresh)
+        if apps and _is_30d_window(start_dt, end_dt):
+            app_ids = [a.application_id for a in apps]
+            try:
+                cache = await _get_cached_app_metrics(prisma_client, app_ids)
+            except Exception:
+                cache = None
+            if cache is not None:
+                for app in apps:
+                    row = cache[app.application_id]
+                    m = ApplicationMetrics(
+                        application_id=app.application_id,
+                        application_name=app.application_name,
+                        application_type=app.application_type,
+                        department=app.department,
+                        lob=app.lob,
+                        team_id=app.team_id,
+                        total_tokens=int(row.total_tokens),
+                        total_cost=float(row.total_cost),
+                        avg_latency_ms=float(row.avg_latency_ms),
+                        error_rate=float(row.error_rate),
+                        is_active=bool(row.is_active),
+                        key_count=int(row.key_count),
+                    )
+                    m.health_check_url = app.health_check_url
+                    m.health_status = app.health_status or "unknown"
+                    m.last_health_check_at = (
+                        app.last_health_check_at.isoformat()
+                        if app.last_health_check_at
+                        else None
+                    )
+                    app_metrics.append(m)
+                active_count = sum(1 for m in app_metrics if m.is_active)
+                return ApplicationHealthResponse(
+                    applications=app_metrics,
+                    total_apps=len(app_metrics),
+                    active_apps=active_count,
+                    time_window_start=start_dt.isoformat(),
+                    time_window_end=end_dt.isoformat(),
+                )
+
         for app in apps:
             m = await _compute_app_metrics(
                 prisma_client, app, start_dt, end_dt, active_since

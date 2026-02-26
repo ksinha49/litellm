@@ -514,6 +514,7 @@ model LiteLLM_SpendLogs {
   @@index([startTime])
   @@index([end_user])
   @@index([session_id])
+  @@index([api_key, startTime])
 }
 
 // View spend, model, api_key per request
@@ -1004,6 +1005,21 @@ model LiteLLM_PolicyAttachmentTable {
   created_by       String?
   updated_at       DateTime  @default(now()) @updatedAt
   updated_by       String?
+}
+
+// Pre-computed application metrics cache — refreshed every 5 min by background job
+model LiteLLM_ApplicationMetricsCache {
+    application_id String   @id
+    total_tokens   BigInt   @default(0)
+    total_cost     Float    @default(0.0)
+    avg_latency_ms Float    @default(0.0)
+    error_rate     Float    @default(0.0)
+    is_active      Boolean  @default(false)
+    key_count      Int      @default(0)
+    window_days    Int      @default(30)
+    computed_at    DateTime @default(now())
+
+    @@index([computed_at])
 }
 
 //Unified Access Groups table for storing unified access groups

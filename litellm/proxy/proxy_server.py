@@ -5734,6 +5734,32 @@ class ProxyStartupEvent:
                 f"Failed to setup application health polling: {e}"
             )
 
+        ### APPLICATION METRICS CACHE ###
+        try:
+            from litellm.proxy.common_utils.application_metrics_cache_job import (
+                ApplicationMetricsCacheJob,
+            )
+
+            _app_metrics_cache_job = ApplicationMetricsCacheJob()
+            _app_metrics_cache_interval = int(
+                os.environ.get("APPLICATION_METRICS_CACHE_INTERVAL", 300)
+            )
+            scheduler.add_job(
+                _app_metrics_cache_job.run,
+                "interval",
+                seconds=_app_metrics_cache_interval,
+                id="application_metrics_cache_job",
+                replace_existing=True,
+                misfire_grace_time=APSCHEDULER_MISFIRE_GRACE_TIME,
+            )
+            verbose_proxy_logger.info(
+                f"Application metrics cache job scheduled every {_app_metrics_cache_interval}s"
+            )
+        except Exception as e:
+            verbose_proxy_logger.debug(
+                f"Failed to setup application metrics cache job: {e}"
+            )
+
         # Start the scheduler immediately without processing backlogs
         scheduler.start(paused=False)
         verbose_proxy_logger.info(
