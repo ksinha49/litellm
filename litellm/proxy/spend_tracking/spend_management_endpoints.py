@@ -313,6 +313,8 @@ async def get_global_activity(
         sum_api_requests = 0
         sum_total_tokens = 0
         daily_data = []
+        # sort by ISO date BEFORE formatting (ISO strings sort chronologically)
+        db_response = sorted(db_response, key=lambda x: x["date"])
         for row in db_response:
             # cast date to datetime
             _date_obj = datetime.fromisoformat(row["date"])
@@ -321,9 +323,6 @@ async def get_global_activity(
             daily_data.append(row)
             sum_api_requests += row.get("api_requests", 0)
             sum_total_tokens += row.get("total_tokens", 0)
-
-        # sort daily_data by date
-        daily_data = sorted(daily_data, key=lambda x: x["date"])
 
         data_to_return = {
             "daily_data": daily_data,
