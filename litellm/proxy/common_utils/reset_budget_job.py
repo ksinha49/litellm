@@ -687,12 +687,22 @@ class ResetBudgetJob:
         item_type: Literal["key", "team", "user"],
     ):
         """
-        In-place, updates spend=0, and sets budget_reset_at to current_time + budget_duration
+        In-place, snapshots current spend into spend_at_last_reset and sets
+        budget_reset_at to current_time + budget_duration.
+
+        We do NOT zero spend here. Instead, period spend is computed as:
+            period_spend = item.spend - item.spend_at_last_reset
+
+        This avoids the race condition where the 10-15s batch-flush queue has
+        pending spend entries that arrive after the reset, re-inflating spend
+        above zero and causing subsequent period spend to be overstated.
 
         Common logic for resetting budget for a team, user, or key
         """
         try:
-            item.spend = 0.0
+            # Snapshot current cumulative spend as the new baseline.
+            # Budget period spend = item.spend - item.spend_at_last_reset
+            item.spend_at_last_reset = item.spend or 0.0
             if hasattr(item, "budget_duration") and item.budget_duration is not None:
                 # Get standardized reset time based on budget duration
                 from litellm.proxy.common_utils.timezone_utils import (

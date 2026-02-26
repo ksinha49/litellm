@@ -13,6 +13,7 @@ from litellm.constants import DEFAULT_MAX_RECURSE_DEPTH
 from litellm.integrations.custom_guardrail import CustomGuardrail
 from litellm.proxy._types import UserAPIKeyAuth
 from litellm.proxy.auth.user_api_key_auth import user_api_key_auth
+from litellm.proxy.common_utils.encrypt_decrypt_utils import decrypt_value_helper
 from litellm.proxy.guardrails.guardrail_registry import GuardrailRegistry
 from litellm.types.guardrails import (PII_ENTITY_CATEGORIES_MAP,
                                       ApplyGuardrailRequest,
@@ -34,6 +35,22 @@ from litellm.types.guardrails import (PII_ENTITY_CATEGORIES_MAP,
 
 router = APIRouter()
 GUARDRAIL_REGISTRY = GuardrailRegistry()
+
+
+def _decrypt_litellm_params(params: dict) -> dict:
+    """Decrypt any encrypted string values in a litellm_params dict before returning to the UI."""
+    decrypted: dict = {}
+    for k, v in params.items():
+        if isinstance(v, str):
+            decrypted[k] = decrypt_value_helper(
+                value=v,
+                key=k,
+                exception_type="debug",
+                return_original_value=True,
+            )
+        else:
+            decrypted[k] = v
+    return decrypted
 
 
 def _get_guardrails_list_response(
@@ -170,8 +187,9 @@ async def list_guardrails_v2():
                 if isinstance(litellm_params, LitellmParams)
                 else litellm_params
             ) or {}
+            decrypted_litellm_params_dict = _decrypt_litellm_params(litellm_params_dict)
             masked_litellm_params_dict = _get_masked_values(
-                litellm_params_dict,
+                decrypted_litellm_params_dict,
                 unmasked_length=4,
                 number_of_asterisks=4,
             )
@@ -698,8 +716,9 @@ async def get_guardrail_info(guardrail_id: str):
             if isinstance(litellm_params, LitellmParams)
             else litellm_params
         ) or {}
+        decrypted_result_litellm_params_dict = _decrypt_litellm_params(result_litellm_params_dict)
         masked_litellm_params_dict = _get_masked_values(
-            result_litellm_params_dict,
+            decrypted_result_litellm_params_dict,
             unmasked_length=4,
             number_of_asterisks=4,
         )

@@ -3351,6 +3351,10 @@ async def _execute_virtual_key_regeneration(
     new_token = get_new_token(data=data)
     new_token_hash = hash_token(new_token)
     new_token_key_name = f"sk-...{new_token[-4:]}"
+    # NOTE: Only the token hash and key_name are changed by default.
+    # spend and spend_at_last_reset are intentionally NOT reset here —
+    # all-time cumulative spend and the period-spend baseline both persist
+    # across key regenerations so that budget history is preserved.
     update_data = {"token": new_token_hash, "key_name": new_token_key_name}
 
     non_default_values = {}

@@ -263,16 +263,18 @@ async def common_checks(
         ):
             user_budget = user_object.max_budget
             # On-demand budget reset check for user
-            user_effective_spend = user_object.spend
+            user_spend_at_last_reset = getattr(user_object, "spend_at_last_reset", None) or 0.0
             user_budget_reset_at = getattr(user_object, "budget_reset_at", None)
             if _should_reset_budget(user_budget_reset_at):
                 verbose_proxy_logger.info(
                     f"[Budget Reset] On-demand reset detected for user - "
                     f"user_id={user_object.user_id}, "
                     f"budget_reset_at={user_budget_reset_at} is in the past, "
-                    f"treating spend as 0 instead of {user_object.spend}"
+                    f"treating period spend as 0"
                 )
                 user_effective_spend = 0.0
+            else:
+                user_effective_spend = user_object.spend - user_spend_at_last_reset
 
             if user_budget < user_effective_spend:
                 raise litellm.BudgetExceededError(
@@ -2716,18 +2718,20 @@ async def _virtual_key_max_budget_check(
         ####################################
         # On-demand budget reset check     #
         ####################################
-        # Check if budget_reset_at has passed - if so, treat spend as 0
-        # This handles the case where the background job hasn't run yet
-        # but the budget period has already passed
-        effective_spend = valid_token.spend
+        # Compute period spend as spend - spend_at_last_reset (baseline snapshot from last reset).
+        # If budget_reset_at has passed but background job hasn't run yet, treat baseline as
+        # current spend so period spend appears as 0.
+        spend_at_last_reset = getattr(valid_token, "spend_at_last_reset", None) or 0.0
         if _should_reset_budget(valid_token.budget_reset_at):
             verbose_proxy_logger.info(
                 f"[Budget Reset] On-demand reset detected for API key - "
                 f"token={valid_token.token[:16] if valid_token.token else 'N/A'}..., "
                 f"budget_reset_at={valid_token.budget_reset_at} is in the past, "
-                f"treating spend as 0 instead of {valid_token.spend}"
+                f"treating period spend as 0 instead of {valid_token.spend - spend_at_last_reset}"
             )
             effective_spend = 0.0
+        else:
+            effective_spend = valid_token.spend - spend_at_last_reset
 
         ####################################
         # collect information for alerting #
@@ -2737,7 +2741,8 @@ async def _virtual_key_max_budget_check(
         verbose_proxy_logger.info(
             f"[Budget Check] API Key Budget - token={valid_token.token[:16] if valid_token.token else 'N/A'}..., "
             f"key_alias={valid_token.key_alias}, user_id={valid_token.user_id}, team_id={valid_token.team_id}, "
-            f"current_spend={valid_token.spend}, effective_spend={effective_spend}, max_budget={valid_token.max_budget}"
+            f"all_time_spend={valid_token.spend}, spend_at_last_reset={spend_at_last_reset}, "
+            f"period_spend={effective_spend}, max_budget={valid_token.max_budget}"
         )
 
         if effective_spend >= valid_token.max_budget:
@@ -2906,23 +2911,26 @@ async def _team_max_budget_check(
         ####################################
         # On-demand budget reset check     #
         ####################################
-        # Check if budget_reset_at has passed - if so, treat spend as 0
-        effective_spend = team_object.spend
+        # Compute period spend as spend - spend_at_last_reset (baseline snapshot from last reset).
+        team_spend_at_last_reset = getattr(team_object, "spend_at_last_reset", None) or 0.0
         team_budget_reset_at = getattr(team_object, "budget_reset_at", None)
         if _should_reset_budget(team_budget_reset_at):
             verbose_proxy_logger.info(
                 f"[Budget Reset] On-demand reset detected for team - "
                 f"team_id={team_object.team_id}, "
                 f"budget_reset_at={team_budget_reset_at} is in the past, "
-                f"treating spend as 0 instead of {team_object.spend}"
+                f"treating period spend as 0"
             )
             effective_spend = 0.0
+        else:
+            effective_spend = (team_object.spend or 0.0) - team_spend_at_last_reset
 
         # @modtag: AAK7S - Log team budget check details for debugging
         verbose_proxy_logger.info(
             f"[Budget Check] Team Budget - team_id={team_object.team_id}, team_alias={team_object.team_alias}, "
             f"budget_id={getattr(team_object, 'budget_id', 'N/A')}, "
-            f"current_spend={team_object.spend}, effective_spend={effective_spend}, max_budget={team_object.max_budget}"
+            f"all_time_spend={team_object.spend}, spend_at_last_reset={team_spend_at_last_reset}, "
+            f"period_spend={effective_spend}, max_budget={team_object.max_budget}"
         )
 
         if effective_spend > team_object.max_budget:

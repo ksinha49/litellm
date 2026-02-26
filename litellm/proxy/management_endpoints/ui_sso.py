@@ -1093,35 +1093,46 @@ async def auth_callback(request: Request, state: Optional[str] = None):  # noqa:
         request=request, sso_callback_route="sso/callback"
     )
 
+    from litellm.proxy.utils import get_custom_url
+
     verbose_proxy_logger.info(f"Redirecting to {redirect_url}")
     result = None
-    if google_client_id is not None:
-        result = await GoogleSSOHandler.get_google_callback_response(
-            request=request,
-            google_client_id=google_client_id,
-            redirect_url=redirect_url,
-        )
-    elif microsoft_client_id is not None:
-        result = await MicrosoftSSOHandler.get_microsoft_callback_response(
-            request=request,
-            microsoft_client_id=microsoft_client_id,
-            redirect_url=redirect_url,
-        )
+    try:
+        if google_client_id is not None:
+            result = await GoogleSSOHandler.get_google_callback_response(
+                request=request,
+                google_client_id=google_client_id,
+                redirect_url=redirect_url,
+            )
+        elif microsoft_client_id is not None:
+            result = await MicrosoftSSOHandler.get_microsoft_callback_response(
+                request=request,
+                microsoft_client_id=microsoft_client_id,
+                redirect_url=redirect_url,
+            )
 
-    elif generic_client_id is not None:
-        result, received_response = await get_generic_sso_response(
-            request=request,
-            jwt_handler=jwt_handler,
-            generic_client_id=generic_client_id,
-            redirect_url=redirect_url,
-            sso_jwt_handler=sso_jwt_handler,
+        elif generic_client_id is not None:
+            result, received_response = await get_generic_sso_response(
+                request=request,
+                jwt_handler=jwt_handler,
+                generic_client_id=generic_client_id,
+                redirect_url=redirect_url,
+                sso_jwt_handler=sso_jwt_handler,
+            )
+    except Exception as e:
+        verbose_proxy_logger.warning(
+            f"SSO provider callback raised an exception — redirecting to login page. Error: {e}"
         )
+        login_url = get_custom_url("", "ui/login")
+        return RedirectResponse(url=f"{login_url}?error=sso_failed", status_code=303)
+
+    login_url = get_custom_url("", "ui/login")
 
     if result is None:
-        raise HTTPException(
-            status_code=401,
-            detail="Result not returned by SSO provider.",
+        verbose_proxy_logger.warning(
+            "SSO provider returned no result — redirecting to login page."
         )
+        return RedirectResponse(url=f"{login_url}?error=sso_failed", status_code=303)
 
     if state and state.startswith(f"{LITELLM_CLI_SESSION_TOKEN_PREFIX}:"):
         # Extract the key ID and existing_key from the state
@@ -1137,13 +1148,19 @@ async def auth_callback(request: Request, state: Optional[str] = None):  # noqa:
             request=request, key=key_id, existing_key=existing_key, result=result
         )
 
-    return await SSOAuthenticationHandler.get_redirect_response_from_openid(
-        result=result,
-        request=request,
-        received_response=received_response,
-        generic_client_id=generic_client_id,
-        ui_access_mode=ui_access_mode,
-    )
+    try:
+        return await SSOAuthenticationHandler.get_redirect_response_from_openid(
+            result=result,
+            request=request,
+            received_response=received_response,
+            generic_client_id=generic_client_id,
+            ui_access_mode=ui_access_mode,
+        )
+    except Exception as e:
+        verbose_proxy_logger.warning(
+            f"SSO authentication failed — redirecting to login page. Error: {e}"
+        )
+        return RedirectResponse(url=f"{login_url}?error=sso_failed", status_code=303)
 
 
 async def cli_sso_callback(

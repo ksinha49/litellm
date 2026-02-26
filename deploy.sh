@@ -7,6 +7,7 @@
 # Options:
 #   --skip-ui-build       Skip the npm / Next.js UI build (use when only Python changed)
 #   --skip-docker-build   Skip docker build (re-deploy the existing image tag)
+#   --no-cache            Pass --no-cache to docker build (clean build, no layer cache)
 #   --yes                 Non-interactive: skip all confirmation prompts
 #   --help                Show this help and exit
 #
@@ -41,12 +42,14 @@ header()  {
 # ── parse flags ───────────────────────────────────────────────────────────────
 SKIP_UI_BUILD=false
 SKIP_DOCKER_BUILD=false
+NO_CACHE=false
 AUTO_YES=false
 
 for arg in "$@"; do
   case "$arg" in
     --skip-ui-build)     SKIP_UI_BUILD=true ;;
     --skip-docker-build) SKIP_DOCKER_BUILD=true ;;
+    --no-cache)          NO_CACHE=true ;;
     --yes)               AUTO_YES=true ;;
     --help)
       grep '^#' "$0" | sed 's/^# \{0,1\}//' | sed -n '2,17p'
@@ -109,12 +112,16 @@ collect_params() {
   prompt_default NO_PROXY_LIST   "NO_PROXY list"     "localhost,127.0.0.1,registry-1.docker.io"
 
   echo -e "\n  ${BOLD}Database${NC}"
-  prompt_default DB_HOST   "DB host"   "aio-llm-litellm-db2.cfko4wc6k724.us-east-2.rds.amazonaws.com"
-  prompt_default DB_PORT   "DB port"   "5432"
-  prompt_default DB_NAME   "DB name"   "litellmdb"
-  prompt_default DB_SCHEMA "DB schema" "litellm"
-  prompt_default DB_USER   "DB user"   "ameritasadmin"
-  prompt_secret  DB_PASSWORD "DB password (hidden)"
+  if [[ -n "${DATABASE_URL:-}" ]]; then
+    info "DATABASE_URL already set — skipping individual DB component prompts."
+  else
+    prompt_default DB_HOST   "DB host"   "aio-llm-litellm-db2.cfko4wc6k724.us-east-2.rds.amazonaws.com"
+    prompt_default DB_PORT   "DB port"   "5432"
+    prompt_default DB_NAME   "DB name"   "litellmdb"
+    prompt_default DB_SCHEMA "DB schema" "litellm"
+    prompt_default DB_USER   "DB user"   "ameritasadmin"
+    prompt_secret  DB_PASSWORD "DB password (hidden)"
+  fi
 
   echo -e "\n  ${BOLD}LiteLLM secrets${NC}"
   prompt_secret LITELLM_MASTER_KEY "LITELLM_MASTER_KEY (hidden)"
@@ -123,6 +130,11 @@ collect_params() {
 
 # ── construct DATABASE_URL ────────────────────────────────────────────────────
 build_database_url() {
+  # If DATABASE_URL is already fully specified, use it as-is
+  if [[ -n "${DATABASE_URL:-}" && -z "${DB_HOST:-}" ]]; then
+    info "Using pre-built DATABASE_URL from environment."
+    return
+  fi
   # percent-encode the password so special characters (@, $, etc.) are safe in the URL
   local encoded_pw
   encoded_pw="$(python3 -c \
@@ -200,9 +212,13 @@ confirm_proceed() {
   printf "  %-24s %s\n" "Prometheus port:"       "${PROMETHEUS_PORT} → 9090"
   printf "  %-24s %s\n" "App name:"              "${APP_NAME}"
   printf "  %-24s %s\n" "Proxy base URL:"        "${PROXY_BASE_URL}"
-  printf "  %-24s %s\n" "DB host:"               "${DB_HOST}:${DB_PORT}/${DB_NAME} (schema: ${DB_SCHEMA})"
-  printf "  %-24s %s\n" "DB user:"               "${DB_USER}"
-  printf "  %-24s %s\n" "DB password:"           "****"
+  if [[ -n "${DB_HOST:-}" ]]; then
+    printf "  %-24s %s\n" "DB host:"             "${DB_HOST}:${DB_PORT}/${DB_NAME} (schema: ${DB_SCHEMA})"
+    printf "  %-24s %s\n" "DB user:"             "${DB_USER}"
+    printf "  %-24s %s\n" "DB password:"         "****"
+  else
+    printf "  %-24s %s\n" "DATABASE_URL:"        "(pre-built — credentials redacted)"
+  fi
   printf "  %-24s %s\n" "LITELLM_MASTER_KEY:"    "****"
   printf "  %-24s %s\n" "LITELLM_SALT_KEY:"      "****"
   printf "  %-24s %s\n" "HTTP proxy:"            "${HTTP_PROXY_URL}"
@@ -284,11 +300,17 @@ build_image() {
   header "Step 2/4 — Build Docker Image"
   info "Image tag: ${IMAGE_TAG}"
 
+  DOCKER_BUILD_EXTRA_ARGS=()
+  if [[ "${NO_CACHE}" == "true" ]]; then
+    DOCKER_BUILD_EXTRA_ARGS+=(--no-cache)
+  fi
+
   docker build \
     -f "${REPO_ROOT}/Dockerfile" \
     --build-arg HTTP_PROXY="${HTTP_PROXY_URL}" \
     --build-arg HTTPS_PROXY="${HTTP_PROXY_URL}" \
     --build-arg NO_PROXY="${NO_PROXY_LIST}" \
+    "${DOCKER_BUILD_EXTRA_ARGS[@]}" \
     -t "${IMAGE_TAG}" \
     "${REPO_ROOT}"
 

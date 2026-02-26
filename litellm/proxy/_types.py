@@ -1725,6 +1725,7 @@ class LiteLLM_ObjectPermissionTable(LiteLLMPydanticObjectBase):
 class LiteLLM_TeamTable(TeamBase):
     team_id: str  # type: ignore
     spend: Optional[float] = None
+    spend_at_last_reset: Optional[float] = 0.0
     max_parallel_requests: Optional[int] = None
     budget_duration: Optional[str] = None
     budget_reset_at: Optional[datetime] = None
@@ -2270,6 +2271,7 @@ class LiteLLM_VerificationToken(LiteLLMPydanticObjectBase):
     key_name: Optional[str] = None
     key_alias: Optional[str] = None
     spend: float = 0.0
+    spend_at_last_reset: Optional[float] = 0.0
     max_budget: Optional[float] = None
     expires: Optional[Union[str, datetime]] = None
     models: List = []
@@ -2292,6 +2294,7 @@ class LiteLLM_VerificationToken(LiteLLMPydanticObjectBase):
     blocked: Optional[bool] = None
     litellm_budget_table: Optional[dict] = None
     org_id: Optional[str] = None  # org id for a given key
+    application_id: Optional[str] = None  # application id for a given key
     created_at: Optional[datetime] = None
     created_by: Optional[str] = None
     updated_at: Optional[datetime] = None
@@ -2558,6 +2561,7 @@ class LiteLLM_UserTable(LiteLLMPydanticObjectBase):
     user_id: str
     max_budget: Optional[float] = None
     spend: float = 0.0
+    spend_at_last_reset: Optional[float] = 0.0
     model_max_budget: Optional[Dict] = {}
     model_spend: Optional[Dict] = {}
     user_email: Optional[str] = None

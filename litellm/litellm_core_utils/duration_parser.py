@@ -12,7 +12,20 @@ from datetime import datetime, timedelta, timezone
 from typing import Optional, Tuple
 
 
+_DURATION_ALIASES: dict = {
+    "daily": "24h",
+    "weekly": "7d",
+    "monthly": "30d",
+}
+
+
+def _normalize_duration(duration: str) -> str:
+    """Normalize human-readable aliases (daily/weekly/monthly) to standard format."""
+    return _DURATION_ALIASES.get(duration.lower(), duration)
+
+
 def _extract_from_regex(duration: str) -> Tuple[int, str]:
+    duration = _normalize_duration(duration)
     match = re.match(r"(\d+)(mo|[smhdw]?)", duration)
 
     if not match:
@@ -117,6 +130,9 @@ def get_next_standardized_reset_time(
     """
     # Set up timezone and normalize current time
     current_time, timezone = _setup_timezone(current_time, timezone_str)
+
+    # Normalize human-readable aliases before parsing
+    duration = _normalize_duration(duration)
 
     # Parse duration
     value, unit = _parse_duration(duration)

@@ -115,11 +115,12 @@ model LiteLLM_TeamTable {
     max_budget Float?
     soft_budget Float?
     spend      Float    @default(0.0)
+    spend_at_last_reset Float @default(0.0)
     models     String[]
     max_parallel_requests Int?
     tpm_limit     BigInt?
     rpm_limit     BigInt?
-    budget_duration String? 
+    budget_duration String?
     budget_reset_at DateTime?
     blocked Boolean @default(false)
     created_at    DateTime               @default(now()) @map("created_at")
@@ -197,13 +198,14 @@ model LiteLLM_UserTable {
     user_role  String?
 		max_budget Float?
     spend      Float    @default(0.0)
+    spend_at_last_reset Float @default(0.0)
     user_email    String?
     models     String[]
     metadata  Json  @default("{}")
     max_parallel_requests Int?
     tpm_limit     BigInt?
     rpm_limit     BigInt?
-    budget_duration String? 
+    budget_duration String?
     budget_reset_at DateTime?
     allowed_cache_controls String[] @default([])
     policies         String[] @default([])
@@ -319,6 +321,7 @@ model LiteLLM_VerificationToken {
     key_alias   String?
     soft_budget_cooldown Boolean @default(false) // key-level state on if budget alerts need to be cooled down
     spend      Float    @default(0.0)
+    spend_at_last_reset Float @default(0.0)
     expires    DateTime?
     models     String[]
     aliases    Json  @default("{}")
