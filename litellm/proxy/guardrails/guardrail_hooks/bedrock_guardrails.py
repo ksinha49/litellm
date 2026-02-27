@@ -9,6 +9,7 @@ import asyncio
 import copy
 import os
 import sys
+from datetime import datetime
 
 sys.path.insert(
     0, os.path.abspath("../..")
@@ -446,8 +447,6 @@ class BedrockGuardrail(CustomGuardrail, BaseAWSLLM):
         response: Optional[Union[Any, litellm.ModelResponse]] = None,
         request_data: Optional[dict] = None,
     ) -> BedrockGuardrailResponse:
-        from datetime import datetime
-
         start_time = datetime.now()
         credentials, aws_region_name = self._load_credentials()
         bedrock_request_data: dict = dict(
@@ -1860,19 +1859,12 @@ class BedrockGuardrail(CustomGuardrail, BaseAWSLLM):
                         )
                     )
                     # Extract any masked text returned by the output guardrail
-                    output_list = bedrock_response.get("output")
-                    if output_list:
-                        for output_item in output_list:
+                    outputs_list = bedrock_response.get("outputs")
+                    if outputs_list:
+                        for output_item in outputs_list:
                             text_content = output_item.get("text")
                             if text_content:
                                 masked_texts.append(str(text_content))
-                    else:
-                        outputs_list = bedrock_response.get("outputs")
-                        if outputs_list:
-                            for output_item in outputs_list:
-                                text_content = output_item.get("text")
-                                if text_content:
-                                    masked_texts.append(str(text_content))
             else:
                 # INPUT path (input_type == "request"): existing logic
                 mock_messages: List[AllMessageValues] = [
@@ -1926,25 +1918,14 @@ class BedrockGuardrail(CustomGuardrail, BaseAWSLLM):
                                 raise
 
                     # Apply any masking that was applied by the guardrail
-                    output_list = bedrock_response.get("output")
-                    if output_list:
-                        # If the guardrail returned modified content, use that
-                        for output_item in output_list:
+                    outputs_list = bedrock_response.get("outputs")
+                    if outputs_list:
+                        for output_item in outputs_list:
                             text_content = output_item.get("text")
                             if text_content:
-                                masked_text = str(text_content)
-                                masked_texts.append(masked_text)
-                    else:
-                        outputs_list = bedrock_response.get("outputs")
-                        if outputs_list:
-                            # Fallback to outputs field if output is not available
-                            for output_item in outputs_list:
-                                text_content = output_item.get("text")
-                                if text_content:
-                                    masked_text = str(text_content)
-                                    masked_texts.append(masked_text)
+                                masked_texts.append(str(text_content))
 
-            # If no output/outputs were provided, use the original texts
+            # If no outputs were provided, use the original texts
             # This happens when the guardrail allows content without modification
             if not masked_texts:
                 masked_texts = texts
