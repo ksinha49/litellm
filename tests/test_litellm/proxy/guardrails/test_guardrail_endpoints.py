@@ -377,6 +377,48 @@ def test_get_provider_specific_params():
     assert (
         nested_fields["outputType"]["type"] == "select"
     )  # Literal type should be select
+    assert "options" in nested_fields["outputType"], (
+        "select fields must include options list for the UI dropdown to render"
+    )
+    assert set(nested_fields["outputType"]["options"]) == {
+        "FourSeverityLevels",
+        "EightSeverityLevels",
+    }
+
+
+def test_bedrock_guardrail_fields_include_on_input_too_long_with_options():
+    """on_input_too_long must appear as a 'select' with the three allowed values."""
+    from litellm.proxy.guardrails.guardrail_endpoints import _get_fields_from_model
+    from litellm.types.guardrails import BedrockGuardrailConfigModel
+
+    fields = _get_fields_from_model(BedrockGuardrailConfigModel)
+
+    # on_input_too_long
+    assert "on_input_too_long" in fields
+    f = fields["on_input_too_long"]
+    assert f["type"] == "select", "on_input_too_long should be a select/dropdown"
+    assert "options" in f, "select field must carry its options list"
+    assert set(f["options"]) == {"fail_closed", "fail_open", "chunk"}
+    assert f["default_value"] == "fail_closed"
+
+    # bedrock_guardrail_max_chunk_size
+    assert "bedrock_guardrail_max_chunk_size" in fields
+    cs = fields["bedrock_guardrail_max_chunk_size"]
+    assert cs["type"] == "number"
+    assert cs["default_value"] == 25000
+
+    # on_flagged (added in previous commit)
+    assert "on_flagged" in fields
+    of = fields["on_flagged"]
+    assert of["type"] == "select"
+    assert "options" in of
+    assert set(of["options"]) == {"block", "monitor"}
+
+    # guardrail_max_chunk_concurrency (added in previous commit)
+    assert "guardrail_max_chunk_concurrency" in fields
+    cc = fields["guardrail_max_chunk_concurrency"]
+    assert cc["type"] == "number"
+    assert cc["default_value"] == 10
 
 
 def test_optional_params_not_returned_when_not_overridden():

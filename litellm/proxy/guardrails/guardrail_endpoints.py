@@ -1141,6 +1141,12 @@ def _build_field_dict(
             field_dict["options"] = list_element_options
             field_dict["type"] = "multiselect"
 
+    elif field_type == "select":
+        # For Literal[...] types, extract the allowed values as options
+        literal_options = _extract_literal_values(field_annotation)
+        if literal_options:
+            field_dict["options"] = literal_options
+
     # Add options if they exist in json_schema_extra (this takes precedence)
     if field_json_schema_extra and "options" in field_json_schema_extra:
         field_dict["options"] = field_json_schema_extra["options"]
