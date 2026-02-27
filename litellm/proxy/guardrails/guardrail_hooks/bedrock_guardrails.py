@@ -128,6 +128,8 @@ class BedrockGuardrail(CustomGuardrail, BaseAWSLLM):
         guardrailVersion: Optional[str] = None,
         disable_exception_on_block: Optional[bool] = False,
         on_flagged: Optional[str] = "block",
+        on_input_too_long: str = "fail_closed",
+        bedrock_guardrail_max_chunk_size: int = 25000,
         **kwargs,
     ):
         self.async_handler = get_async_httpx_client(
@@ -152,6 +154,19 @@ class BedrockGuardrail(CustomGuardrail, BaseAWSLLM):
         """
         Action to take when content is flagged: "block" or "monitor".
         In "monitor" mode, violations are detected and logged but requests are allowed through.
+        """
+
+        self.on_input_too_long: str = on_input_too_long
+        """
+        Behavior when Bedrock returns 'Input is too long':
+        'fail_closed' - raise error (default)
+        'fail_open'   - log critical warning and allow request through
+        'chunk'       - split input into chunks and apply guardrail to each
+        """
+
+        self.bedrock_guardrail_max_chunk_size: int = bedrock_guardrail_max_chunk_size
+        """
+        Maximum characters per Bedrock guardrail API call when on_input_too_long='chunk'.
         """
 
         # Set supported event hooks to include MCP hooks
@@ -1379,6 +1394,77 @@ class BedrockGuardrail(CustomGuardrail, BaseAWSLLM):
                             "Applied masking to choice text content"
                         )
 
+    @staticmethod
+    def _is_input_too_long_error(e: HTTPException) -> bool:
+        """Return True if the HTTPException is a Bedrock 'Input is too long' error."""
+        detail = getattr(e, "detail", "") or ""
+        return "input is too long" in str(detail).lower()
+
+    def _split_texts_into_chunks(self, texts: List[str]) -> List[List[str]]:
+        """
+        Split a list of texts into chunks where total chars per chunk <= max_chunk_size.
+        A single text longer than max_chunk_size is split by character boundary.
+        """
+        chunks: List[List[str]] = []
+        current_chunk: List[str] = []
+        current_size = 0
+        max_size = self.bedrock_guardrail_max_chunk_size
+
+        for text in texts:
+            if len(text) > max_size:
+                # Flush current chunk first
+                if current_chunk:
+                    chunks.append(current_chunk)
+                    current_chunk, current_size = [], 0
+                # Break oversized text into sub-chunks
+                for i in range(0, len(text), max_size):
+                    chunks.append([text[i : i + max_size]])
+            elif current_size + len(text) > max_size:
+                chunks.append(current_chunk)
+                current_chunk, current_size = [text], len(text)
+            else:
+                current_chunk.append(text)
+                current_size += len(text)
+
+        if current_chunk:
+            chunks.append(current_chunk)
+        return chunks
+
+    async def _apply_guardrail_to_chunks(
+        self,
+        texts: List[str],
+        request_data: dict,
+    ) -> BedrockGuardrailResponse:
+        """
+        Split texts into chunks and apply the Bedrock guardrail to each chunk.
+
+        If any chunk is BLOCKED the appropriate exception propagates immediately.
+        Returns the last successful BedrockGuardrailResponse (or an empty one when
+        no chunks were produced).
+        """
+        chunks: List[List[str]] = self._split_texts_into_chunks(texts)
+        verbose_proxy_logger.info(
+            "Bedrock Guardrail: chunking input into %d chunk(s) (max_chunk_size=%d), "
+            "guardrail_name=%s",
+            len(chunks),
+            self.bedrock_guardrail_max_chunk_size,
+            self.guardrail_name,
+        )
+        last_response: BedrockGuardrailResponse = BedrockGuardrailResponse()
+        for chunk_texts in chunks:
+            chunk_messages: List[AllMessageValues] = [
+                ChatCompletionUserMessage(role="user", content=text)
+                for text in chunk_texts
+            ]
+            # Raises if blocked — let it propagate to the caller
+            chunk_response = await self.make_bedrock_api_request(
+                source="INPUT",
+                messages=chunk_messages,
+                request_data=request_data,
+            )
+            last_response = chunk_response
+        return last_response
+
     async def apply_guardrail(
         self,
         inputs: "GenericGuardrailAPIInputs",
@@ -1424,11 +1510,30 @@ class BedrockGuardrail(CustomGuardrail, BaseAWSLLM):
 
             # Bedrock will throw an error if there is no text to process
             if filtered_messages:
-                bedrock_response = await self.make_bedrock_api_request(
-                    source="INPUT",
-                    messages=filtered_messages,
-                    request_data=request_data,
-                )
+                try:
+                    bedrock_response = await self.make_bedrock_api_request(
+                        source="INPUT",
+                        messages=filtered_messages,
+                        request_data=request_data,
+                    )
+                except HTTPException as exc:
+                    if self._is_input_too_long_error(exc):
+                        if self.on_input_too_long == "fail_open":
+                            verbose_proxy_logger.critical(
+                                "Bedrock Guardrail: input too long, fail-open. "
+                                "Proceeding without guardrail check. guardrail_name=%s",
+                                self.guardrail_name,
+                            )
+                            return inputs  # pass through unchanged
+                        elif self.on_input_too_long == "chunk":
+                            bedrock_response = await self._apply_guardrail_to_chunks(
+                                texts=texts,
+                                request_data=request_data,
+                            )
+                        else:
+                            raise  # fail_closed: default, re-raise
+                    else:
+                        raise
 
                 # Apply any masking that was applied by the guardrail
                 output_list = bedrock_response.get("output")

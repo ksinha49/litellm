@@ -331,6 +331,22 @@ class BedrockGuardrailConfigModel(BaseModel):
         default=False,
         description="If True, will not raise an exception when the guardrail is blocked. Useful for OpenWebUI where exceptions can end the chat flow.",
     )
+    on_input_too_long: Literal["fail_closed", "fail_open", "chunk"] = Field(
+        default="fail_closed",
+        description=(
+            "Behavior when Bedrock returns 'Input is too long'. "
+            "'fail_closed' raises an error (default). "
+            "'fail_open' logs a critical warning and allows the request to proceed. "
+            "'chunk' splits input into chunks and applies the guardrail to each (AWS-recommended)."
+        ),
+    )
+    bedrock_guardrail_max_chunk_size: int = Field(
+        default=25000,
+        description=(
+            "Maximum characters per Bedrock guardrail API call when on_input_too_long='chunk'. "
+            "Default 25000 matches Bedrock's default 25 text-unit quota (1 text unit ≈ 1000 chars)."
+        ),
+    )
     aws_region_name: Optional[str] = Field(
         default=None, description="AWS region where your guardrail is deployed"
     )
@@ -706,6 +722,7 @@ class LitellmParams(
         "default_action",
         "on_disallowed_action",
         "unreachable_fallback",
+        "on_input_too_long",
         mode="before",
         check_fields=False,
     )
