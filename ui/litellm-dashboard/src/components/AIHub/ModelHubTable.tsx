@@ -357,6 +357,12 @@ const ModelHubTable: React.FC<ModelHubTableProps> = ({ accessToken, publicPage, 
   console.log("publicPage: ", publicPage);
   console.log("publicPageAllowed: ", publicPageAllowed);
 
+  // While data is still loading on the public page, show a neutral loading state
+  // so the "not enabled" message never flashes before the fetch completes.
+  if (publicPage && loading) {
+    return <div className="flex items-center justify-center min-h-screen">Loading...</div>;
+  }
+
   // If this is a public page, use the dedicated PublicModelHub component
   if (publicPage && publicPageAllowed) {
     return <PublicModelHub accessToken={accessToken} />;
