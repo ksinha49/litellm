@@ -258,6 +258,8 @@ class PiiEntityCategoryMap(TypedDict):
 class GuardrailParamUITypes(str, Enum):
     BOOL = "bool"
     STR = "str"
+    RADIO = "radio"
+    SELECT = "select"
 
 
 class PresidioPresidioConfigModelUserInterface(BaseModel):
@@ -339,7 +341,7 @@ class BedrockGuardrailConfigModel(BaseModel):
             "'fail_open' logs a critical warning and allows the request to proceed. "
             "'chunk' splits input into chunks and applies the guardrail to each (AWS-recommended)."
         ),
-        json_schema_extra={"type": "radio"},
+        json_schema_extra={"ui_type": GuardrailParamUITypes.RADIO},
     )
     bedrock_guardrail_max_chunk_size: int = Field(
         default=25000,
@@ -368,7 +370,7 @@ class BedrockGuardrailConfigModel(BaseModel):
         default=None,
         description="AWS region where your guardrail is deployed",
         json_schema_extra={
-            "type": "select",
+            "ui_type": GuardrailParamUITypes.SELECT,
             "options": [
                 "us-east-1",       # US East (N. Virginia)
                 "us-east-2",       # US East (Ohio)
