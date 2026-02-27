@@ -347,6 +347,22 @@ class BedrockGuardrailConfigModel(BaseModel):
             "Default 25000 matches Bedrock's default 25 text-unit quota (1 text unit ≈ 1000 chars)."
         ),
     )
+    guardrail_max_chunk_concurrency: int = Field(
+        default=10,
+        description=(
+            "Maximum concurrent Bedrock ApplyGuardrail API calls when chunking is active "
+            "(on_input_too_long='chunk'). Increase if your AWS account has a higher "
+            "ApplyGuardrail TPS quota; decrease to reduce connection pressure."
+        ),
+    )
+    on_flagged: Optional[Literal["block", "monitor"]] = Field(
+        default="block",
+        description=(
+            "Action to take when Bedrock guardrail flags content. "
+            "'block' raises an exception and stops the request (default). "
+            "'monitor' logs the violation but allows the request to proceed."
+        ),
+    )
     aws_region_name: Optional[str] = Field(
         default=None, description="AWS region where your guardrail is deployed"
     )

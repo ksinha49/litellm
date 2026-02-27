@@ -21,6 +21,7 @@ def initialize_bedrock(litellm_params: LitellmParams, guardrail: Guardrail):
         on_flagged=litellm_params.on_flagged,
         on_input_too_long=litellm_params.on_input_too_long,
         bedrock_guardrail_max_chunk_size=litellm_params.bedrock_guardrail_max_chunk_size,
+        guardrail_max_chunk_concurrency=litellm_params.guardrail_max_chunk_concurrency,
         mask_request_content=litellm_params.mask_request_content,
         mask_response_content=litellm_params.mask_response_content,
         aws_region_name=litellm_params.aws_region_name,
