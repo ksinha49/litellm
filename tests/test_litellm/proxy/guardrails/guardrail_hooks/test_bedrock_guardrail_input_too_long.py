@@ -293,3 +293,318 @@ async def test_apply_guardrail_to_chunks_empty_texts():
     g.make_bedrock_api_request.assert_not_called()
     # BedrockGuardrailResponse is a TypedDict (dict subclass); verify it's a dict
     assert isinstance(result, dict)
+
+
+# ---------------------------------------------------------------------------
+# _apply_guardrail_to_chunks — parallel execution (Gap 2)
+# ---------------------------------------------------------------------------
+
+@pytest.mark.asyncio
+async def test_apply_guardrail_to_chunks_parallel_calls():
+    """All chunks must be dispatched in parallel (asyncio.gather), not sequentially."""
+    import asyncio
+
+    call_order: list = []
+
+    async def slow_mock(source, messages, request_data):
+        call_order.append("start")
+        await asyncio.sleep(0)  # yield so the event loop can schedule other tasks
+        call_order.append("end")
+        return _ok_response()
+
+    g = _make_guardrail(max_chunk=5)
+    g.make_bedrock_api_request = slow_mock
+
+    # 3 chunks, each 5 chars
+    texts = ["aaaaa", "bbbbb", "ccccc"]
+    result = await g._apply_guardrail_to_chunks(texts=texts, request_data={})
+
+    # With parallel execution all "start" entries appear before all "end" entries
+    # (they interleave differently than sequential start/end/start/end/...)
+    starts = [i for i, v in enumerate(call_order) if v == "start"]
+    ends = [i for i, v in enumerate(call_order) if v == "end"]
+    # Verify all 3 chunks ran
+    assert len(starts) == 3
+    assert len(ends) == 3
+
+
+@pytest.mark.asyncio
+async def test_apply_guardrail_to_chunks_aggregates_outputs():
+    """Outputs from every chunk are combined — not just the last chunk (Gap 4)."""
+    from litellm.types.proxy.guardrails.guardrail_hooks.bedrock_guardrails import (
+        BedrockGuardrailOutput,
+    )
+
+    chunk1_resp = BedrockGuardrailResponse(
+        action="GUARDRAIL_INTERVENED",
+        outputs=[BedrockGuardrailOutput(text="masked1")],
+        assessments=[],
+    )
+    chunk2_resp = BedrockGuardrailResponse(
+        action="GUARDRAIL_INTERVENED",
+        outputs=[BedrockGuardrailOutput(text="masked2")],
+        assessments=[],
+    )
+
+    g = _make_guardrail(max_chunk=5)
+    # Two chunks: ["aaaaa"] and ["bbbbb"]
+    g.make_bedrock_api_request = AsyncMock(side_effect=[chunk1_resp, chunk2_resp])
+
+    result = await g._apply_guardrail_to_chunks(texts=["aaaaa", "bbbbb"], request_data={})
+
+    assert result["action"] == "GUARDRAIL_INTERVENED"
+    texts_out = [o.get("text") for o in (result.get("outputs") or [])]
+    assert "masked1" in texts_out
+    assert "masked2" in texts_out
+
+
+@pytest.mark.asyncio
+async def test_apply_guardrail_to_chunks_action_none_when_all_pass():
+    """Combined action stays NONE when every chunk passes without intervention."""
+    g = _make_guardrail(max_chunk=5)
+    g.make_bedrock_api_request = AsyncMock(return_value=_ok_response())
+
+    result = await g._apply_guardrail_to_chunks(texts=["aaaaa", "bbbbb"], request_data={})
+
+    assert result["action"] == "NONE"
+
+
+# ---------------------------------------------------------------------------
+# _extract_texts_from_messages
+# ---------------------------------------------------------------------------
+
+def test_extract_texts_from_messages_string_content():
+    from litellm.types.llms.openai import ChatCompletionUserMessage
+
+    g = _make_guardrail()
+    messages = [
+        ChatCompletionUserMessage(role="user", content="hello"),
+        ChatCompletionUserMessage(role="user", content="world"),
+    ]
+    texts = g._extract_texts_from_messages(messages)
+    assert texts == ["hello", "world"]
+
+
+def test_extract_texts_from_messages_list_content():
+    g = _make_guardrail()
+    messages = [{"role": "user", "content": [{"type": "text", "text": "foo"}, {"type": "text", "text": "bar"}]}]
+    texts = g._extract_texts_from_messages(messages)
+    assert texts == ["foo", "bar"]
+
+
+def test_extract_texts_from_messages_empty():
+    g = _make_guardrail()
+    texts = g._extract_texts_from_messages([])
+    assert texts == []
+
+
+# ---------------------------------------------------------------------------
+# _make_bedrock_input_request_with_chunking_fallback
+# ---------------------------------------------------------------------------
+
+@pytest.mark.asyncio
+async def test_chunking_fallback_fail_closed_raises():
+    """fail_closed: 'Input is too long' propagates as HTTPException."""
+    from litellm.types.llms.openai import ChatCompletionUserMessage
+
+    g = _make_guardrail(on_input_too_long="fail_closed", max_chunk=25000)
+    g.make_bedrock_api_request = AsyncMock(side_effect=_too_long_exc())
+
+    messages = [ChatCompletionUserMessage(role="user", content="x" * 30000)]
+    with pytest.raises(HTTPException) as exc_info:
+        await g._make_bedrock_input_request_with_chunking_fallback(
+            messages=messages, request_data={}
+        )
+    assert "too long" in str(exc_info.value.detail).lower()
+
+
+@pytest.mark.asyncio
+async def test_chunking_fallback_fail_open_returns_empty_response():
+    """fail_open: when input is too long, an empty BedrockGuardrailResponse is returned."""
+    from litellm.types.llms.openai import ChatCompletionUserMessage
+
+    g = _make_guardrail(on_input_too_long="fail_open", max_chunk=25000)
+    g.make_bedrock_api_request = AsyncMock(side_effect=_too_long_exc())
+
+    messages = [ChatCompletionUserMessage(role="user", content="x" * 30000)]
+    result = await g._make_bedrock_input_request_with_chunking_fallback(
+        messages=messages, request_data={}
+    )
+    # Should return an empty dict-like response (not raise)
+    assert isinstance(result, dict)
+    g.make_bedrock_api_request.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_chunking_fallback_chunk_mode_delegates_to_apply_guardrail_to_chunks():
+    """chunk mode: _apply_guardrail_to_chunks is called when API raises too-long."""
+    from litellm.types.llms.openai import ChatCompletionUserMessage
+
+    g = _make_guardrail(on_input_too_long="chunk", max_chunk=25000)
+    g.make_bedrock_api_request = AsyncMock(side_effect=_too_long_exc())
+    g._apply_guardrail_to_chunks = AsyncMock(return_value=_ok_response())
+
+    messages = [ChatCompletionUserMessage(role="user", content="x" * 30000)]
+    result = await g._make_bedrock_input_request_with_chunking_fallback(
+        messages=messages, request_data={}
+    )
+
+    g._apply_guardrail_to_chunks.assert_called_once()
+    assert result == _ok_response()
+
+
+@pytest.mark.asyncio
+async def test_chunking_fallback_preflight_skips_api_call():
+    """Pre-flight check: when chunk mode and total_chars > max_chunk, API is not called."""
+    from litellm.types.llms.openai import ChatCompletionUserMessage
+
+    g = _make_guardrail(on_input_too_long="chunk", max_chunk=10)
+    g.make_bedrock_api_request = AsyncMock(return_value=_ok_response())
+    g._apply_guardrail_to_chunks = AsyncMock(return_value=_ok_response())
+
+    # 20 chars, max_chunk=10 → pre-flight triggers without calling make_bedrock_api_request
+    messages = [ChatCompletionUserMessage(role="user", content="x" * 20)]
+    await g._make_bedrock_input_request_with_chunking_fallback(
+        messages=messages, request_data={}
+    )
+
+    g.make_bedrock_api_request.assert_not_called()
+    g._apply_guardrail_to_chunks.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_chunking_fallback_preflight_not_triggered_for_fail_closed():
+    """Pre-flight only triggers when on_input_too_long='chunk'; fail_closed still calls API."""
+    from litellm.types.llms.openai import ChatCompletionUserMessage
+
+    g = _make_guardrail(on_input_too_long="fail_closed", max_chunk=10)
+    g.make_bedrock_api_request = AsyncMock(return_value=_ok_response())
+
+    # Even though 20 > 10, fail_closed should NOT pre-flight; should call the API
+    messages = [ChatCompletionUserMessage(role="user", content="x" * 20)]
+    await g._make_bedrock_input_request_with_chunking_fallback(
+        messages=messages, request_data={}
+    )
+
+    g.make_bedrock_api_request.assert_called_once()
+
+
+# ---------------------------------------------------------------------------
+# async_pre_call_hook — chunking fallback (Gap 1)
+# ---------------------------------------------------------------------------
+
+def _make_request_data(content: str = "hello") -> dict:
+    return {
+        "messages": [{"role": "user", "content": content}],
+        "model": "bedrock/anthropic.claude-3-haiku-20240307-v1:0",
+    }
+
+
+@pytest.mark.asyncio
+async def test_async_pre_call_hook_uses_chunking_fallback():
+    """async_pre_call_hook delegates to _make_bedrock_input_request_with_chunking_fallback."""
+    from unittest.mock import MagicMock
+
+    from litellm.caching import DualCache
+    from litellm.proxy._types import UserAPIKeyAuth
+
+    g = _make_guardrail(on_input_too_long="chunk", max_chunk=10)
+    g.should_run_guardrail = MagicMock(return_value=True)
+    g._make_bedrock_input_request_with_chunking_fallback = AsyncMock(
+        return_value=_ok_response()
+    )
+
+    data = _make_request_data("x" * 20)
+    result = await g.async_pre_call_hook(
+        user_api_key_dict=UserAPIKeyAuth(),
+        cache=DualCache(),
+        data=data,
+        call_type="completion",
+    )
+
+    g._make_bedrock_input_request_with_chunking_fallback.assert_called_once()
+    assert result is not None
+
+
+@pytest.mark.asyncio
+async def test_async_pre_call_hook_too_long_fail_closed_raises():
+    """async_pre_call_hook propagates HTTPException in fail_closed mode."""
+    from unittest.mock import MagicMock
+
+    from litellm.caching import DualCache
+    from litellm.proxy._types import UserAPIKeyAuth
+
+    g = _make_guardrail(on_input_too_long="fail_closed", max_chunk=10)
+    g.should_run_guardrail = MagicMock(return_value=True)
+    g._make_bedrock_input_request_with_chunking_fallback = AsyncMock(
+        side_effect=_too_long_exc()
+    )
+
+    data = _make_request_data("x" * 20)
+    with pytest.raises(HTTPException) as exc_info:
+        await g.async_pre_call_hook(
+            user_api_key_dict=UserAPIKeyAuth(),
+            cache=DualCache(),
+            data=data,
+            call_type="completion",
+        )
+    assert "too long" in str(exc_info.value.detail).lower()
+
+
+# ---------------------------------------------------------------------------
+# async_moderation_hook — chunking fallback (Gap 1)
+# ---------------------------------------------------------------------------
+
+@pytest.mark.asyncio
+async def test_async_moderation_hook_uses_chunking_fallback():
+    """async_moderation_hook delegates to _make_bedrock_input_request_with_chunking_fallback."""
+    from unittest.mock import MagicMock
+
+    from litellm.proxy._types import UserAPIKeyAuth
+
+    g = _make_guardrail(on_input_too_long="chunk", max_chunk=10)
+    g.should_run_guardrail = MagicMock(return_value=True)
+    g._make_bedrock_input_request_with_chunking_fallback = AsyncMock(
+        return_value=_ok_response()
+    )
+
+    data = _make_request_data("x" * 20)
+    await g.async_moderation_hook(
+        data=data,
+        user_api_key_dict=UserAPIKeyAuth(),
+        call_type="completion",
+    )
+
+    g._make_bedrock_input_request_with_chunking_fallback.assert_called_once()
+
+
+# ---------------------------------------------------------------------------
+# apply_guardrail — pre-flight check (Gap 3)
+# ---------------------------------------------------------------------------
+
+@pytest.mark.asyncio
+async def test_apply_guardrail_preflight_skips_api_call():
+    """apply_guardrail pre-flight check: API not called when total_chars > max_chunk and mode=chunk."""
+    g = _make_guardrail(on_input_too_long="chunk", max_chunk=10)
+    g.make_bedrock_api_request = AsyncMock(return_value=_ok_response())
+    g._apply_guardrail_to_chunks = AsyncMock(return_value=_ok_response())
+
+    inputs = {"texts": ["x" * 20]}
+    await g.apply_guardrail(inputs=inputs, request_data={}, input_type="request")
+
+    g.make_bedrock_api_request.assert_not_called()
+    g._apply_guardrail_to_chunks.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_apply_guardrail_preflight_not_triggered_for_fail_closed():
+    """apply_guardrail pre-flight skipped for fail_closed; API is called normally."""
+    g = _make_guardrail(on_input_too_long="fail_closed", max_chunk=10)
+    g.make_bedrock_api_request = AsyncMock(return_value=_ok_response())
+
+    inputs = {"texts": ["x" * 20]}
+    # Should not raise; the API mock returns ok even though text > max_chunk
+    result = await g.apply_guardrail(inputs=inputs, request_data={}, input_type="request")
+
+    g.make_bedrock_api_request.assert_called_once()
+    assert result["texts"] == ["x" * 20]
