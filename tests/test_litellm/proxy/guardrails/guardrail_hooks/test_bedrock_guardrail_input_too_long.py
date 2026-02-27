@@ -978,3 +978,126 @@ async def test_async_post_call_success_hook_uses_output_fallback():
     )
 
     g._make_bedrock_output_request_with_chunking_fallback.assert_called_once()
+
+
+# ---------------------------------------------------------------------------
+# Gap 1 — apply_guardrail with input_type="response"
+# ---------------------------------------------------------------------------
+
+@pytest.mark.asyncio
+async def test_apply_guardrail_response_type_calls_output_fallback():
+    """input_type='response' calls _make_bedrock_output_request_with_chunking_fallback,
+    not the INPUT path (make_bedrock_api_request with source='INPUT')."""
+    g = _make_guardrail()
+    g._make_bedrock_output_request_with_chunking_fallback = AsyncMock(
+        return_value=_ok_response()
+    )
+    g.make_bedrock_api_request = AsyncMock(return_value=_ok_response())
+
+    inputs = {"texts": ["hello", "world"]}
+    result = await g.apply_guardrail(inputs=inputs, request_data={}, input_type="response")
+
+    # Output fallback must have been called once
+    g._make_bedrock_output_request_with_chunking_fallback.assert_called_once()
+    # INPUT path (make_bedrock_api_request) must NOT have been reached
+    g.make_bedrock_api_request.assert_not_called()
+    # Originals unchanged (ok response has no masking)
+    assert result["texts"] == ["hello", "world"]
+
+
+@pytest.mark.asyncio
+async def test_apply_guardrail_response_type_preflight_chunks():
+    """Pre-flight chunking triggers for input_type='response' when text > max_chunk."""
+    g = _make_guardrail(on_input_too_long="chunk", max_chunk=10)
+    g.make_bedrock_api_request = AsyncMock(return_value=_ok_response())
+    g._apply_output_guardrail_to_chunks = AsyncMock(return_value=_ok_response())
+
+    inputs = {"texts": ["x" * 20]}  # 20 chars > max_chunk=10
+    await g.apply_guardrail(inputs=inputs, request_data={}, input_type="response")
+
+    # Pre-flight inside _make_bedrock_output_request_with_chunking_fallback must
+    # skip the direct API call and go straight to chunking.
+    g.make_bedrock_api_request.assert_not_called()
+    g._apply_output_guardrail_to_chunks.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_apply_guardrail_response_type_masked_text_extracted():
+    """Masked text from output guardrail is applied to result for input_type='response'."""
+    from litellm.types.proxy.guardrails.guardrail_hooks.bedrock_guardrails import (
+        BedrockGuardrailOutput,
+    )
+
+    g = _make_guardrail()
+    masked_response = BedrockGuardrailResponse(
+        action="GUARDRAIL_INTERVENED",
+        outputs=[BedrockGuardrailOutput(text="masked output")],
+        assessments=[],
+    )
+    g._make_bedrock_output_request_with_chunking_fallback = AsyncMock(
+        return_value=masked_response
+    )
+
+    inputs = {"texts": ["original text"]}
+    result = await g.apply_guardrail(inputs=inputs, request_data={}, input_type="response")
+
+    assert result["texts"] == ["masked output"]
+
+
+# ---------------------------------------------------------------------------
+# Gap 3 — async_post_call_success_hook early-cancel on blocked output
+# ---------------------------------------------------------------------------
+
+@pytest.mark.asyncio
+async def test_post_call_success_hook_early_cancel_on_output_block():
+    """When output validation task raises, the sibling input task is cancelled (Gap 3)."""
+    import asyncio
+
+    import litellm
+    from litellm.proxy._types import UserAPIKeyAuth
+    from litellm.types.utils import Choices, Message
+
+    # event_hook="post_call" ensures should_validate_input=True
+    # (neither pre_call nor during_call is in the hook, so input is validated here)
+    g = BedrockGuardrail(
+        guardrailIdentifier="test-id",
+        guardrailVersion="1",
+        event_hook="post_call",
+    )
+    g._load_credentials = MagicMock(return_value=(MagicMock(), "us-east-1"))
+    g._prepare_request = MagicMock(
+        return_value=MagicMock(url="http://x", body=b"", headers={})
+    )
+    g.should_run_guardrail = MagicMock(return_value=True)
+
+    input_cancelled = {"value": False}
+
+    async def _slow_input(messages, request_data):
+        try:
+            await asyncio.sleep(10)
+        except asyncio.CancelledError:
+            input_cancelled["value"] = True
+            raise
+        return _ok_response()  # pragma: no cover
+
+    async def _blocked_output(response, request_data):
+        raise HTTPException(
+            status_code=400, detail={"error": "Violated guardrail policy"}
+        )
+
+    g._make_bedrock_input_request_with_chunking_fallback = _slow_input
+    g._make_bedrock_output_request_with_chunking_fallback = _blocked_output
+
+    response = litellm.ModelResponse(
+        choices=[Choices(message=Message(content="hello", role="assistant"))]
+    )
+    with pytest.raises(HTTPException):
+        await g.async_post_call_success_hook(
+            user_api_key_dict=UserAPIKeyAuth(),
+            response=response,
+            data={"messages": [{"role": "user", "content": "test"}]},
+        )
+
+    # Give the event loop a tick to process the CancelledError in the slow task
+    await asyncio.sleep(0)
+    assert input_cancelled["value"] is True
