@@ -63,6 +63,7 @@ from litellm.types.utils import (
     CallTypesLiteral,
     Choices,
     GuardrailStatus,
+    Message,
     ModelResponse,
     ModelResponseStream,
     StreamingChoices,
@@ -70,6 +71,7 @@ from litellm.types.utils import (
 )
 
 GUARDRAIL_NAME = "bedrock"
+_CHUNK_COUNT_WARNING_THRESHOLD = 4
 
 
 class GuardrailMessageFilterResult(NamedTuple):
@@ -132,6 +134,7 @@ class BedrockGuardrail(CustomGuardrail, BaseAWSLLM):
         on_flagged: Optional[str] = "block",
         on_input_too_long: str = "fail_closed",
         bedrock_guardrail_max_chunk_size: int = 25000,
+        guardrail_max_chunk_concurrency: int = 10,
         **kwargs,
     ):
         self.async_handler = get_async_httpx_client(
@@ -169,6 +172,12 @@ class BedrockGuardrail(CustomGuardrail, BaseAWSLLM):
         self.bedrock_guardrail_max_chunk_size: int = bedrock_guardrail_max_chunk_size
         """
         Maximum characters per Bedrock guardrail API call when on_input_too_long='chunk'.
+        """
+
+        self.guardrail_max_chunk_concurrency: int = guardrail_max_chunk_concurrency
+        """
+        Maximum concurrent Bedrock API calls when chunks are processed in parallel.
+        Prevents connection storms against the ApplyGuardrail endpoint at high throughput.
         """
 
         # Set supported event hooks to include MCP hooks
@@ -1004,13 +1013,14 @@ class BedrockGuardrail(CustomGuardrail, BaseAWSLLM):
             input_messages = input_filter.payload_messages or new_messages
 
             # Create tasks for parallel execution of both INPUT and OUTPUT validation.
-            # INPUT uses the chunking-fallback wrapper so on_input_too_long is honoured.
+            # Both use the chunking-fallback wrappers so on_input_too_long is honoured
+            # for INPUT and OUTPUT alike (Gap A).
             input_task = self._make_bedrock_input_request_with_chunking_fallback(
                 messages=input_messages,
                 request_data=data,
             )
-            output_task = self.make_bedrock_api_request(
-                source="OUTPUT", response=response, request_data=data
+            output_task = self._make_bedrock_output_request_with_chunking_fallback(
+                response=response, request_data=data
             )
 
             # Execute both requests in parallel
@@ -1023,8 +1033,10 @@ class BedrockGuardrail(CustomGuardrail, BaseAWSLLM):
         else:
             # Only run OUTPUT validation (INPUT was already validated in pre_call or during_call)
             try:
-                output_content_bedrock = await self.make_bedrock_api_request(
-                    source="OUTPUT", response=response, request_data=data
+                output_content_bedrock = (
+                    await self._make_bedrock_output_request_with_chunking_fallback(
+                        response=response, request_data=data
+                    )
                 )
             except GuardrailInterventionNormalStringError as e:
                 output_content_bedrock = e.message
@@ -1100,9 +1112,19 @@ class BedrockGuardrail(CustomGuardrail, BaseAWSLLM):
         request_data: dict,
     ) -> AsyncGenerator[ModelResponseStream, None]:
         """
-        Process streaming response chunks.
+        Process streaming response chunks through the Bedrock guardrail.
 
-        Collect content from the stream and make parallel bedrock api requests to get the guardrail responses.
+        **Streaming buffer note (Gap F):** This hook must buffer the *entire*
+        stream before calling Bedrock's ``ApplyGuardrail`` API because that API
+        is synchronous and requires the complete text.  As a result, the caller
+        will not receive any tokens until the full response has been assembled
+        and checked.  This is an architectural limitation of the
+        ``ApplyGuardrail`` endpoint — it cannot be resolved by changing this
+        hook.
+
+        Operators who need streaming latency-sensitive guardrail checks should
+        use ``mode: pre_call`` so the guardrail runs on the request (INPUT)
+        before the LLM call rather than on the assembled response.
         """
         from litellm.llms.base_llm.base_model_iterator import MockResponseIterator
         from litellm.main import stream_chunk_builder
@@ -1138,7 +1160,8 @@ class BedrockGuardrail(CustomGuardrail, BaseAWSLLM):
 
             if should_validate_input:
                 # Create tasks for parallel execution.
-                # INPUT uses the chunking-fallback wrapper so on_input_too_long is honoured.
+                # Both use chunking-fallback wrappers so on_input_too_long is
+                # honoured for INPUT and OUTPUT alike (Gap A).
                 input_filter = self._prepare_guardrail_messages_for_role(
                     messages=request_data.get("messages")
                 )
@@ -1149,9 +1172,10 @@ class BedrockGuardrail(CustomGuardrail, BaseAWSLLM):
                     messages=input_messages,
                     request_data=request_data,
                 )
-                output_task = self.make_bedrock_api_request(
-                    source="OUTPUT", response=assembled_model_response
-                )  # Only response
+                output_task = self._make_bedrock_output_request_with_chunking_fallback(
+                    response=assembled_model_response,
+                    request_data=request_data,
+                )
 
                 # Execute both requests in parallel
                 try:
@@ -1163,8 +1187,11 @@ class BedrockGuardrail(CustomGuardrail, BaseAWSLLM):
             else:
                 # Only run OUTPUT validation (INPUT was already validated in pre_call or during_call)
                 try:
-                    output_guardrail_response = await self.make_bedrock_api_request(
-                        source="OUTPUT", response=assembled_model_response
+                    output_guardrail_response = (
+                        await self._make_bedrock_output_request_with_chunking_fallback(
+                            response=assembled_model_response,
+                            request_data=request_data,
+                        )
                     )
                 except GuardrailInterventionNormalStringError as e:
                     output_guardrail_response = e.message
@@ -1396,9 +1423,21 @@ class BedrockGuardrail(CustomGuardrail, BaseAWSLLM):
 
     @staticmethod
     def _is_input_too_long_error(e: HTTPException) -> bool:
-        """Return True if the HTTPException is a Bedrock 'Input is too long' error."""
+        """Return True if the HTTPException is a Bedrock 'Input is too long' error.
+
+        Performs two checks to handle AWS phrasing variations:
+        1. Primary: exact substring "input is too long" (case-insensitive)
+        2. Secondary: "too long" on a 400 response (catches variants like
+           "input text is too long")
+        """
         detail = getattr(e, "detail", "") or ""
-        return "input is too long" in str(detail).lower()
+        detail_str = str(detail).lower()
+        if "input is too long" in detail_str:
+            return True
+        # Catch AWS phrasing variations (e.g. "input text is too long")
+        if e.status_code == 400 and "too long" in detail_str:
+            return True
+        return False
 
     def _extract_texts_from_messages(
         self, messages: List[AllMessageValues]
@@ -1461,6 +1500,67 @@ class BedrockGuardrail(CustomGuardrail, BaseAWSLLM):
                 # else: fail_closed — fall through to re-raise
             raise
 
+    def _extract_texts_from_response(self, response: Any) -> List[str]:
+        """Extract all text content strings from a ModelResponse's choices."""
+        texts: List[str] = []
+        if isinstance(response, litellm.ModelResponse):
+            for choice in response.choices:
+                if isinstance(choice, Choices):
+                    if choice.message.content and isinstance(
+                        choice.message.content, str
+                    ):
+                        texts.append(choice.message.content)
+        return texts
+
+    async def _make_bedrock_output_request_with_chunking_fallback(
+        self,
+        response: Any,
+        request_data: dict,
+    ) -> BedrockGuardrailResponse:
+        """
+        Make a Bedrock OUTPUT guardrail request with on_input_too_long handling.
+
+        Mirrors ``_make_bedrock_input_request_with_chunking_fallback`` for the
+        OUTPUT source so that long model responses are handled gracefully.
+
+        Behaviour on 'Input is too long' (or similar 400) error:
+        - fail_closed (default): re-raises the HTTPException
+        - fail_open: logs a critical warning and returns an empty response
+        - chunk: splits output text into chunks and runs each in parallel (Gap A)
+        """
+        output_texts = self._extract_texts_from_response(response)
+        total_chars = sum(len(t) for t in output_texts)
+
+        # Pre-flight: skip the Bedrock round-trip when we already know the
+        # payload will exceed the limit and chunking is requested.
+        if (
+            total_chars > self.bedrock_guardrail_max_chunk_size
+            and self.on_input_too_long == "chunk"
+        ):
+            return await self._apply_output_guardrail_to_chunks(
+                output_texts=output_texts, request_data=request_data
+            )
+
+        try:
+            return await self.make_bedrock_api_request(
+                source="OUTPUT", response=response, request_data=request_data
+            )
+        except HTTPException as exc:
+            if self._is_input_too_long_error(exc):
+                if self.on_input_too_long == "fail_open":
+                    verbose_proxy_logger.critical(
+                        "Bedrock Guardrail: OUTPUT too long, fail-open. "
+                        "Proceeding without guardrail check. guardrail_name=%s",
+                        self.guardrail_name,
+                    )
+                    return BedrockGuardrailResponse()
+                elif self.on_input_too_long == "chunk":
+                    return await self._apply_output_guardrail_to_chunks(
+                        output_texts=output_texts, request_data=request_data
+                    )
+                # else: fail_closed — fall through to re-raise
+            raise
+
     def _split_texts_into_chunks(self, texts: List[str]) -> List[List[str]]:
         """
         Split a list of texts into chunks where total chars per chunk <= max_chunk_size.
@@ -1498,9 +1598,12 @@ class BedrockGuardrail(CustomGuardrail, BaseAWSLLM):
     ) -> BedrockGuardrailResponse:
         """
         Split texts into chunks and apply the Bedrock guardrail to each chunk in
-        parallel via asyncio.gather (Gap 2 — reduces latency from O(n) to O(1)).
+        parallel, bounded by ``guardrail_max_chunk_concurrency`` (Gap 2/B —
+        reduces latency from O(n) to O(1), prevents connection storms).
 
-        If any chunk is BLOCKED the appropriate exception propagates immediately.
+        In-flight tasks are cancelled as soon as one task raises an exception
+        (Gap C — early cancellation avoids wasted Bedrock quota).
+
         Returns a combined BedrockGuardrailResponse that aggregates outputs and
         assessments from all chunks so masked texts from every chunk are preserved
         for PII/masking workflows (Gap 4).
@@ -1516,29 +1619,145 @@ class BedrockGuardrail(CustomGuardrail, BaseAWSLLM):
         if not chunks:
             return BedrockGuardrailResponse()
 
-        async def _call_chunk(chunk_texts: List[str]) -> BedrockGuardrailResponse:
-            chunk_messages: List[AllMessageValues] = [
-                ChatCompletionUserMessage(role="user", content=text)
-                for text in chunk_texts
-            ]
-            # Raises if blocked — propagates through asyncio.gather to the caller
-            return await self.make_bedrock_api_request(
-                source="INPUT",
-                messages=chunk_messages,
-                request_data=request_data,
+        # Warn operator when chunk count is suspiciously high
+        if len(chunks) >= _CHUNK_COUNT_WARNING_THRESHOLD:
+            verbose_proxy_logger.warning(
+                "Bedrock Guardrail: input split into %d chunk(s) "
+                "(bedrock_guardrail_max_chunk_size=%d). "
+                "If you have a raised AWS Bedrock guardrail quota, increase "
+                "bedrock_guardrail_max_chunk_size to match it. guardrail_name=%s",
+                len(chunks),
+                self.bedrock_guardrail_max_chunk_size,
+                self.guardrail_name,
             )
 
-        # Execute all chunks in parallel; first blocked chunk raises immediately
-        chunk_responses: List[BedrockGuardrailResponse] = list(
-            await asyncio.gather(*[_call_chunk(c) for c in chunks])
-        )
+        sem = asyncio.Semaphore(self.guardrail_max_chunk_concurrency)
 
-        # Aggregate outputs and assessments from all chunks so masking data is
-        # not discarded (previously only the last chunk's response was returned)
+        async def _call_chunk(chunk_texts: List[str]) -> BedrockGuardrailResponse:
+            async with sem:
+                chunk_messages: List[AllMessageValues] = [
+                    ChatCompletionUserMessage(role="user", content=text)
+                    for text in chunk_texts
+                ]
+                return await self.make_bedrock_api_request(
+                    source="INPUT",
+                    messages=chunk_messages,
+                    request_data=request_data,
+                )
+
+        tasks = [asyncio.create_task(_call_chunk(c)) for c in chunks]
+        chunk_responses = await self._gather_with_early_cancel(tasks)
+        return self._aggregate_input_chunk_responses(chunk_responses)
+
+    async def _apply_output_guardrail_to_chunks(
+        self,
+        output_texts: List[str],
+        request_data: dict,
+    ) -> BedrockGuardrailResponse:
+        """
+        Split output texts into chunks and apply the Bedrock guardrail to each
+        chunk in parallel, bounded by ``guardrail_max_chunk_concurrency``.
+
+        Each chunk is wrapped in a synthetic ModelResponse so that
+        ``_create_bedrock_output_content_request`` can serialise it correctly.
+
+        In-flight tasks are cancelled as soon as one raises an exception (early
+        cancellation, Gap C).  Returns a combined BedrockGuardrailResponse whose
+        outputs entries contain the concatenated masked text so that
+        ``_apply_masking_to_model_response`` receives a single coherent string.
+        """
+        chunks: List[List[str]] = self._split_texts_into_chunks(output_texts)
+        verbose_proxy_logger.info(
+            "Bedrock Guardrail: chunking OUTPUT into %d chunk(s) "
+            "(max_chunk_size=%d), guardrail_name=%s",
+            len(chunks),
+            self.bedrock_guardrail_max_chunk_size,
+            self.guardrail_name,
+        )
+        if not chunks:
+            return BedrockGuardrailResponse()
+
+        # Warn when unusually many chunks are needed
+        if len(chunks) >= _CHUNK_COUNT_WARNING_THRESHOLD:
+            verbose_proxy_logger.warning(
+                "Bedrock Guardrail: OUTPUT split into %d chunk(s) "
+                "(bedrock_guardrail_max_chunk_size=%d). "
+                "If you have a raised AWS Bedrock guardrail quota, increase "
+                "bedrock_guardrail_max_chunk_size to match it. guardrail_name=%s",
+                len(chunks),
+                self.bedrock_guardrail_max_chunk_size,
+                self.guardrail_name,
+            )
+
+        sem = asyncio.Semaphore(self.guardrail_max_chunk_concurrency)
+
+        async def _call_chunk(chunk_texts: List[str]) -> BedrockGuardrailResponse:
+            async with sem:
+                # Build a synthetic ModelResponse containing one choice per text
+                synthetic_response = litellm.ModelResponse(
+                    choices=[
+                        Choices(message=Message(content=text, role="assistant"))
+                        for text in chunk_texts
+                    ]
+                )
+                return await self.make_bedrock_api_request(
+                    source="OUTPUT",
+                    response=synthetic_response,
+                    request_data=request_data,
+                )
+
+        tasks = [asyncio.create_task(_call_chunk(c)) for c in chunks]
+        chunk_responses = await self._gather_with_early_cancel(tasks)
+        return self._aggregate_output_chunk_responses(chunk_responses)
+
+    async def _gather_with_early_cancel(
+        self,
+        tasks: List["asyncio.Task[BedrockGuardrailResponse]"],
+    ) -> List[BedrockGuardrailResponse]:
+        """
+        Await all tasks and return their results in the original task order.
+
+        If any task raises an exception, all still-pending tasks are immediately
+        cancelled (early-cancel, Gap C) to avoid wasting Bedrock quota, and the
+        first exception is re-raised.
+        """
+        try:
+            done, pending = await asyncio.wait(
+                tasks, return_when=asyncio.FIRST_EXCEPTION
+            )
+        except BaseException:
+            for t in tasks:
+                t.cancel()
+            raise
+
+        # Cancel any tasks that are still running (they were pending when a
+        # sibling raised an exception)
+        for t in pending:
+            t.cancel()
+
+        # Surface the first exception from the completed set
+        for t in done:
+            if not t.cancelled():
+                exc = t.exception()
+                if exc is not None:
+                    raise exc
+
+        # All tasks completed successfully — return results in submission order
+        return [t.result() for t in tasks]
+
+    def _aggregate_input_chunk_responses(
+        self, responses: List[BedrockGuardrailResponse]
+    ) -> BedrockGuardrailResponse:
+        """
+        Combine per-chunk INPUT responses into a single BedrockGuardrailResponse.
+
+        Extends ``outputs`` and ``assessments`` from all chunks so masking data
+        is not discarded (Gap 4).
+        """
         combined_outputs: List[BedrockGuardrailOutput] = []
         combined_assessments: List[BedrockGuardrailAssessment] = []
         combined_action: Optional[str] = "NONE"
-        for resp in chunk_responses:
+        for resp in responses:
             combined_outputs.extend(resp.get("outputs") or [])
             combined_assessments.extend(resp.get("assessments") or [])
             if resp.get("action") == "GUARDRAIL_INTERVENED":
@@ -1548,6 +1767,42 @@ class BedrockGuardrail(CustomGuardrail, BaseAWSLLM):
         combined["action"] = combined_action
         combined["outputs"] = combined_outputs
         combined["assessments"] = combined_assessments
+        return combined
+
+    def _aggregate_output_chunk_responses(
+        self, responses: List[BedrockGuardrailResponse]
+    ) -> BedrockGuardrailResponse:
+        """
+        Combine per-chunk OUTPUT responses into a single BedrockGuardrailResponse.
+
+        For OUTPUT, the masked text parts from all chunks are **concatenated**
+        into a single ``BedrockGuardrailOutput`` entry so that
+        ``_apply_masking_to_model_response`` receives one reconstructed string
+        that maps to the single choice in the original ModelResponse.
+
+        Without this, only the first chunk's masked text would be applied.
+        """
+        combined_assessments: List[BedrockGuardrailAssessment] = []
+        combined_action: Optional[str] = "NONE"
+        all_masked_parts: List[str] = []
+
+        for resp in responses:
+            combined_assessments.extend(resp.get("assessments") or [])
+            if resp.get("action") == "GUARDRAIL_INTERVENED":
+                combined_action = "GUARDRAIL_INTERVENED"
+            for output in resp.get("outputs") or []:
+                text = output.get("text")
+                if text is not None:
+                    all_masked_parts.append(text)
+
+        combined: BedrockGuardrailResponse = BedrockGuardrailResponse()
+        combined["action"] = combined_action
+        combined["assessments"] = combined_assessments
+        if all_masked_parts:
+            concatenated_text = "".join(all_masked_parts)
+            combined["outputs"] = [BedrockGuardrailOutput(text=concatenated_text)]
+        else:
+            combined["outputs"] = []
         return combined
 
     async def apply_guardrail(

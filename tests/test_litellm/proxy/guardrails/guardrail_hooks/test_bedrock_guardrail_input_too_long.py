@@ -608,3 +608,373 @@ async def test_apply_guardrail_preflight_not_triggered_for_fail_closed():
 
     g.make_bedrock_api_request.assert_called_once()
     assert result["texts"] == ["x" * 20]
+
+
+# ---------------------------------------------------------------------------
+# Gap E — _is_input_too_long_error phrasing variations
+# ---------------------------------------------------------------------------
+
+def test_is_input_too_long_error_variation():
+    """'input text is too long' (AWS phrasing variation) matches on a 400."""
+    exc = HTTPException(status_code=400, detail="input text is too long")
+    assert BedrockGuardrail._is_input_too_long_error(exc) is True
+
+
+def test_is_input_too_long_error_too_long_non_400_no_match():
+    """'too long' on a non-400 status code does NOT match."""
+    exc = HTTPException(status_code=500, detail="response too long")
+    assert BedrockGuardrail._is_input_too_long_error(exc) is False
+
+
+def test_is_input_too_long_error_too_long_400_matches():
+    """'too long' on a 400 status code matches (catches AWS phrasing variations)."""
+    exc = HTTPException(status_code=400, detail="the text is too long for this API")
+    assert BedrockGuardrail._is_input_too_long_error(exc) is True
+
+
+# ---------------------------------------------------------------------------
+# Gap B/C — _gather_with_early_cancel
+# ---------------------------------------------------------------------------
+
+@pytest.mark.asyncio
+async def test_gather_with_early_cancel_all_pass():
+    """All tasks succeed — results returned in original submission order."""
+    import asyncio
+
+    from litellm.types.proxy.guardrails.guardrail_hooks.bedrock_guardrails import (
+        BedrockGuardrailResponse,
+    )
+
+    g = _make_guardrail()
+
+    resp_a = BedrockGuardrailResponse(action="NONE", outputs=[], assessments=[])
+    resp_b = BedrockGuardrailResponse(action="NONE", outputs=[], assessments=[])
+
+    async def _coro_a():
+        return resp_a
+
+    async def _coro_b():
+        return resp_b
+
+    tasks = [asyncio.create_task(_coro_a()), asyncio.create_task(_coro_b())]
+    results = await g._gather_with_early_cancel(tasks)
+
+    assert results[0] is resp_a
+    assert results[1] is resp_b
+
+
+@pytest.mark.asyncio
+async def test_gather_with_early_cancel_cancels_pending_on_block():
+    """When one task raises, pending tasks are cancelled."""
+    import asyncio
+
+    g = _make_guardrail()
+
+    cancelled_flag = {"value": False}
+
+    async def _slow_task():
+        try:
+            await asyncio.sleep(10)  # long enough that it won't complete naturally
+        except asyncio.CancelledError:
+            cancelled_flag["value"] = True
+            raise
+
+    async def _failing_task():
+        raise HTTPException(status_code=400, detail="Violated guardrail policy")
+
+    # Failing task first so it resolves before the slow one
+    slow = asyncio.create_task(_slow_task())
+    fail = asyncio.create_task(_failing_task())
+
+    with pytest.raises(HTTPException):
+        await g._gather_with_early_cancel([fail, slow])
+
+    # Give the event loop a tick to process the cancellation
+    await asyncio.sleep(0)
+    assert cancelled_flag["value"] is True
+
+
+# ---------------------------------------------------------------------------
+# Gap B — concurrency cap (_apply_guardrail_to_chunks semaphore)
+# ---------------------------------------------------------------------------
+
+@pytest.mark.asyncio
+async def test_apply_guardrail_to_chunks_respects_concurrency_cap():
+    """Semaphore limits simultaneous Bedrock calls to guardrail_max_chunk_concurrency."""
+    import asyncio
+
+    max_concurrent = 2
+    g = _make_guardrail(max_chunk=5)
+    g.guardrail_max_chunk_concurrency = max_concurrent
+
+    active_calls: list = []
+    peak_concurrent = {"value": 0}
+
+    async def _mock_api(**_kwargs):
+        active_calls.append(1)
+        peak_concurrent["value"] = max(peak_concurrent["value"], len(active_calls))
+        await asyncio.sleep(0)  # yield so other tasks can try to acquire the semaphore
+        active_calls.pop()
+        return _ok_response()
+
+    g.make_bedrock_api_request = _mock_api
+
+    # 5 chunks of 5 chars each
+    texts = ["aaaaa", "bbbbb", "ccccc", "ddddd", "eeeee"]
+    await g._apply_guardrail_to_chunks(texts=texts, request_data={})
+
+    assert peak_concurrent["value"] <= max_concurrent
+
+
+# ---------------------------------------------------------------------------
+# Gap D — high-chunk-count warning
+# ---------------------------------------------------------------------------
+
+@pytest.mark.asyncio
+async def test_apply_guardrail_to_chunks_warns_high_chunk_count(caplog):
+    """A warning is emitted when the chunk count reaches _CHUNK_COUNT_WARNING_THRESHOLD."""
+    import logging
+
+    from litellm.proxy.guardrails.guardrail_hooks.bedrock_guardrails import (
+        _CHUNK_COUNT_WARNING_THRESHOLD,
+    )
+
+    g = _make_guardrail(max_chunk=5)
+    g.make_bedrock_api_request = AsyncMock(return_value=_ok_response())
+
+    # Generate exactly _CHUNK_COUNT_WARNING_THRESHOLD chunks (5 chars each, max=5)
+    texts = ["aaaaa"] * _CHUNK_COUNT_WARNING_THRESHOLD
+
+    with caplog.at_level(logging.WARNING, logger="LiteLLM Proxy"):
+        await g._apply_guardrail_to_chunks(texts=texts, request_data={})
+
+    warning_messages = " ".join(caplog.messages)
+    assert "chunk" in warning_messages.lower() or len(caplog.records) > 0
+
+
+# ---------------------------------------------------------------------------
+# Gap A — _extract_texts_from_response
+# ---------------------------------------------------------------------------
+
+def test_extract_texts_from_response_single_choice():
+    """Single-choice ModelResponse returns list with that text."""
+    import litellm
+    from litellm.types.utils import Choices, Message
+
+    g = _make_guardrail()
+    response = litellm.ModelResponse(
+        choices=[Choices(message=Message(content="hello world", role="assistant"))]
+    )
+    texts = g._extract_texts_from_response(response)
+    assert texts == ["hello world"]
+
+
+def test_extract_texts_from_response_empty():
+    """Non-ModelResponse input returns empty list."""
+    g = _make_guardrail()
+    assert g._extract_texts_from_response(None) == []
+    assert g._extract_texts_from_response("not a response") == []
+
+
+def test_extract_texts_from_response_multiple_choices():
+    """Multiple choices each contribute their text."""
+    import litellm
+    from litellm.types.utils import Choices, Message
+
+    g = _make_guardrail()
+    response = litellm.ModelResponse(
+        choices=[
+            Choices(message=Message(content="first", role="assistant")),
+            Choices(message=Message(content="second", role="assistant")),
+        ]
+    )
+    texts = g._extract_texts_from_response(response)
+    assert texts == ["first", "second"]
+
+
+# ---------------------------------------------------------------------------
+# Gap A — _aggregate_output_chunk_responses
+# ---------------------------------------------------------------------------
+
+def test_aggregate_output_chunk_responses_concatenates_masked_text():
+    """Masked text parts from multiple chunks are concatenated into one output."""
+    from litellm.types.proxy.guardrails.guardrail_hooks.bedrock_guardrails import (
+        BedrockGuardrailOutput,
+        BedrockGuardrailResponse,
+    )
+
+    g = _make_guardrail()
+    chunk1 = BedrockGuardrailResponse(
+        action="GUARDRAIL_INTERVENED",
+        outputs=[BedrockGuardrailOutput(text="part1 ")],
+        assessments=[],
+    )
+    chunk2 = BedrockGuardrailResponse(
+        action="GUARDRAIL_INTERVENED",
+        outputs=[BedrockGuardrailOutput(text="part2")],
+        assessments=[],
+    )
+    result = g._aggregate_output_chunk_responses([chunk1, chunk2])
+
+    assert result["action"] == "GUARDRAIL_INTERVENED"
+    outputs = result.get("outputs") or []
+    assert len(outputs) == 1
+    assert outputs[0].get("text") == "part1 part2"
+
+
+def test_aggregate_output_chunk_responses_no_masked_text():
+    """When no chunks have masked text, outputs is empty."""
+    from litellm.types.proxy.guardrails.guardrail_hooks.bedrock_guardrails import (
+        BedrockGuardrailResponse,
+    )
+
+    g = _make_guardrail()
+    chunk1 = BedrockGuardrailResponse(action="NONE", outputs=[], assessments=[])
+    result = g._aggregate_output_chunk_responses([chunk1])
+
+    assert result["action"] == "NONE"
+    assert result.get("outputs") == []
+
+
+# ---------------------------------------------------------------------------
+# Gap A — _apply_output_guardrail_to_chunks
+# ---------------------------------------------------------------------------
+
+@pytest.mark.asyncio
+async def test_apply_output_guardrail_to_chunks_passes():
+    """All output chunks pass → combined action is NONE."""
+    import litellm
+    from litellm.types.utils import Choices, Message
+
+    g = _make_guardrail(max_chunk=5)
+    g.make_bedrock_api_request = AsyncMock(return_value=_ok_response())
+
+    texts = ["aaaaa", "bbbbb"]
+    result = await g._apply_output_guardrail_to_chunks(
+        output_texts=texts, request_data={}
+    )
+
+    assert result["action"] == "NONE"
+    assert g.make_bedrock_api_request.call_count == 2
+
+
+@pytest.mark.asyncio
+async def test_apply_output_guardrail_to_chunks_blocked_raises():
+    """A blocked output chunk raises HTTPException."""
+    g = _make_guardrail(max_chunk=5)
+    block_exc = HTTPException(
+        status_code=400, detail={"error": "Violated guardrail policy"}
+    )
+    g.make_bedrock_api_request = AsyncMock(side_effect=block_exc)
+
+    with pytest.raises(HTTPException):
+        await g._apply_output_guardrail_to_chunks(
+            output_texts=["aaaaa"], request_data={}
+        )
+
+
+# ---------------------------------------------------------------------------
+# Gap A — _make_bedrock_output_request_with_chunking_fallback
+# ---------------------------------------------------------------------------
+
+@pytest.mark.asyncio
+async def test_make_bedrock_output_request_with_chunking_fallback_preflight():
+    """Pre-flight: when chunk mode and output > max_chunk, API is skipped."""
+    import litellm
+    from litellm.types.utils import Choices, Message
+
+    g = _make_guardrail(on_input_too_long="chunk", max_chunk=10)
+    g.make_bedrock_api_request = AsyncMock(return_value=_ok_response())
+    g._apply_output_guardrail_to_chunks = AsyncMock(return_value=_ok_response())
+
+    response = litellm.ModelResponse(
+        choices=[Choices(message=Message(content="x" * 20, role="assistant"))]
+    )
+    await g._make_bedrock_output_request_with_chunking_fallback(
+        response=response, request_data={}
+    )
+
+    g.make_bedrock_api_request.assert_not_called()
+    g._apply_output_guardrail_to_chunks.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_make_bedrock_output_request_with_chunking_fallback_fail_open():
+    """fail_open: 'output is too long' → returns empty response without raising."""
+    import litellm
+    from litellm.types.utils import Choices, Message
+
+    g = _make_guardrail(on_input_too_long="fail_open", max_chunk=25000)
+    g.make_bedrock_api_request = AsyncMock(
+        side_effect=HTTPException(status_code=400, detail="Input is too long.")
+    )
+
+    response = litellm.ModelResponse(
+        choices=[Choices(message=Message(content="x" * 30000, role="assistant"))]
+    )
+    result = await g._make_bedrock_output_request_with_chunking_fallback(
+        response=response, request_data={}
+    )
+
+    assert isinstance(result, dict)
+    g.make_bedrock_api_request.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_make_bedrock_output_request_with_chunking_fallback_fail_closed():
+    """fail_closed: 'output is too long' → re-raises HTTPException."""
+    import litellm
+    from litellm.types.utils import Choices, Message
+
+    g = _make_guardrail(on_input_too_long="fail_closed", max_chunk=25000)
+    g.make_bedrock_api_request = AsyncMock(
+        side_effect=HTTPException(status_code=400, detail="Input is too long.")
+    )
+
+    response = litellm.ModelResponse(
+        choices=[Choices(message=Message(content="x" * 30000, role="assistant"))]
+    )
+    with pytest.raises(HTTPException) as exc_info:
+        await g._make_bedrock_output_request_with_chunking_fallback(
+            response=response, request_data={}
+        )
+    assert exc_info.value.status_code == 400
+
+
+# ---------------------------------------------------------------------------
+# Gap A — async_post_call_success_hook uses output chunking fallback
+# ---------------------------------------------------------------------------
+
+@pytest.mark.asyncio
+async def test_async_post_call_success_hook_uses_output_fallback():
+    """async_post_call_success_hook delegates OUTPUT to _make_bedrock_output_request_with_chunking_fallback."""
+    import litellm
+    from litellm.proxy._types import UserAPIKeyAuth
+    from litellm.types.utils import Choices, Message
+
+    g = _make_guardrail(on_input_too_long="chunk", max_chunk=10)
+    g.should_run_guardrail = MagicMock(return_value=True)
+    g._make_bedrock_output_request_with_chunking_fallback = AsyncMock(
+        return_value=_ok_response()
+    )
+    # Stub INPUT path to avoid real calls
+    g._make_bedrock_input_request_with_chunking_fallback = AsyncMock(
+        return_value=_ok_response()
+    )
+    # Prevent INPUT validation running (simulate pre_call already ran)
+    g._event_hook_is_event_type = MagicMock(return_value=True)
+
+    response = litellm.ModelResponse(
+        choices=[Choices(message=Message(content="hello", role="assistant"))]
+    )
+    data = {
+        "messages": [{"role": "user", "content": "hi"}],
+        "model": "bedrock/anthropic.claude-3-haiku-20240307-v1:0",
+    }
+    await g.async_post_call_success_hook(
+        data=data,
+        user_api_key_dict=UserAPIKeyAuth(),
+        response=response,
+    )
+
+    g._make_bedrock_output_request_with_chunking_fallback.assert_called_once()
