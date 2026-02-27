@@ -138,9 +138,13 @@ async def anthropic_messages(
     # Anthropic custom: {"type":"custom","name":…,"description":…,"input_schema":{…}}
     if tools:
         for tool in tools:
-            if isinstance(tool, dict) and tool.get("type") == "function":
+            # Only normalize OpenAI-style tools that have the nested "function" object.
+            # Anthropic-native tools may also carry type="function" but have no nested
+            # "function" key — those must be left unchanged.
+            if isinstance(tool, dict) and tool.get("type") == "function" and "function" in tool:
                 fn = tool.pop("function", {})
-                tool["type"] = "custom"
+                # Standard Anthropic tools don't use a "type" field; remove it.
+                tool.pop("type", None)
                 if "name" not in tool and "name" in fn:
                     tool["name"] = fn["name"]
                 if "description" not in tool and "description" in fn:
