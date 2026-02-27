@@ -18,7 +18,7 @@ import {
   updateConfigFieldSetting,
   deleteConfigFieldSetting,
 } from "./networking";
-import { InputNumber } from "antd";
+import { InputNumber, Switch } from "antd";
 import { TrashIcon, CheckCircleIcon } from "@heroicons/react/outline";
 
 import RouterSettings from "./router_settings";
@@ -57,6 +57,16 @@ const GeneralSettings: React.FC<GeneralSettingsPageProps> = ({ accessToken, user
       setting.field_name === fieldName ? { ...setting, field_value: newValue } : setting,
     );
     setGeneralSettings(updatedSettings);
+
+    // Auto-save Boolean toggles immediately on change
+    const setting = generalSettings.find((s) => s.field_name === fieldName);
+    if (setting?.field_type === "Boolean" && accessToken) {
+      updateConfigFieldSetting(accessToken, fieldName, newValue).then(() => {
+        setGeneralSettings((prev) =>
+          prev.map((s) => (s.field_name === fieldName ? { ...s, field_value: newValue, stored_in_db: true } : s)),
+        );
+      }).catch(() => {});
+    }
   };
 
   const handleUpdateField = (fieldName: string, idx: number) => {
@@ -164,6 +174,11 @@ const GeneralSettings: React.FC<GeneralSettingsPageProps> = ({ accessToken, user
                               step={1}
                               value={value.field_value}
                               onChange={(newValue) => handleInputChange(value.field_name, newValue)} // Handle value change
+                            />
+                          ) : value.field_type == "Boolean" ? (
+                            <Switch
+                              checked={value.field_value === true || value.field_value === "true"}
+                              onChange={(checked) => handleInputChange(value.field_name, checked)}
                             />
                           ) : null}
                         </TableCell>

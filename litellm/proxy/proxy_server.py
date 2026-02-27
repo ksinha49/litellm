@@ -11504,6 +11504,7 @@ async def get_config_list(
         "maximum_spend_logs_retention_period": {"type": "String"},
         "mcp_internal_ip_ranges": {"type": "List"},
         "mcp_trusted_proxy_ranges": {"type": "List"},
+        "enable_public_model_hub": {"type": "Boolean"},
     }
 
     return_val = []
