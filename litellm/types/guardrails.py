@@ -339,6 +339,7 @@ class BedrockGuardrailConfigModel(BaseModel):
             "'fail_open' logs a critical warning and allows the request to proceed. "
             "'chunk' splits input into chunks and applies the guardrail to each (AWS-recommended)."
         ),
+        json_schema_extra={"type": "radio"},
     )
     bedrock_guardrail_max_chunk_size: int = Field(
         default=25000,

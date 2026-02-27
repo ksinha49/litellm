@@ -1141,7 +1141,7 @@ def _build_field_dict(
             field_dict["options"] = list_element_options
             field_dict["type"] = "multiselect"
 
-    elif field_type == "select":
+    elif field_type in ("select", "radio"):
         # For Literal[...] types, extract the allowed values as options
         literal_options = _extract_literal_values(field_annotation)
         if literal_options:

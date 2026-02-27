@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Form, Select, Spin, Input } from "antd";
+import { Form, Select, Spin, Input, Radio } from "antd";
 import {
   guardrail_provider_map,
   populateGuardrailProviders,
@@ -162,7 +162,15 @@ const GuardrailProviderFields: React.FC<GuardrailProviderFieldsProps> = ({
           tooltip={field.description}
           rules={field.required ? [{ required: true, message: `${fieldKey} is required` }] : undefined}
         >
-          {field.type === "select" && field.options ? (
+          {field.type === "radio" && field.options ? (
+            <Radio.Group defaultValue={fieldValue || field.default_value}>
+              {field.options.map((option) => (
+                <Radio key={option} value={option}>
+                  {option}
+                </Radio>
+              ))}
+            </Radio.Group>
+          ) : field.type === "select" && field.options ? (
             <Select placeholder={field.description} defaultValue={fieldValue || field.default_value}>
               {field.options.map((option) => (
                 <Select.Option key={option} value={option}>
