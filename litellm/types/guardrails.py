@@ -774,11 +774,21 @@ class LitellmParams(
     )
     @classmethod
     def normalize_lowercase(cls, v):
-        """Normalize string and list fields to lowercase for ALL guardrail types."""
+        """Normalize string and list fields to lowercase for ALL guardrail types.
+
+        Encrypted values (format: "{8hex}:{base64}") are left untouched —
+        lowercasing base64 ciphertext corrupts it irreversibly.
+        """
+        import re
+        _ENCRYPTED_RE = re.compile(r'^[0-9a-f]{8}:[A-Za-z0-9+/]+=*$')
         if isinstance(v, str):
-            return v.lower()
+            return v if _ENCRYPTED_RE.match(v) else v.lower()
         if isinstance(v, list):
-            return [x.lower() if isinstance(x, str) else x for x in v]
+            return [
+                x if (isinstance(x, str) and _ENCRYPTED_RE.match(x)) else
+                (x.lower() if isinstance(x, str) else x)
+                for x in v
+            ]
         return v
 
     def __init__(self, **kwargs):
